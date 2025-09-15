@@ -144,7 +144,7 @@ async def process_chat(session_id: str, message: str):
                     pass
 
             session["campaign_data"] = final_data
-            return JSONResponse(content={"status": "completed", "basic": final_data})
+            return JSONResponse(content={"status": "completed", "data": final_data})
         except json.JSONDecodeError:
             return JSONResponse(content={"status": "error", "message": "Invalid JSON from AI"})
 

@@ -88,6 +88,7 @@ import shutil
 from fastapi import FastAPI, UploadFile, File
 from PyPDF2 import PdfReader
 from pdf2image import convert_from_path
+from pdf2image.exceptions import PDFInfoNotInstalledError
 import pytesseract
 from openai import OpenAI
 
@@ -98,25 +99,36 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # ---------------------------
 # Extract text from PDF (OCR)
 # ---------------------------
+POPPLER_PATH = r"C:\Users\CEPL\Downloads\Release-25.07.0-0\poppler-25.07.0\Library\bin" 
+pytesseract.pytesseract.tesseract_cmd = r"C:\Users\CEPL\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+
 def extract_text_from_pdf(file_path: str) -> str:
     text = ""
     try:
-        # First try extracting selectable text
         reader = PdfReader(file_path)
         for page in reader.pages:
             page_text = page.extract_text()
             if page_text:
                 text += page_text + "\n"
 
-        # If no text found, fallback to OCR
-        if not text.strip():
-            pages = convert_from_path(file_path)
-            for page in pages:
-                text += pytesseract.image_to_string(page) + "\n"
+        if text.strip():
+            print("[INFO] Extracted text directly from PDF")
+        else:
+            print("[INFO] No selectable text found, trying OCR...")
+            try:
+                pages = convert_from_path(file_path, poppler_path=POPPLER_PATH)
+                print(f"[INFO] OCR mode: {len(pages)} pages found")
+                for i, page in enumerate(pages):
+                    ocr_text = pytesseract.image_to_string(page)
+                    print(f"[DEBUG] OCR Page {i+1} length: {len(ocr_text.strip())}")
+                    text += ocr_text + "\n"
+            except Exception as e:
+                print("[ERROR] OCR failed:", e)
 
     except Exception as e:
-        print("PDF extraction failed:", e)
+        print("[ERROR] PDF extraction failed:", e)
     return text
+
 
 # ---------------------------
 # Split text into chunks
