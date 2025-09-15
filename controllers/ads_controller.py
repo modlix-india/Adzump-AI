@@ -1,0 +1,155 @@
+from typing import List
+from pydantic import BaseModel
+from fastapi import APIRouter, UploadFile,File,HTTPException
+from fastapi.responses import JSONResponse
+from services.scraper_service import scrape_website
+from services.summary import make_readable
+from services.ads_service import generate_ad_assets
+from services import keyword_service
+from services.pdf_service import process_pdf
+from services.summary_service import merge_summaries
+from services.google_ads_builder import build_google_ads_payloads
+from services.banners import generate_banners
+
+router = APIRouter()
+
+
+class BannerRequest(BaseModel):
+    data: dict  
+
+@router.post("/generate_banners")
+async def create_banners(request: BannerRequest):
+    try:
+        banners = await generate_banners(request.data)
+        return {"banners": banners}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/constructPayloads")
+async def build_payloads(body: dict):
+    try:
+        ads = body.get("ads", {})
+        customer_id = body.get("customerId", "")
+
+        payloads = build_google_ads_payloads(customer_id, ads)
+        return {"success": True, "payloads": payloads}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build payloads: {e}")
+
+class WebsiteAnalysisRequest(BaseModel):
+    websiteUrl: str
+
+@router.post("/scrape")
+async def analyze_website(request: WebsiteAnalysisRequest):
+    try:
+        # Scrape website content asynchronously
+        scraped_data = await scrape_website(request.websiteUrl)
+
+        # Construct final response
+        response = {
+            "status": "success",
+            "data": {
+                "websiteUrl": request.websiteUrl,
+                "scrapedData": scraped_data
+            }
+        }
+
+        return JSONResponse(content=response)
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+    
+
+class ReadableRequest(BaseModel):
+    scrapedData: dict
+
+@router.post("/scrappedSummary")
+async def make_readable_endpoint(req: ReadableRequest):
+    try:
+        result = await make_readable(req.scrapedData)
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return {
+            "status": "success",
+            "data": result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+class AdAssetRequest(BaseModel):
+    summary: str
+
+@router.post("/adAssets")
+async def create_ad_assets(req: AdAssetRequest):
+    try:
+        result = await generate_ad_assets(req.summary)
+
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return {
+            "status": "success",
+            "data": {
+                "headlines": result.get("headlines", []),
+                "descriptions": result.get("descriptions", []),
+                "audience": {
+                    "gender": result.get("audience", {}).get("gender", []),
+                    "age_range": result.get("audience", {}).get("age_range", [])
+                }
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+agent = keyword_service.StreamlinedKeywordAgent()
+    
+
+class KeywordRequest(BaseModel):
+    scraped_data: str
+    customer_id: str
+    url: str 
+
+
+@router.post("/keywords")
+async def generate_keywords(req: KeywordRequest):
+    try:
+        result = agent.run_full_pipeline(
+            scraped_data=req.scraped_data,
+            customer_id=req.customer_id,
+            url=req.url
+        )
+
+        return {
+            "status": "success",
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/summarize-pdf")
+async def summarize_pdf(file: UploadFile = File(...)):
+    result = process_pdf(file.file, file.filename)
+    return result
+
+
+class SummariesRequest(BaseModel):
+    summaries: List[str]
+
+@router.post("/merge-summaries")
+async def merge_summaries_endpoint(request: SummariesRequest):
+    final_summary = merge_summaries(request.summaries)
+    return {
+        "success": True if request.summaries else False,
+        "input_count": len(request.summaries),
+        "final_summary": final_summary
+    }
