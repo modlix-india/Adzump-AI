@@ -78,7 +78,6 @@ class StreamlinedKeywordAgent:
 
             self.google_ads_client = GoogleAdsClient.load_from_dict(
                 google_ads_config)
-            logger.info("Successfully initialized API clients")
         except Exception as e:
             logger.exception("Failed to setup APIs: %s", e)
             raise
