@@ -1,13 +1,17 @@
+import os
+import tempfile
+from typing import Any, Dict, List
 from typing import List,Dict,Any
 from pydantic import BaseModel
-from fastapi import APIRouter, UploadFile,File,HTTPException
+from fastapi import APIRouter,HTTPException
 from fastapi.responses import JSONResponse
+import requests
 from services.scraper_service import scrape_website
+from services.summarise_external_links import summarize_with_context
 from services.summary import make_readable
 from services.ads_service import generate_ad_assets
-from services import keyword_service
-from services import keyword_planner
-from services.pdf_service import process_pdf
+from services import keyword_planner, keyword_service
+from services.pdf_service import process_pdf_from_path
 from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
@@ -216,3 +220,114 @@ async def merge_summaries_endpoint(request: SummariesRequest):
         "input_count": len(request.summaries),
         "final_summary": final_summary
     }
+class SummarizeRequest(BaseModel):
+    pdf_url: str
+
+@router.post("/summarize-pdf")
+async def summarize_pdf(request: SummarizeRequest):
+    try:
+        pdf_url = request.pdf_url
+        # Download PDF from given URL
+        response = requests.get(pdf_url, stream=True)
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Could not download PDF")
+
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            for chunk in response.iter_content(chunk_size=8192):
+                tmp_file.write(chunk)
+            tmp_file_path = tmp_file.name
+
+        # Process PDF
+        result = process_pdf_from_path(tmp_file_path, pdf_url)
+
+        # Cleanup
+        os.remove(tmp_file_path)
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+class SummaryRequest(BaseModel):
+    scrapedData: dict
+    context:str
+
+@router.post("/externalSummary")
+async def fetch_exteranl_summary(req: SummaryRequest):
+    try:
+        result = await summarize_with_context(req.scrapedData, req.context)
+        if "error" in result:
+            raise HTTPException(status_code=500, detail=result["error"])
+
+        return {
+            "status": "success",
+            "data": result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+# positive keywords endPoint
+keywordAgent = keyword_planner.AIKeywordAgent()
+class PositiveKeywordRequest(BaseModel):
+    scraped_data: str
+    customer_id: str
+    url: str = None
+    seed_count: int = 40
+    target_count: int = 50
+
+@router.post("/positiveKeywords")
+async def generate_positive_keywords(req: PositiveKeywordRequest):
+    try:
+        result = keywordAgent.run_positive_pipeline(
+            scraped_data =req.scraped_data,
+            url=req.url,
+            customer_id =req.customer_id
+        )
+        return {
+            "status":"Success",
+            "data":result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500,details=str(e))
+    
+# negative keyword endPoint
+class NegativeKeywordRequest(BaseModel):
+    scraped_data:str
+    url:str=None
+    positive_keywords:List[Dict[str,Any]]
+
+@router.post("/negativeKeywords")
+async def generateNegativeKeywords(req:NegativeKeywordRequest):
+    try:
+        result = keywordAgent.run_negative_pipeline(
+            scraped_data= req.scraped_data,
+            url=req.url,
+            optimized_positive_keywords=req.positive_keywords
+        )
+        return{
+            "status":"Success",
+            "data":result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500,details=str(e))
+    
+# Endpoint for the full(positive and negative) keywords generation
+# used the above keywordRequest class
+@router.post("/keywordSuggestions")
+async def generateKeywordSuggestions(req:KeywordRequest):
+    try:
+        result = keywordAgent.run_keywords_pipeline(
+            scraped_data=req.scraped_data,
+            url=req.url,
+            customer_id=req.customer_id
+        )
+        return {
+            "status":"Success",
+            "data":result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500,details=str(e))

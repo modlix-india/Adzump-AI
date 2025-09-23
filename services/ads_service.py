@@ -24,7 +24,7 @@ Here is the JSON data:
 1. **Headlines**
    - Generate between 8 and 12 unique headlines.
    - Each headline must be short, catchy, and persuasive.
-   - Length: strictly 15 characters.
+   - Length: strictly 20-25 characters.
    - Headlines should highlight the strongest benefits, offers, or unique features.
    - Avoid quotation marks, emojis, or unnecessary punctuation.
    - Each headline must be unique (no repetitions).

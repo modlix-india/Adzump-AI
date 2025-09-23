@@ -24,23 +24,27 @@ Rules:
    - websiteURL (must be a valid http/https URL)
    - budget (accept only numbers, e.g., "5000")
    - durationDays (number of days to run the campaign)
-5. When the user provides duration, always respond with a JSON like:
-   {{ "durationDays": 7 }}
-   (replace 7 with the actual number of days provided by user).
-6. Do NOT ask for location, campaign type, or goals.
+5. If the user provides ALL details at once:
+   - Validate each field using the rules below.
+   - If everything is valid, show the user the complete summary and ask:
+     "Please confirm if everything is correct (yes/no)."
+6. If the user provides details one by one:
+   - After each field, respond with TWO things:
+     a) A JSON object containing only the field you just captured.
+     b) A follow-up question asking for the next missing detail.
 7. Validation rules for budget:
    - Accept only numbers (like "5000" or "20000").
    - Do NOT accept text like "five thousand".
 8. Validation rules for websiteURL:
    - Must start with http:// or https://
    - If invalid, ask the user again until they provide a valid URL.
-9. When a user provides a field value, you must respond with TWO things:
-   a) A JSON object containing only the field you just captured. Example:
-      {{ "businessName": "Earthen Eambience" }}
-   b) A follow-up question asking for the next missing detail.
-10. After you collect all four fields, always show the user a summary of the details
-   AND end with this exact sentence (do not change wording at all):
-   "Please confirm if everything is correct (yes/no)."
+9. When a user provides duration, always respond with a JSON like:
+   {{ "durationDays": 7 }}
+   (replace 7 with the actual number of days provided by user).
+10. After you collect all four fields (either step by step or all at once),
+    always show the user a summary of the details
+    AND end with this exact sentence (do not change wording at all):
+    "Please confirm if everything is correct (yes/no)."
 11. If user confirms with "yes", output ONLY the final JSON and end.
 12. If user says "no", ask them what needs to be corrected and then continue.
 
@@ -95,13 +99,15 @@ async def process_chat(session_id: str, message: str):
                     try:
                         days = int(new_data["durationDays"])
                         start_date = datetime.now().date()
+                        print("Python datetime.now():", datetime.now())
+                        print("Python datetime.now(timezone.utc):", datetime.now(timezone.utc))         
                         end_date = start_date + timedelta(days=days)
                         new_data["startDate"] = start_date.strftime("%Y-%m-%d")
                         new_data["endDate"] = end_date.strftime("%Y-%m-%d")
-                        new_data.pop("durationDays", None)
+                        # new_data.pop("durationDays", None)
                     except ValueError:
                         pass
-                # ✅ Changed: always merge into collected_data
+                # Changed: always merge into collected_data
                 collected_data.update(new_data)
                 session["campaign_data"] = collected_data
                 collected_this_turn = new_data
@@ -132,9 +138,9 @@ async def process_chat(session_id: str, message: str):
             final_data = {**session.get("campaign_data", {}), **parsed}
 
             # Convert durationDays if still present
-            if "durationDays" in final_data:
+            if "startDate" in final_data or "endDate" in final_data or "durationDays" in final_data:
                 try:
-                    days = int(final_data["durationDays"])
+                    days = int(final_data.get("durationDays", 7))  # fallback 7 days
                     start_date = datetime.now().date()
                     end_date = start_date + timedelta(days=days)
                     final_data["startDate"] = start_date.strftime("%Y-%m-%d")
@@ -144,7 +150,8 @@ async def process_chat(session_id: str, message: str):
                     pass
 
             session["campaign_data"] = final_data
-            return JSONResponse(content={"status": "completed", "basic": final_data})
+            return JSONResponse(content={"status": "completed", "data": final_data})
+            
         except json.JSONDecodeError:
             return JSONResponse(content={"status": "error", "message": "Invalid JSON from AI"})
 

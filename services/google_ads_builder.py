@@ -178,11 +178,11 @@ def build_google_ads_payloads(customer_id, ads):
     start_date = ads.get("startDate")
     end_date = ads.get("endDate")
     goal = ads.get("goal", "leads")
-    final_urls = [ads.get("url")] if ads.get("url") else []
+    final_urls = [ads.get("websiteURL")] if ads.get("websiteURL") else []
 
     locations = ads.get("locations", [])
     age_range = ads.get("age_range", [])
-    genders = ads.get("gender", [])
+    genders = ads.get("genders", [])
 
     headlines = ads.get("headlines", [])
     descriptions = ads.get("descriptions", [])
@@ -243,6 +243,7 @@ def build_google_ads_payloads(customer_id, ads):
                     "name": f"{safe_name} Campaign {get_unique_suffix()}",
                     "status": "ENABLED",
                     "advertisingChannelType": "SEARCH",
+                    "contains_eu_political_advertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
                     "maximizeConversions": {} if goal == "leads" else {},
                     **({"startDate": start_date} if start_date else {}),
                     **({"endDate": end_date} if end_date else {}),
