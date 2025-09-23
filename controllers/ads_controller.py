@@ -1,6 +1,7 @@
 import os
 import tempfile
 from typing import Any, Dict, List
+from typing import List,Dict,Any
 from pydantic import BaseModel
 from fastapi import APIRouter,HTTPException
 from fastapi.responses import JSONResponse
@@ -122,7 +123,6 @@ class KeywordRequest(BaseModel):
     customer_id: str
     url: str 
 
-
 @router.post("/keywords")
 async def generate_keywords(req: KeywordRequest):
     try:
@@ -138,6 +138,75 @@ async def generate_keywords(req: KeywordRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# positive keywords endPoint
+keywordAgent = keyword_planner.AIKeywordAgent()
+class PositiveKeywordRequest(BaseModel):
+    scraped_data: str
+    customer_id: str
+    url: str = None
+    seed_count: int = 40
+    target_count: int = 50
+
+@router.post("/positiveKeywords")
+async def generate_positive_keywords(req: PositiveKeywordRequest):
+    try:
+        result = keywordAgent.run_positive_pipeline(
+            scraped_data =req.scraped_data,
+            url=req.url,
+            customer_id =req.customer_id
+        )
+        return {
+            "status":"Success",
+            "data":result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500,details=str(e))
+    
+# negative keyword endPoint
+class NegativeKeywordRequest(BaseModel):
+    scraped_data:str
+    url:str=None
+    positive_keywords:List[Dict[str,Any]]
+
+@router.post("/negativeKeywords")
+async def generateNegativeKeywords(req:NegativeKeywordRequest):
+    try:
+        result = keywordAgent.run_negative_pipeline(
+            scraped_data= req.scraped_data,
+            url=req.url,
+            optimized_positive_keywords=req.positive_keywords
+        )
+        return{
+            "status":"Success",
+            "data":result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500,details=str(e))
+    
+# Endpoint for the full(positive and negative) keywords generation
+# used the above keywordRequest class
+@router.post("/keywordSuggestions")
+async def generateKeywordSuggestions(req:KeywordRequest):
+    try:
+        result = keywordAgent.run_keywords_pipeline(
+            scraped_data=req.scraped_data,
+            url=req.url,
+            customer_id=req.customer_id
+        )
+        return {
+            "status":"Success",
+            "data":result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500,details=str(e))
+
+
+
+# @router.post("/summarize-pdf")
+# async def summarize_pdf(file: UploadFile = File(...)):
+#     result = process_pdf(file.file, file.filename)
+#     return result
 
 
 class SummariesRequest(BaseModel):

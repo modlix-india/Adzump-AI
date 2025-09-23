@@ -1,4 +1,6 @@
 .env
-__pycache__/
+.idea
+DS.iml
+__pycache__
 *.py[cod]
 venv/
