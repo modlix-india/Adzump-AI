@@ -90,11 +90,12 @@ async def make_readable_endpoint(req: ReadableRequest):
 
 class AdAssetRequest(BaseModel):
     summary: str
+    positive_keywords: List[Dict[str, Any]] = []
 
 @router.post("/adAssets")
 async def create_ad_assets(req: AdAssetRequest):
     try:
-        result = await generate_ad_assets(req.summary)
+        result = await generate_ad_assets(req.summary, req.positive_keywords)
 
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
@@ -113,102 +114,6 @@ async def create_ad_assets(req: AdAssetRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-
-agent = keyword_service.StreamlinedKeywordAgent()
-    
-
-class KeywordRequest(BaseModel):
-    scraped_data: str
-    customer_id: str
-    url: str 
-
-@router.post("/keywords")
-async def generate_keywords(req: KeywordRequest):
-    try:
-        result = agent.run_full_pipeline(
-            scraped_data=req.scraped_data,
-            customer_id=req.customer_id,
-            url=req.url
-        )
-
-        return {
-            "status": "success",
-            "data": result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# positive keywords endPoint
-keywordAgent = keyword_planner.AIKeywordAgent()
-class PositiveKeywordRequest(BaseModel):
-    scraped_data: str
-    customer_id: str
-    url: str = None
-    seed_count: int = 40
-    target_count: int = 50
-
-@router.post("/positiveKeywords")
-async def generate_positive_keywords(req: PositiveKeywordRequest):
-    try:
-        result = keywordAgent.run_positive_pipeline(
-            scraped_data =req.scraped_data,
-            url=req.url,
-            customer_id =req.customer_id
-        )
-        return {
-            "status":"Success",
-            "data":result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500,details=str(e))
-    
-# negative keyword endPoint
-class NegativeKeywordRequest(BaseModel):
-    scraped_data:str
-    url:str=None
-    positive_keywords:List[Dict[str,Any]]
-
-@router.post("/negativeKeywords")
-async def generateNegativeKeywords(req:NegativeKeywordRequest):
-    try:
-        result = keywordAgent.run_negative_pipeline(
-            scraped_data= req.scraped_data,
-            url=req.url,
-            optimized_positive_keywords=req.positive_keywords
-        )
-        return{
-            "status":"Success",
-            "data":result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500,details=str(e))
-    
-# Endpoint for the full(positive and negative) keywords generation
-# used the above keywordRequest class
-@router.post("/keywordSuggestions")
-async def generateKeywordSuggestions(req:KeywordRequest):
-    try:
-        result = keywordAgent.run_keywords_pipeline(
-            scraped_data=req.scraped_data,
-            url=req.url,
-            customer_id=req.customer_id
-        )
-        return {
-            "status":"Success",
-            "data":result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500,details=str(e))
-
-
-
-# @router.post("/summarize-pdf")
-# async def summarize_pdf(file: UploadFile = File(...)):
-#     result = process_pdf(file.file, file.filename)
-#     return result
-
-
 class SummariesRequest(BaseModel):
     summaries: List[str]
 
@@ -316,7 +221,11 @@ async def generateNegativeKeywords(req:NegativeKeywordRequest):
         raise HTTPException(status_code=500,details=str(e))
     
 # Endpoint for the full(positive and negative) keywords generation
-# used the above keywordRequest class
+class KeywordRequest(BaseModel):
+    scraped_data: str
+    customer_id: str
+    url: str 
+
 @router.post("/keywordSuggestions")
 async def generateKeywordSuggestions(req:KeywordRequest):
     try:

@@ -10,39 +10,43 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 executor = ThreadPoolExecutor()
 
-def generate_ad_assets_sync(summary):
+def generate_ad_assets_sync(summary, positive_keywords):
     try:
         prompt = f"""
 You are a world-class advertising manager, expert copywriter, and SEO strategist.  
 Your task is to analyze the following structured webpage summary JSON and generate **high-quality ad assets**.
 
-Here is the JSON data:
+Here is the summary JSON:
 {json.dumps(summary, indent=2)}
+
+Here are the **positive keywords** you MUST use in the ad assets:
+{json.dumps(positive_keywords, indent=2)}
 
 ### Requirements:
 
 1. **Headlines**
-   - Generate between 8 and 12 unique headlines.
+   - Generate between 12 to 15 unique headlines.
    - Each headline must be short, catchy, and persuasive.
-   - Length: strictly 20-25 characters.
-   - Headlines should highlight the strongest benefits, offers, or unique features.
+   - Length: strictly 20–25 characters (including spaces).
+   - Each headline MUST include at least one keyword from the provided positive keywords.
+   - Highlight benefits, offers, or unique features.
    - Avoid quotation marks, emojis, or unnecessary punctuation.
-   - Each headline must be unique (no repetitions).
+   - Each headline must be unique.
 
 2. **Descriptions**
    - Generate between 2–3 unique ad descriptions.
-   - Each description must be clear, engaging, and persuasive.
-   - Length: strictly between 80–85 characters.
+   - Each description must be 80–85 characters inlcuding spaces.
+   - Each description MUST include at least one keyword from the provided positive keywords.
    - Focus on value proposition, benefits, and differentiation.
    - Vary sentence structures to avoid repetition.
 
 3. **Audience Targeting**
-   - Suggest the most relevant gender(s) for the ads in an array (e.g., ["Male", "Female"]).
-   - Suggest a minimum and maximum age in an array (e.g., [23, 56]).
-   - Base these suggestions strictly on the provided JSON data.
+   - Suggest the most relevant gender(s) in an array (e.g., ["Male", "Female"]).
+   - Suggest a min and max age in an array (e.g., [23, 56]).
+   - Base on the provided JSON data.
 
 ### Output format:
-Return the result **strictly as a valid JSON object** with the following structure:
+Return strictly as a valid JSON object:
 
 {{
   "headlines": ["Headline 1", "Headline 2", ...],
@@ -52,7 +56,6 @@ Return the result **strictly as a valid JSON object** with the following structu
       "age_range": [23, 56]
   }}
 }}
-
 Do not include explanations, comments, or extra text outside the JSON object.
 """
         response = client.chat.completions.create(
@@ -70,6 +73,6 @@ Do not include explanations, comments, or extra text outside the JSON object.
         }
 
 
-async def generate_ad_assets(summary):
+async def generate_ad_assets(summary, positive_keywords):
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(executor, generate_ad_assets_sync, summary)
+    return await loop.run_in_executor(executor, generate_ad_assets_sync, summary,positive_keywords)
