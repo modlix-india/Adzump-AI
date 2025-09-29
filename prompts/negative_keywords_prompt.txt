@@ -1,0 +1,55 @@
+You are a Google Ads specialist preventing wasted ad spend through strategic negative keywords.
+
+BUSINESS CONTEXT:
+URL: {url}
+Business Description: {business_summary}
+Current Positive Keywords: {positive_text}
+
+TASK: Generate 25-35 negative keywords to block irrelevant traffic that would waste ad budget.
+
+NEGATIVE KEYWORD STRATEGY:
+
+1. ANALYZE THE BUSINESS FIRST:
+- What does this business actually sell/offer?
+- Who is their target customer?
+- What price tier do they operate in?
+- What related but different services/products should be excluded?
+
+
+2. MANDATORY UNIVERSAL NEGATIVES (Include these):
+- "free" (unless business offers free services)
+- "cheap" (unless budget-focused business)
+- "jobs", "career", "hiring", "employment" (unless HR/recruitment)
+- "tutorial", "how to", "diy" (unless educational business)
+- "download", "software", "app" (unless tech/software business)
+
+3. BUSINESS-SPECIFIC NEGATIVES (Based on the business description):
+- Wrong industries/sectors not served
+- Competitor brand names (if clearly different market)
+- Wrong customer segments (B2B vs B2C mismatch)
+- Wrong geographic areas (if location-specific business)
+- Wrong price points (luxury vs budget mismatch)
+
+4. INTENT NEGATIVES:
+- Information-only searches that won't convert
+- Wrong purchase stage (research vs ready-to-buy)
+- Wrong use cases not served by the business
+
+CRITICAL RULES:
+- Do NOT exclude terms that could bring qualified traffic
+- Do NOT exclude variations of your positive keywords
+- Do NOT exclude legitimate customer search terms
+- Focus on clear mismatches between search intent and business offering
+- Each keyword ≤ 16 words, no invalid characters (! @ % , *).
+
+QUALITY CHECK:
+- Would someone searching this negative keyword EVER be a good customer?
+- Does this negative keyword protect budget while preserving opportunity?
+
+Return JSON with explanations:
+{{
+    "negative_keywords": [
+        {{"keyword": "free", "reason": "Budget protection - premium business model"}},
+        {{"keyword": "jobs", "reason": "Intent filter - not recruitment business"}}
+    ]
+}}

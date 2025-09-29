@@ -3,14 +3,15 @@ import tempfile
 from typing import Any, Dict, List
 from typing import List,Dict,Any
 from pydantic import BaseModel
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,HTTPException,Request
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
 from services.summarise_external_links import summarize_with_context
 from services.summary import make_readable
 from services.ads_service import generate_ad_assets
-from services import keyword_planner, keyword_service
+from services import keyword_planner
+from services.google_keywords_service import GoogleKeywordService
 from services.pdf_service import process_pdf_from_path
 from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
@@ -240,3 +241,62 @@ async def generateKeywordSuggestions(req:KeywordRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500,details=str(e))
+    
+gks = GoogleKeywordService()
+
+class GoogleKeywordsRequest(BaseModel):
+    scraped_data: str
+    customer_id: str
+    url: str = None
+    location_ids: List[str] = []
+    language_id: int = 1000
+    seed_count: int = 40
+    target_positive_count: int = 30
+
+class GoogleNegativeRequest(BaseModel):
+    scraped_data: str
+    url: str = None
+    positive_keywords: List[Dict[str, Any]]
+
+@router.post("/gks/keywords")
+async def gks_keywords(request: Request, body: GoogleKeywordsRequest):
+    access_token = request.headers.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Missing access_token header")
+    result = gks.execute_keyword_strategy(
+        scraped_data=body.scraped_data,
+        customer_id=body.customer_id,
+        access_token=access_token,
+        location_ids=body.location_ids,
+        url=body.url,
+        language_id=body.language_id,
+        seed_count=body.seed_count,
+        target_positive_count=body.target_positive_count
+    )
+    return {"status": "success", "data": result}
+
+@router.post("/gks/positive")
+async def gks_positive(request: Request, body: GoogleKeywordsRequest):
+    access_token = request.headers.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Missing access_token header")
+    positives = gks.extract_positive_strategy(
+        scraped_data=body.scraped_data,
+        customer_id=body.customer_id,
+        access_token=access_token,
+        location_ids=body.location_ids,
+        url=body.url,
+        language_id=body.language_id,
+        seed_count=body.seed_count,
+        target_positive_count=body.target_positive_count
+    )
+    return {"status": "success", "positive_keywords": positives}
+
+@router.post("/gks/negative")
+async def gks_negative(request: Request, body: GoogleNegativeRequest):
+    negatives = gks.generate_negative_keywords(
+        optimized_positive_keywords=body.positive_keywords,
+        scraped_data=body.scraped_data,
+        url=body.url
+    )
+    return {"status": "success", "negative_keywords": negatives}
