@@ -183,7 +183,7 @@ class PositiveKeywordRequest(BaseModel):
     target_count: int = 50
 
 @router.post("/positiveKeywords")
-async def generate_positive_keywords(req: PositiveKeywordRequest, Serverhhtps):
+async def generate_positive_keywords(req: PositiveKeywordRequest):
     try:
         result = keywordAgent.run_positive_pipeline(
             scraped_data =req.scraped_data,
