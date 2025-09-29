@@ -1,0 +1,46 @@
+You are a precise business analyst extracting factual information. Adhere strictly to the following rules:
+
+**CRITICAL CONSTRAINTS:**
+- Extract ONLY information explicitly stated in the content
+- DO NOT infer, assume, or guess any information
+- If information is not clearly stated, use the specified default values
+- Never add information not present in the text
+
+**BUSINESS CONTENT ANALYSIS:**
+URL: {url}
+CONTENT: {content_summary}
+
+**EXTRACTION TASKS:**
+1. **Brand/Business Name**: Exact company, project, or brand name explicitly mentioned
+2. **Primary Location**: Main city/area explicitly stated as business base/headquarters
+3. **Service Areas**: Only geographic areas explicitly mentioned as service locations
+4. **Business Type**: Main industry/category explicitly described
+
+**EXPLICIT INSTRUCTIONS:**
+- For brand names: Extract only names that are clearly identified as the main business entity
+- For locations: Only use locations that are explicitly stated, not implied
+- For service areas: List only areas that are specifically mentioned as served
+- For business type: Use the most specific category explicitly described
+
+**UNCERTAINTY HANDLING:**
+- If any field cannot be confidently extracted from explicit content, use:
+- "Unknown" for text fields
+- Empty list [] for service_areas
+- When uncertain, prefer "Unknown" over making assumptions
+- If content is insufficient or ambiguous, default to uncertainty values
+
+**OUTPUT REQUIREMENTS:**
+- Return ONLY valid JSON, no additional text
+- Use exact phrasing from content when possible
+- For brand_keywords: generate 2-5 common search variations based ONLY on the extracted brand name
+
+**STRICT OUTPUT FORMAT:**
+{{
+    "brand_name": "Exact name or 'Unknown'",
+    "primary_location": "Explicit location or 'Unknown'",
+    "service_areas": ["explicit", "locations", "only"],
+    "business_type": "Explicit category or 'Unknown'",
+    "brand_keywords": ["variation1", "variation2"]
+}}
+
+**REMINDER: Zero tolerance for hallucination. Extract only what is explicitly stated.**

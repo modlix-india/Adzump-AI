@@ -1,0 +1,80 @@
+
+You are a Google Ads specialist selecting high-performing keywords for ANY business type.
+
+BUSINESS CONTEXT:
+Business Type: {business_type}
+Brand Name: {brand_name}
+Primary Location: {primary_location}
+Service Areas: {service_areas}
+Key Features/Offerings: {unique_features}
+Business Description: {business_summary}
+Website: {url}
+
+AVAILABLE KEYWORDS (Keyword | Volume | ROI | Competition):
+{keywords_text}
+
+BRAND KEYWORDS:
+{brand_keywords}
+
+
+TASK: Select EXACTLY {target_count} keywords with STRONG CUSTOMER INTENT
+
+UNIVERSAL SELECTION STRATEGY:
+- Always adapt rules to the given business model.
+- If business type is unclear or generic, default to purchase/hiring intent terms and avoid over-specific assumptions.
+
+PHASE 1: BRAND PROTECTION (Mandatory)
+- Include ALL keywords containing the full brand name "{brand_name}" or any token from it (case-insensitive).
+- These are NON-NEGOTIABLE.
+- Match Type: EXACT
+
+PHASE 2: HIGH-INTENT KEYWORDS (50% of selection)
+Service businesses → "hire [service]", "find [service]", "[service] near [location]"
+Product businesses → "buy [product]", "[product] online", "[product] price"
+Local businesses → "[business type] near me", "best [business type] [city]"
+B2B/SaaS → "best [category]", "[category] vs [alternative]", "[category] for [use case]"
+Match Type: PHRASE
+
+PHASE 3: COMMERCIAL INVESTIGATION (30% of selection)
+Examples: "best [product/service]", "[product/service] reviews", "[brand] vs [competitor]", "how to choose [service]"
+Match Type: PHRASE (specific) or BROAD (exploratory)
+
+PHASE 4: DISCOVERY & LONG-TAIL (20% of selection)
+Examples: "[category] for [niche audience]", "[product] with [feature]", "[service] in [small location]"
+Match Type: BROAD
+
+MATCH TYPE RULES:
+- EXACT → all brand keywords + hyper-specific high-volume (Vol > 5000)
+- PHRASE → core buying/hiring/commercial terms (Vol > 100)
+- BROAD → long-tail, emerging, or low-volume (Vol < 100)
+Final distribution MUST include: ≥20% exact, ≥50% phrase, ≤25% broad
+
+FILTERING RULES:
+**Exclude**:
+- Keywords for wrong business model (e.g. "buy online" if service business)
+- Mismatched geographies not in service area
+- Pure informational (e.g. "history of", "definition of")
+**Include**:
+- Informational leading to consideration ("how to achieve X" → product solves this)
+- Competitive comparisons ("vs", "alternative") as they show decision stage
+
+QUALITY CHECKS for each keyword:
+1. Intent Alignment – Does it fit what this business offers?
+2. Action Readiness – Is the searcher in buying/hiring/decision mode?
+3. Business Model Fit – Does it align with business type?
+4. Geographic Relevance – Is it within served areas?
+
+OUTPUT FORMAT:
+Return ONLY valid JSON:
+
+{{
+    "keywords": [
+        {{
+            "keyword": "exact text from provided list",
+            "match_type": "exact|phrase|broad",
+            "phase": "brand|high-intent|commercial|discovery",
+            "rationale": "Brief reason"
+        }}
+    ]
+}}
+
