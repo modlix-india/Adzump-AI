@@ -256,22 +256,6 @@ class GoogleNegativeRequest(BaseModel):
     url: str = None
     positive_keywords: List[Dict[str, Any]]
 
-@router.post("/gks/keywords")
-async def gks_keywords(request: Request, body: GoogleKeywordsRequest):
-    access_token = request.headers.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Missing access_token header")
-    result = gks.execute_keyword_strategy(
-        scraped_data=body.scraped_data,
-        customer_id=body.customer_id,
-        access_token=access_token,
-        location_ids=body.location_ids,
-        url=body.url,
-        language_id=body.language_id,
-        seed_count=body.seed_count,
-        target_positive_count=body.target_positive_count
-    )
-    return {"status": "success", "data": result}
 
 @router.post("/gks/positive")
 async def gks_positive(request: Request, body: GoogleKeywordsRequest):

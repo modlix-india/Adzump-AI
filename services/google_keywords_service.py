@@ -6,14 +6,12 @@ import json
 import re
 
 from typing import List, Dict, Set, Any
-from dotenv import load_dotenv
 from utils.text_utils import normalize_text, safe_truncate_to_sentence, get_safety_patterns, setup_apis, get_fallback_negative_keywords
 from utils.prompt_loader import load_prompt
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-load_dotenv()
 
 
 
@@ -483,100 +481,6 @@ class GoogleKeywordService:
         except Exception as e:
             logger.error(f"Negative keyword generation failed: {e}")
             return []
-
-    def execute_keyword_strategy(
-        self,
-        scraped_data: str,
-        customer_id: str,
-        access_token:str,
-        location_ids: List[str],
-        url: str = None,
-        language_id: int = 1000,
-        seed_count: int = 40,
-        target_positive_count: int = 30
-    ) -> Dict[str, Any]:
-
-        start_time = time.time()
-        logger.info("Starting strategic keyword research pipeline")
-
-        try:
-            # STEP 1: Extract business foundation
-            logger.info("STEP 1: Extracting business information and USPs")
-            brand_info = self.extract_business_metadata(scraped_data, url)
-            unique_features = self.extract_business_unique_features(scraped_data)
-            
-            # STEP 2: Generate strategic seeds (brand + services + locations)
-            logger.info("STEP 2: Generating strategic seed keywords")
-            seed_keywords = self.generate_seed_keywords(
-                scraped_data, url, brand_info, unique_features, seed_count
-            )
-
-            logger.info("seed_keywords: %s", seed_keywords)
-            if not seed_keywords:
-                logger.error("No seed keywords generated")
-                return {"positive_keywords": [], "negative_keywords": []}
-
-            # STEP 3: Get Google Ads suggestions
-            logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(seed_keywords))
-            all_suggestions = self.fetch_google_ads_suggestions(
-                customer_id=customer_id,
-                seed_keywords=seed_keywords,
-                access_token = access_token,
-                url=url,
-                location_ids=location_ids,
-                language_id=language_id,
-            )
-
-            # Inject seed keywords back to prevent loss
-            suggestion_texts = {s['keyword'] for s in all_suggestions}
-            for seed in seed_keywords:
-                if seed not in suggestion_texts:
-                    all_suggestions.append({
-                        "keyword": seed,
-                        "volume": 0,
-                        "competition": "UNKNOWN",
-                        "competitionIndex": 0.0,
-                    })
-
-            if not all_suggestions:
-                logger.error("No suggestions from Google Ads API")
-                return {"positive_keywords": [], "negative_keywords": []}
-
-            # STEP 4: Final optimization for intent and match types
-            logger.info("STEP 4: Final optimization for buying intent and match types")
-            optimized_positive = self.select_positive_keywords(
-                all_suggestions, brand_info, unique_features, scraped_data,url, target_positive_count
-            )
-
-            if not optimized_positive:
-                logger.error("No keywords survived optimization - using all suggestions fallback")
-                optimized_positive = all_suggestions[:target_positive_count]
-                for kw in optimized_positive:
-                    kw["match_type"] = "phrase"
-                    kw["rationale"] = "Fallback selection"
-
-            # STEP 5: Generate negative keywords
-            logger.info("STEP 5: Generating negative keywords")
-            negative_keywords = self.generate_negative_keywords(
-                optimized_positive, scraped_data, url
-            )
-
-            result = {
-                "positive_keywords": optimized_positive,
-                "negative_keywords": negative_keywords,
-                "brand_info": brand_info,
-                "unique_features": unique_features
-            }
-
-            total_time = time.time() - start_time
-            logger.info("Complete pipeline completed in %.2f seconds: %d positive, %d negative keywords",
-                        total_time, len(optimized_positive), len(negative_keywords))
-
-            return result
-
-        except Exception as e:
-            logger.exception("Pipeline failed: %s", e)
-            return {"positive_keywords": [], "negative_keywords": []}
 
     def extract_positive_strategy(
         self,
