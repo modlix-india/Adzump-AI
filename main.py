@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from controllers.ads_controller import router as ads_router
-from controllers.chat_controller import router as chat_router
+from apis.ads_api import router as ads_router
+from apis.chat_api import router as chat_router
 from dotenv import load_dotenv
 load_dotenv()  # No-op in prod if no .env is present
 
