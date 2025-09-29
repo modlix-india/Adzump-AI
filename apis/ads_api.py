@@ -9,7 +9,6 @@ from services.scraper_service import scrape_website
 from services.summarise_external_links import summarize_with_context
 from services.summary import make_readable
 from services.ads_service import generate_ad_assets
-from services import keyword_planner
 from services.google_keywords_service import GoogleKeywordService
 from services.pdf_service import process_pdf_from_path
 from services.summary_service import merge_summaries
@@ -174,72 +173,6 @@ async def fetch_exteranl_summary(req: SummaryRequest):
         raise HTTPException(status_code=500, detail=str(e))
     
 
-# positive keywords endPoint
-keywordAgent = keyword_planner.AIKeywordAgent()
-class PositiveKeywordRequest(BaseModel):
-    scraped_data: str
-    customer_id: str
-    url: str = None
-    seed_count: int = 40
-    target_count: int = 50
-
-@router.post("/positiveKeywords")
-async def generate_positive_keywords(req: PositiveKeywordRequest):
-    try:
-        result = keywordAgent.run_positive_pipeline(
-            scraped_data =req.scraped_data,
-            url=req.url,
-            customer_id =req.customer_id
-        )
-        return {
-            "status":"Success",
-            "data":result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500,details=str(e))
-    
-# negative keyword endPoint
-class NegativeKeywordRequest(BaseModel):
-    scraped_data:str
-    url:str=None
-    positive_keywords:List[Dict[str,Any]]
-
-@router.post("/negativeKeywords")
-async def generateNegativeKeywords(req:NegativeKeywordRequest):
-    try:
-        result = keywordAgent.run_negative_pipeline(
-            scraped_data= req.scraped_data,
-            url=req.url,
-            optimized_positive_keywords=req.positive_keywords
-        )
-        return{
-            "status":"Success",
-            "data":result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500,details=str(e))
-    
-# Endpoint for the full(positive and negative) keywords generation
-class KeywordRequest(BaseModel):
-    scraped_data: str
-    customer_id: str
-    url: str 
-
-@router.post("/keywordSuggestions")
-async def generateKeywordSuggestions(req:KeywordRequest):
-    try:
-        result = keywordAgent.run_keywords_pipeline(
-            scraped_data=req.scraped_data,
-            url=req.url,
-            customer_id=req.customer_id
-        )
-        return {
-            "status":"Success",
-            "data":result
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500,details=str(e))
-    
 gks = GoogleKeywordService()
 
 class GoogleKeywordsRequest(BaseModel):
@@ -278,7 +211,7 @@ async def gks_positive(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/gks/negative")
-async def gks_negative(google_keyword_request: GoogleKeywordsRequest, ):
+async def gks_negative(google_keyword_request: GoogleNegativeRequest, ):
     try:
         negatives = gks.generate_negative_keywords(
             optimized_positive_keywords=google_keyword_request.positive_keywords,
