@@ -17,9 +17,7 @@ BRAND KEYWORDS:
 {brand_keywords}
 
 
-═══════════════════════════════════════════════════════════════
 TASK: Select EXACTLY {target_count} keywords with STRONG CUSTOMER INTENT
-═══════════════════════════════════════════════════════════════
 
 UNIVERSAL SELECTION STRATEGY:
 - Always adapt rules to the given business model.
@@ -45,14 +43,12 @@ PHASE 4: DISCOVERY & LONG-TAIL (20% of selection)
 Examples: "[category] for [niche audience]", "[product] with [feature]", "[service] in [small location]"
 Match Type: BROAD
 
-═══════════════════════════════════════════════════════════════
 MATCH TYPE RULES:
 - EXACT → all brand keywords + hyper-specific high-volume (Vol > 5000)
 - PHRASE → core buying/hiring/commercial terms (Vol > 100)
 - BROAD → long-tail, emerging, or low-volume (Vol < 100)
 Final distribution MUST include: ≥20% exact, ≥50% phrase, ≤25% broad
 
-═══════════════════════════════════════════════════════════════
 FILTERING RULES:
 **Exclude**:
 - Keywords for wrong business model (e.g. "buy online" if service business)
@@ -62,14 +58,12 @@ FILTERING RULES:
 - Informational leading to consideration ("how to achieve X" → product solves this)
 - Competitive comparisons ("vs", "alternative") as they show decision stage
 
-═══════════════════════════════════════════════════════════════
 QUALITY CHECKS for each keyword:
 1. Intent Alignment – Does it fit what this business offers?
 2. Action Readiness – Is the searcher in buying/hiring/decision mode?
 3. Business Model Fit – Does it align with business type?
 4. Geographic Relevance – Is it within served areas?
 
-═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT:
 Return ONLY valid JSON:
 
