@@ -6,6 +6,8 @@ import json
 import re
 
 from typing import List, Dict, Set, Any
+
+import oserver
 from utils.text_utils import normalize_text, safe_truncate_to_sentence, get_safety_patterns, setup_apis, get_fallback_negative_keywords
 from utils.prompt_loader import load_prompt
 
@@ -155,15 +157,17 @@ class GoogleKeywordService:
             return []
 
     def fetch_google_ads_suggestions(
-        self,
-        customer_id: str,
-        seed_keywords: List[str],
-        access_token: str,
-        url: str = None,
-        location_ids :List[str] = None,
-        language_id: int = 1000,
-        chunk_size: int = 15,
+            self,
+            customer_id: str,
+            client_code: str,
+            seed_keywords: List[str],
+            url: str = None,
+            location_ids: List[str] = None,
+            language_id: int = 1000,
+            chunk_size: int = 15,
     ) -> List[Dict[str, Any]]:
+
+        access_token = oserver.fetch_google_api_token_simple(client_code)
         
         try:
             if location_ids is None or len(location_ids) == 0:
@@ -407,7 +411,8 @@ class GoogleKeywordService:
                 })
             return fallback
 
-    def generate_negative_keywords(self, optimized_positive_keywords: List[Dict[str, Any]], scraped_data: str, url: str = None) -> List[Dict[str, Any]]:
+    def generate_negative_keywords(self, optimized_positive_keywords: List[Dict[str, Any]], scraped_data: str,
+                                   url: str = None) -> List[Dict[str, Any]]:
 
         try:
             business_summary = safe_truncate_to_sentence(str(scraped_data), 2500)
@@ -415,6 +420,7 @@ class GoogleKeywordService:
             positive_text = ", ".join(positive_terms)
 
             prompt_template = load_prompt('negative_keywords_prompt.txt')
+
             prompt = prompt_template.format(
                 business_summary=business_summary,
                 positive_text=positive_text,
@@ -484,9 +490,9 @@ class GoogleKeywordService:
 
     def extract_positive_strategy(
         self,
+        client_code: str,
         scraped_data: str,
         customer_id: str,
-        access_token:str,
         location_ids: List[str],
         url: str = None,
         language_id: int = 1000,
@@ -517,8 +523,8 @@ class GoogleKeywordService:
             logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(seed_keywords))
             all_suggestions = self.fetch_google_ads_suggestions(
                 customer_id=customer_id,
+                client_code=client_code,
                 seed_keywords=seed_keywords,
-                access_token = access_token,
                 url=url,
                 location_ids=location_ids,
                 language_id=language_id,

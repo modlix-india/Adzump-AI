@@ -2,7 +2,7 @@ import os
 import tempfile
 from typing import List,Dict,Any
 from pydantic import BaseModel
-from fastapi import APIRouter,HTTPException,Request
+from fastapi import APIRouter, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
@@ -258,27 +258,33 @@ class GoogleNegativeRequest(BaseModel):
 
 
 @router.post("/gks/positive")
-async def gks_positive(request: Request, body: GoogleKeywordsRequest):
-    access_token = request.headers.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Missing access_token header")
-    positives = gks.extract_positive_strategy(
-        scraped_data=body.scraped_data,
-        customer_id=body.customer_id,
-        access_token=access_token,
-        location_ids=body.location_ids,
-        url=body.url,
-        language_id=body.language_id,
-        seed_count=body.seed_count,
-        target_positive_count=body.target_positive_count
-    )
-    return {"status": "success", "positive_keywords": positives}
+async def gks_positive(
+        google_keyword_request: GoogleKeywordsRequest,
+        client_code: str = Header(..., alias="clientCode"),
+):
+    try:
+        positives = gks.extract_positive_strategy(
+            scraped_data=google_keyword_request.scraped_data,
+            customer_id=google_keyword_request.customer_id,
+            client_code=client_code,
+            location_ids=google_keyword_request.location_ids,
+            url=google_keyword_request.url,
+            language_id=google_keyword_request.language_id,
+            seed_count=google_keyword_request.seed_count,
+            target_positive_count=google_keyword_request.target_positive_count,
+        )
+        return {"status": "success", "positive_keywords": positives}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/gks/negative")
-async def gks_negative(request: Request, body: GoogleNegativeRequest):
-    negatives = gks.generate_negative_keywords(
-        optimized_positive_keywords=body.positive_keywords,
-        scraped_data=body.scraped_data,
-        url=body.url
-    )
-    return {"status": "success", "negative_keywords": negatives}
+async def gks_negative(google_keyword_request: GoogleKeywordsRequest, ):
+    try:
+        negatives = gks.generate_negative_keywords(
+            optimized_positive_keywords=google_keyword_request.positive_keywords,
+            scraped_data=google_keyword_request.scraped_data,
+            url=google_keyword_request.url
+        )
+        return {"status": "success", "negative_keywords": negatives}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
