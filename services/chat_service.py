@@ -4,7 +4,6 @@ from fastapi.responses import JSONResponse
 from services.openai_client import chat_completion
 from services.session_manager import sessions
 
-
 SESSION_TIMEOUT = timedelta(minutes=30)
 TODAY = datetime.now().strftime("%Y-%m-%d")
 
@@ -58,6 +57,7 @@ Expected Final JSON Format:
 }}
 """
 
+
 def start_session():
     session_id = str(uuid.uuid4())
     sessions[session_id] = {
@@ -67,7 +67,9 @@ def start_session():
     }
     return {"session_id": session_id, "message": "New session started."}
 
+
 async def process_chat(session_id: str, message: str):
+
     if session_id not in sessions:
         return JSONResponse(content={"status": "error", "message": "Invalid or expired session."}, status_code=400)
 
@@ -100,7 +102,7 @@ async def process_chat(session_id: str, message: str):
                         days = int(new_data["durationDays"])
                         start_date = datetime.now().date()
                         print("Python datetime.now():", datetime.now())
-                        print("Python datetime.now(timezone.utc):", datetime.now(timezone.utc))         
+                        print("Python datetime.now(timezone.utc):", datetime.now(timezone.utc))
                         end_date = start_date + timedelta(days=days)
                         new_data["startDate"] = start_date.strftime("%Y-%m-%d")
                         new_data["endDate"] = end_date.strftime("%Y-%m-%d")
@@ -151,7 +153,7 @@ async def process_chat(session_id: str, message: str):
 
             session["campaign_data"] = final_data
             return JSONResponse(content={"status": "completed", "data": final_data})
-            
+
         except json.JSONDecodeError:
             return JSONResponse(content={"status": "error", "message": "Invalid JSON from AI"})
 
@@ -164,6 +166,7 @@ async def process_chat(session_id: str, message: str):
     }
 
     return JSONResponse(content=response)
+
 
 def end_session(session_id: str):
     session = sessions.get(session_id)
