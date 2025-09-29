@@ -1,6 +1,5 @@
 import os
 import tempfile
-from typing import Any, Dict, List
 from typing import List,Dict,Any
 from pydantic import BaseModel
 from fastapi import APIRouter,HTTPException
@@ -16,8 +15,7 @@ from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 
-router = APIRouter()
-
+router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
 class BannerRequest(BaseModel):
     data: dict  
@@ -185,7 +183,7 @@ class PositiveKeywordRequest(BaseModel):
     target_count: int = 50
 
 @router.post("/positiveKeywords")
-async def generate_positive_keywords(req: PositiveKeywordRequest):
+async def generate_positive_keywords(req: PositiveKeywordRequest, Serverhhtps):
     try:
         result = keywordAgent.run_positive_pipeline(
             scraped_data =req.scraped_data,
