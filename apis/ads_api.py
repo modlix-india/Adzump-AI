@@ -14,6 +14,7 @@ from services.pdf_service import process_pdf_from_path
 from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
+from services.optimize_ad import optimize_with_llm
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
@@ -219,5 +220,24 @@ async def gks_negative(google_keyword_request: GoogleNegativeRequest, ):
             url=google_keyword_request.url
         )
         return {"status": "success", "negative_keywords": negatives}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class OptimizeCampaignRequest(BaseModel):
+    campaignData: List[dict]
+    basicData: dict
+
+
+@router.post("/optimize-campaign")
+async def optimize_campaign(req: OptimizeCampaignRequest):
+    try:
+        result = optimize_with_llm({
+            "campaignData": req.campaignData,
+            "basicData": req.basicData
+        })
+        return {
+            "status": "success",
+            "optimizedData": result
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
