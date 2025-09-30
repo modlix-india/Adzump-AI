@@ -12,8 +12,12 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # ---------------------------
 # Extract text from PDF (OCR)
 # ---------------------------
-POPPLER_PATH = r"C:\Users\CEPL\Downloads\Release-25.07.0-0\poppler-25.07.0\Library\bin" 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Users\CEPL\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+TESSERACT_CMD = os.getenv("TESSERACT_CMD")
+if TESSERACT_CMD:
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
+
+# Poppler directory (contains pdftoppm/pdftocairo). Often not needed on Linux when on PATH.
+POPPLER_PATH = os.getenv("POPPLER_PATH")
 
 # ---------------------------
 # Extract text from PDF
