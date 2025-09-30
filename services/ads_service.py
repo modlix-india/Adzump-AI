@@ -26,6 +26,7 @@ Here are the **positive keywords** you MUST use in the ad assets:
 
 1. **Headlines**
    - Generate between 30 to 40 unique headlines.
+   - Each headline must be 25-30 characters include spacing.
    - Each headline must be short, catchy, and persuasive.
    - Each headline MUST include at least one keyword from the provided positive keywords.
    - Highlight benefits, offers, or unique features.
@@ -34,6 +35,7 @@ Here are the **positive keywords** you MUST use in the ad assets:
 
 2. **Descriptions**
    - Generate between 10–15 unique ad descriptions.
+   - Each description must be 85-90 characters include spacing.
    - Each description MUST include at least one keyword from the provided positive keywords.
    - Focus on value proposition, benefits, and differentiation.
    - Vary sentence structures to avoid repetition.
