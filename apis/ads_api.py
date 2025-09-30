@@ -88,7 +88,7 @@ async def make_readable_endpoint(req: ReadableRequest):
 
 class AdAssetRequest(BaseModel):
     summary: str
-    positive_keywords: List[Dict[str, Any]] = []
+    positive_keywords: List[Dict[str, Any]]
 
 @router.post("/adAssets")
 async def create_ad_assets(req: AdAssetRequest):

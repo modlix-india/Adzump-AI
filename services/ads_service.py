@@ -25,17 +25,15 @@ Here are the **positive keywords** you MUST use in the ad assets:
 ### Requirements:
 
 1. **Headlines**
-   - Generate between 12 to 15 unique headlines.
+   - Generate between 30 to 40 unique headlines.
    - Each headline must be short, catchy, and persuasive.
-   - Length: strictly 20–25 characters (including spaces).
    - Each headline MUST include at least one keyword from the provided positive keywords.
    - Highlight benefits, offers, or unique features.
    - Avoid quotation marks, emojis, or unnecessary punctuation.
    - Each headline must be unique.
 
 2. **Descriptions**
-   - Generate between 2–3 unique ad descriptions.
-   - Each description must be 80–85 characters inlcuding spaces.
+   - Generate between 10–15 unique ad descriptions.
    - Each description MUST include at least one keyword from the provided positive keywords.
    - Focus on value proposition, benefits, and differentiation.
    - Vary sentence structures to avoid repetition.
@@ -64,8 +62,29 @@ Do not include explanations, comments, or extra text outside the JSON object.
             temperature=0.7
         )
         raw_output = response.choices[0].message.content.strip()
-        return safe_json_parse(raw_output)
-    
+        parsed = safe_json_parse(raw_output)
+
+        if not parsed:
+            return parsed
+
+        if "headlines" in parsed:
+            filtered_headlines = [
+                h for h in parsed["headlines"]
+                if len(h) <= 30
+            ]
+            filtered_headlines = sorted(filtered_headlines, key=len)
+            parsed["headlines"] = filtered_headlines[:15]
+
+        if "descriptions" in parsed:
+            filtered_descriptions = [
+                d for d in parsed["descriptions"]
+                if len(d) <= 85
+            ]
+            filtered_descriptions = sorted(filtered_descriptions, key=len)
+            parsed["descriptions"] = filtered_descriptions[:4]
+
+        return parsed
+
     except Exception as e:
         return {
             "error": f"Exception occurred: {str(e)}",
@@ -75,4 +94,4 @@ Do not include explanations, comments, or extra text outside the JSON object.
 
 async def generate_ad_assets(summary, positive_keywords):
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(executor, generate_ad_assets_sync, summary,positive_keywords)
+    return await loop.run_in_executor(executor, generate_ad_assets_sync, summary, positive_keywords)
