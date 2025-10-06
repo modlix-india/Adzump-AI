@@ -1,7 +1,8 @@
 from datetime import datetime
 
 def get_unique_suffix():
-    now = datetime.now()
+    local_tz = datetime.now().astimezone().tzinfo  
+    now = datetime.now(local_tz)
     return now.strftime("%d/%m/%Y_%H:%M:%S")
 
 def build_google_ads_payloads(customer_id, ads):

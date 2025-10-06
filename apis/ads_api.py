@@ -223,15 +223,15 @@ async def gks_negative(google_keyword_request: GoogleNegativeRequest, ):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-class OptimizeCampaignRequest(BaseModel):
-    campaignData: List[dict]
-    basicData: dict
 
+class OptimizeCampaignRequest(BaseModel):
+    campaignData: List[Dict]
+    basicData: Dict
 
 @router.post("/optimize-campaign")
 async def optimize_campaign(req: OptimizeCampaignRequest):
     try:
-        result = optimize_with_llm({
+        result = await optimize_with_llm({
             "campaignData": req.campaignData,
             "basicData": req.basicData
         })
@@ -241,3 +241,4 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
