@@ -168,11 +168,11 @@ class GoogleKeywordService:
     ) -> List[Dict[str, Any]]:
 
         access_token = oserver.fetch_google_api_token_simple(client_code)
-        
+
         try:
             if location_ids is None or len(location_ids) == 0:
                 location_ids = ["geoTargetConstants/2840"]  # India
-            
+
             all_suggestions: List[Dict[str, Any]] = []
             seen_keywords: Set[str] = set()
 
@@ -182,7 +182,7 @@ class GoogleKeywordService:
 
             if not developer_token:
                 raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
-            
+
             endpoint = f"https://googleads.googleapis.com/v20/customers/{customer_id}:generateKeywordIdeas"
 
             # Headers for API call
@@ -211,7 +211,7 @@ class GoogleKeywordService:
                         "includeAdultKeywords": False,
                         "keywordPlanNetwork": "GOOGLE_SEARCH_AND_PARTNERS"
                     }
-                    
+
                     # Set seed keywords
                     if url and url.strip():
                         payload["keywordAndUrlSeed"] = {
@@ -232,14 +232,14 @@ class GoogleKeywordService:
                                 headers=headers,
                                 json=payload,
                             )
-                            
+
                             if response.status_code == 200:
                                 break
                             else:
-                                logger.warning(f"API error attempt {attempt + 1}: {response.status_code} - {response.text[:200]}")
+                                logger.warning(f"API error attempt {attempt + 1}: {response.status_code} - {response.text}")
                                 if attempt == 0:
                                     time.sleep(1)
-                                    
+
                         except requests.exceptions.RequestException as ex:
                             logger.warning(f"Request error attempt {attempt + 1}: {str(ex)[:100]}")
                             if attempt == 0:
@@ -251,7 +251,7 @@ class GoogleKeywordService:
 
                     response_data = response.json()
                     results = response_data.get("results", [])
-                    
+
                     if not results:
                         logger.info(f"No results in chunk {chunk_num}")
                         continue
@@ -273,7 +273,7 @@ class GoogleKeywordService:
                                 volume = int(metrics.get("avgMonthlySearches", 0))
                             except (ValueError, TypeError):
                                 volume = 0
-                            
+
                             try:
                                 competition = metrics.get("competition", "UNKNOWN")
                             except:
