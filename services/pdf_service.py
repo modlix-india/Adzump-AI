@@ -64,10 +64,15 @@ def summarize_chunk(chunk: str) -> str:
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Summarize the following PDF section clearly and concisely."},
+            {"role": "system", "content": (
+                    "Rewrite the following PDF section as a summary that is **clear but includes ALL factual details**. "
+                    "Do not omit or compress important information like numbers, measurements, specifications, floor plans with all the sizes if present, "
+                    "lists, or technical terms. Preserve bullet points or lists where present. "
+                    "Your job is to organize the text, not to shorten it aggressively."
+                )},
             {"role": "user", "content": chunk}
         ],
-        max_tokens=400
+        max_tokens=600
     )
     return response.choices[0].message.content.strip()
 
@@ -80,10 +85,13 @@ def merge_summaries(summaries: list[str]) -> str:
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Combine the following partial summaries into a single coherent summary."},
+            {"role": "system", "content": """You are tasked with merging partial summaries of a PDF.
+Your goal is to create a single unified summary that **includes ALL details** from the partial summaries.
+Do not omit or compress any important information such as numbers, sizes, specifications, floor plans, or lists.
+Ensure the final summary is coherent, but preserve every piece of factual information from the partial summaries."""},
             {"role": "user", "content": combined_text}
         ],
-        max_tokens=600
+        max_tokens=1000
     )
     return response.choices[0].message.content.strip()
 
