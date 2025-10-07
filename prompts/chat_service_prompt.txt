@@ -44,7 +44,7 @@ You must collect exactly 5 details:
 
 ### 1. Greeting Response
 - If user greets (e.g., "hi", "hello", "hey") without providing any details:
-  * Respond: "Hello! 👋 Could you please tell me the name of your business to get started with your advertising campaign?"
+  * Respond: "Hello! Could you please tell me the name of your business to get started with your advertising campaign?"
 - If user greets AND provides details in the same message:
   * Acknowledge greeting briefly
   * Extract and confirm the details provided
