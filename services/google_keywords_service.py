@@ -90,7 +90,7 @@ class GoogleKeywordService:
     def generate_seed_keywords(self, scraped_data: str, url: str = None, brand_info: Dict[str, Any] = None, unique_features: List[str] = None, max_kw: int = 40) -> List[str]:
         try:
             content_summary = safe_truncate_to_sentence(str(scraped_data), 2000)
-            
+
             brand_name = brand_info.get("brand_name", "Unknown")
             primary_location = brand_info.get("primary_location", "Unknown")
             service_areas = brand_info.get("service_areas", [])
@@ -118,7 +118,7 @@ class GoogleKeywordService:
                 primary_location=primary_location,
                 service_areas=service_areas,
                 unique_features=unique_features
-                )
+            )
 
             resp = self.openai_client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -134,7 +134,6 @@ class GoogleKeywordService:
                 if not isinstance(parsed, list):
                     raise ValueError("Response not a list")
             except Exception:
-
                 parts = re.findall(r'"([^"]+)"', raw)
                 if not parts:
                     parts = re.split(r'[\n,•;]+', raw)
@@ -159,6 +158,7 @@ class GoogleKeywordService:
     def fetch_google_ads_suggestions(
             self,
             customer_id: str,
+            login_customer_id:str,
             client_code: str,
             seed_keywords: List[str],
             url: str = None,
@@ -178,7 +178,6 @@ class GoogleKeywordService:
 
             # Google Ads API endpoint
             developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-            login_customer_id = os.getenv("GOOGLE_ADS_LOGIN_CUSTOMER_ID")
 
             if not developer_token:
                 raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
@@ -491,6 +490,7 @@ class GoogleKeywordService:
     def extract_positive_strategy(
         self,
         client_code: str,
+        login_customer_id:str,
         scraped_data: str,
         customer_id: str,
         location_ids: List[str],
@@ -523,6 +523,7 @@ class GoogleKeywordService:
             logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(seed_keywords))
             all_suggestions = self.fetch_google_ads_suggestions(
                 customer_id=customer_id,
+                login_customer_id = login_customer_id,
                 client_code=client_code,
                 seed_keywords=seed_keywords,
                 url=url,
