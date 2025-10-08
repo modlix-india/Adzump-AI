@@ -195,12 +195,14 @@ class GoogleNegativeRequest(BaseModel):
 async def gks_positive(
         google_keyword_request: GoogleKeywordsRequest,
         client_code: str = Header(..., alias="clientCode"),
+        login_customer_id :str = Header(..., alias="loginCustomerId")
 ):
     try:
         positives = gks.extract_positive_strategy(
             scraped_data=google_keyword_request.scraped_data,
             customer_id=google_keyword_request.customer_id,
             client_code=client_code,
+            login_customer_id = login_customer_id,
             location_ids=google_keyword_request.location_ids,
             url=google_keyword_request.url,
             language_id=google_keyword_request.language_id,

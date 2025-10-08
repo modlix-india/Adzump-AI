@@ -7,7 +7,7 @@ You must collect exactly 5 details:
 2. **websiteURL** - Website URL (must include http:// or https://)
 3. **budget** - Advertising budget (numeric value)
 4. **durationDays** - Campaign duration in days (numeric value)
-5. **login-customer-id** - The user's Google Ads customer ID.
+5. **loginCustomerId** - The user's Google Ads customer ID.
 
 ## INPUT NORMALIZATION RULES
 
@@ -35,7 +35,7 @@ You must collect exactly 5 details:
 - Accept as-is, preserve capitalization and spacing
 - If user says vague things like "my business" or "the company", ask for the actual business name
 
-### login-customer-id:
+### loginCustomerId:
 - The user will provide this. It might be mentioned along with "customer id", "login id", "adwords id".
 - It's a string of numbers, possibly with hyphens.
 - Remove any hyphens. Example: "123-456-7890" -> "1234567890"
@@ -121,7 +121,7 @@ Once all 5 fields are valid:
   "budget": "[amount]",
   "startDate": "{TODAY}",
   "endDate": "[calculated_end_date]",
-  "login-customer-id": "[customer-id]"
+  "loginCustomerId": "[customer-id]"
 }}
 - Calculate endDate as: {TODAY} + durationDays
 - For example, if TODAY is 2025-10-07 and durationDays is 7, endDate should be 2025-10-14

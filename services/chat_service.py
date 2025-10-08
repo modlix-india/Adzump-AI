@@ -41,7 +41,7 @@ def validate_and_clean_data(data: dict):
 
     validated_data = {}
     url_regex = re.compile(r'^https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)')
-    
+
     for key, value in data.items():
         if key == "websiteURL":
             if isinstance(value, str) and url_regex.match(value):
@@ -55,7 +55,7 @@ def validate_and_clean_data(data: dict):
         elif key == "businessName":
             if isinstance(value, str) and value:
                 validated_data[key] = value
-        elif key == "login-customer-id":
+        elif key == "loginCustomerId":
             if isinstance(value, str):
                 validated_data[key] = value.replace("-", "")
     return validated_data
@@ -74,7 +74,7 @@ async def process_chat(session_id: str, message: str, login_customer_id: str = N
 
     # If login_customer_id is provided, add it to the message and save to session.
     if login_customer_id:
-        session["campaign_data"]["login-customer-id"] = login_customer_id.replace("-", "")
+        session["campaign_data"]["loginCustomerId"] = login_customer_id.replace("-", "")
         message = f"{message} (My customer id is {login_customer_id})"
 
     # Expiry check

@@ -205,14 +205,14 @@ def test_greeting_with_details():
     assert_status(response.get("status"), "in_progress", test_name)
     assert_field_extracted(response, "businessName", test_name)
     assert_field_extracted(response, "budget", test_name)
-    assert_field_extracted(response, "login-customer-id", test_name)
+    assert_field_extracted(response, "loginCustomerId", test_name)
     assert_progress(response, "3/5", test_name)
     
     client.end_session()
 
 def test_initial_customer_id():
-    """Test 1.3: Initial message with login-customer-id"""
-    test_name = "Initial Customer ID"
+    """Test 1.3: Initial message with loginCustomerId"""
+    test_name = "Initial Login Customer ID"
     print_test_name(test_name)
 
     client = CampaignTestClient()
@@ -223,7 +223,7 @@ def test_initial_customer_id():
     print_response(response)
 
     assert_status(response.get("status"), "in_progress", test_name)
-    assert_field_extracted(response, "login-customer-id", test_name)
+    assert_field_extracted(response, "loginCustomerId", test_name)
     assert_progress(response, "1/5", test_name)
 
     client.end_session()
@@ -286,11 +286,11 @@ def test_all_at_once_standard():
         stats.failed += 1
         stats.failed_tests.append(test_name)
         
-    if data.get("login-customer-id") == "1112223333":
-        print_success("login-customer-id: 1112223333")
+    if data.get("loginCustomerId") == "1112223333":
+        print_success("loginCustomerId: 1112223333")
         stats.passed += 1
     else:
-        print_error(f"login-customer-id incorrect: {data.get('login-customer-id')}")
+        print_error(f"loginCustomerId incorrect: {data.get('loginCustomerId')}")
         stats.failed += 1
         stats.failed_tests.append(test_name)
 
