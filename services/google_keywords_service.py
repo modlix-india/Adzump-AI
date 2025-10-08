@@ -90,7 +90,7 @@ class GoogleKeywordService:
     def generate_seed_keywords(self, scraped_data: str, url: str = None, brand_info: Dict[str, Any] = None, unique_features: List[str] = None, max_kw: int = 40) -> List[str]:
         try:
             content_summary = safe_truncate_to_sentence(str(scraped_data), 2000)
-            
+
             brand_name = brand_info.get("brand_name", "Unknown")
             primary_location = brand_info.get("primary_location", "Unknown")
             service_areas = brand_info.get("service_areas", [])
@@ -118,7 +118,7 @@ class GoogleKeywordService:
                 primary_location=primary_location,
                 service_areas=service_areas,
                 unique_features=unique_features
-                )
+            )
 
             resp = self.openai_client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -134,7 +134,6 @@ class GoogleKeywordService:
                 if not isinstance(parsed, list):
                     raise ValueError("Response not a list")
             except Exception:
-
                 parts = re.findall(r'"([^"]+)"', raw)
                 if not parts:
                     parts = re.split(r'[\n,•;]+', raw)

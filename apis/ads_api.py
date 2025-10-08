@@ -15,6 +15,7 @@ from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
+from services.session_manager import sessions
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
@@ -195,14 +196,23 @@ class GoogleNegativeRequest(BaseModel):
 async def gks_positive(
         google_keyword_request: GoogleKeywordsRequest,
         client_code: str = Header(..., alias="clientCode"),
-        login_customer_id :str = Header(..., alias="loginCustomerId")
+        session_id: str = Header(..., alias="sessionId")
 ):
     try:
+        if session_id not in sessions:
+            raise HTTPException(status_code=404, detail="Invalid or expired session.")
+
+        session = sessions[session_id]
+        login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
+
+        if not login_customer_id:
+            raise HTTPException(status_code=400, detail="loginCustomerId not found in session.")
+
         positives = gks.extract_positive_strategy(
             scraped_data=google_keyword_request.scraped_data,
             customer_id=google_keyword_request.customer_id,
             client_code=client_code,
-            login_customer_id = login_customer_id,
+            login_customer_id=login_customer_id,
             location_ids=google_keyword_request.location_ids,
             url=google_keyword_request.url,
             language_id=google_keyword_request.language_id,
