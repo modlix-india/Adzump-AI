@@ -15,6 +15,7 @@ from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
+from services.sitelink_service import generate_sitelinks
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
@@ -242,3 +243,20 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ----- Router Endpoint For Generete Site Lins -----
+
+class SitelinkRequest(BaseModel):
+    links: List[Dict[str, Any]]
+    base_url: str
+
+@router.post("/generate_sitelinks")
+async def create_sitelinks(request: SitelinkRequest):
+    """
+    Generate Google Ads sitelinks (text, descriptions, final URLs)
+    from scraped website link data only.
+    """
+    try:
+        sitelinks = await generate_sitelinks(request.links,request.base_url)
+        return {"sitelinks": sitelinks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
