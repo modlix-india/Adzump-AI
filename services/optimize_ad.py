@@ -1,3 +1,5 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 import re
@@ -8,6 +10,7 @@ from typing import List, Dict, Any
 # Load .env
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+executor = ThreadPoolExecutor()
 
 # ---------------------------
 # Helpers for location logic
@@ -129,7 +132,7 @@ def clean_llm_json(raw_text: str) -> str:
     cleaned = re.sub(r"```json|```", "", raw_text, flags=re.IGNORECASE).strip()
     return cleaned
 
-def optimize_with_llm(full_payload: dict):
+def optimize_with_llm_sync(full_payload: dict):
     """
     Sends campaign payload to LLM and returns optimized JSON response.
     Enforces limits for headlines/descriptions and validates locations.
@@ -138,7 +141,7 @@ def optimize_with_llm(full_payload: dict):
     You are a Google Ads optimization expert.
 
     Your job is to take the given campaign JSON payload and return an optimized version.
-    ⚠️ Rules:
+    Rules:
     - Keep the JSON structure and keys identical.
     - Return only valid JSON (no markdown, no comments).
     - All text fields must strictly follow Google Ads limits.
@@ -186,3 +189,8 @@ def optimize_with_llm(full_payload: dict):
             "error": "LLM response could not be parsed as JSON",
             "raw": cleaned_content
         }
+
+
+async def optimize_with_llm(full_payload: dict):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, optimize_with_llm_sync, full_payload)
