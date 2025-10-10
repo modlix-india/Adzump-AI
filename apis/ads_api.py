@@ -15,6 +15,8 @@ from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
+from services.sitelink_service import generate_sitelinks
+from oserver.connection import fetch_product_details
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
@@ -242,3 +244,44 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ----- Router Endpoint For Generete Site Lins -----
+
+class SitelinkRequest(BaseModel):
+    data_object_id: str
+
+
+@router.post("/generate_sitelinks")
+async def create_sitelinks(
+    request: SitelinkRequest,
+    access_token: str = Header(..., alias="access_token"),
+    clientCode: str = Header(..., alias="clientCode"),
+):
+    """
+    Generate high-quality, lead-focused Google Ads sitelinks.
+    Only 'data_object_id' is passed in payload; 
+    'access_token' and 'clientCode' come from headers.
+    """
+    try:
+        # Step 1: Fetch product data from CoreServices.Storage API
+        product_data = fetch_product_details(request.data_object_id, access_token, clientCode)
+        # print(product_data)
+        # Step 2: Extract relevant fields
+        product_result = product_data[0]["result"]["result"]
+        summary = product_result.get("summary", "")
+        base_url = product_result.get("businessUrl", "")
+        links = product_result.get("siteLinks", [])
+
+        # print(links)
+
+        if not base_url or not summary:
+            raise HTTPException(status_code=400, detail="Missing 'summary' or 'businessUrl' in product data")
+
+        # Step 3: Generate sitelinks using OpenAI model
+        sitelinks = await generate_sitelinks(links, base_url, summary)
+
+        return {"sitelinks": sitelinks}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
