@@ -3,45 +3,32 @@ from typing import List, Dict, Any
 from urllib.parse import urlparse
 import json
 import re
-import requests
-import os
 
 from services.openai_client import chat_completion  # ✅ Using your OpenAI client
 from utils.text_utils import is_internal_link
 from utils.prompt_loader import load_prompt
+from oserver.connection import fetch_product_details
 
 
-def fetch_product_details(data_object_id: str,access_token:str, clientCode:str):
+# ---------------- Core: Generate sitelinks (after fetching data) ---------------- #
+async def generate_sitelinks_service(data_object_id: str, access_token: str, clientCode: str):
+    """
+    Fetch data from CoreServices and generate sitelinks using LLM.
+    """
+    product_data = fetch_product_details(data_object_id, access_token, clientCode)
 
-    base = (os.getenv("NOCODE_PLATFORM_HOST") or "").rstrip("/")
-    if not base:
-        raise RuntimeError("NOCODE_PLATFORM_HOST is not set")
-    
-    url = f"{base}/api/core/function/execute/CoreServices.Storage/Read"
+    if not product_data or not isinstance(product_data, list):
+        raise HTTPException(status_code=500, detail="Invalid product data response")
 
-    headers = {
-        "authorization": access_token,
-        "content-type": "application/json",
-        "clientCode": clientCode
-    }
+    product_result = product_data[0].get("result", {}).get("result", {})
+    summary = product_result.get("summary", "")
+    base_url = product_result.get("businessUrl", "")
+    links = product_result.get("siteLinks", [])
 
-    payload = {
-        "storageName": "AISuggestedData",
-        "appCode": "marketingai",
-        "dataObjectId": data_object_id,
-        "eager": False,
-        "eagerFields": []
-    }
+    if not base_url or not summary:
+        raise HTTPException(status_code=400, detail="Missing 'summary' or 'businessUrl' in product data")
 
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
-
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching product details: {e}")
-        return None
-
+    return await generate_sitelinks(links, base_url, summary)
 
 # ---------------- Core: Generate Sitelinks ---------------- #
 async def generate_sitelinks(links: List[Dict[str, Any]], base_url: str, summary: str):
