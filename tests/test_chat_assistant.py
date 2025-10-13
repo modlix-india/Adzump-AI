@@ -4,16 +4,20 @@ This file to test all scenarios comprehensively
 """
 
 import requests
+import os
 import json
 import time
 from datetime import datetime
 from typing import Dict, Any
 from colorama import init, Fore, Style
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Initialize colorama for colored output
 init(autoreset=True)
 
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = os.getenv("BASE_URL")
 
 class TestStats:
     def __init__(self):
@@ -168,9 +172,7 @@ def assert_progress(response: Dict, expected_progress: str, test_name: str):
         return False
 
 
-# ============================================================================ 
 # TEST CATEGORY 1: GREETING TESTS
-# ============================================================================ 
 
 def test_simple_greeting():
     """Test 1.1: Simple greeting"""
@@ -230,9 +232,7 @@ def test_initial_customer_id():
 
 # todo to add the greet and the data message testcase
 
-# ============================================================================ 
 # TEST CATEGORY 2: ALL-AT-ONCE INPUT
-# ============================================================================ 
 
 def test_all_at_once_standard():
     """Test 2.1: All-at-once with standard format"""
@@ -380,9 +380,7 @@ def test_all_at_once_various_formats():
     client.end_session()
 
 
-# ============================================================================ 
 # TEST CATEGORY 3: STEP-BY-STEP INPUT
-# ============================================================================ 
 
 def test_step_by_step_flow():
     """Test 3.1: Complete step-by-step flow"""
@@ -465,9 +463,7 @@ def test_random_order():
     client.end_session()
 
 
-# ============================================================================ 
 # TEST CATEGORY 4: INPUT NORMALIZATION
-# ============================================================================ 
 
 def test_budget_normalization():
     """Test 4.1: Budget format normalization"""
@@ -579,9 +575,7 @@ def test_url_normalization():
         time.sleep(0.5)
 
 
-# ============================================================================ 
 # TEST CATEGORY 5: VALIDATION & ERROR HANDLING
-# ============================================================================ 
 
 def test_invalid_url():
     """Test 5.1: Invalid URL handling"""
@@ -675,10 +669,138 @@ def test_name_domain_mismatch():
 
     client.end_session()
 
+def test_non_existent_domain():
+    """Test 5.4: Non-existent domain handling"""
+    test_name = "Non-Existent Domain"
+    print_test_name(test_name)
+    
+    client = CampaignTestClient()
+    client.start_session()
+    
+    print_step(1, "Send non-existent domain: 'svdgsvfgdsvfg.com'")
+    response = client.send_message("My website is svdgsvfgdsvfg.com")
+    print_response(response)
+    
+    # Should recognize as invalid domain
+    reply = response.get("reply","").lower()
+    stats.total += 1
 
-# ============================================================================ 
+    if "website" in reply or "domain" in reply or "url" in reply:
+        print_success("AI recognized non-existent domain and asked for correction")
+        stats.passed += 1
+    else:
+        print_error("AI didn't handle non-existent domain properly")
+        stats.failed += 1
+        stats.failed_tests.append(test_name)
+    
+    # URL should not be extracted
+    collected = response.get("collected_data") or {}
+    stats.total += 1
+    if "websiteURL" not in collected:
+        print_success("Non-existent domain correctly rejected")
+        stats.passed += 1
+    else:
+        print_error("Non-existent domain was accepted")
+        stats.failed += 1
+        stats.failed_tests.append(test_name)
+    
+    client.end_session()
+
+def test_valid_domain():
+    """Test 5.5: Valid domain should pass"""
+    test_name = "Valid Domain"
+    print_test_name(test_name)
+
+    client = CampaignTestClient()
+    client.start_session()
+
+    print_step(1, "Send valid domain: 'https://www.google.com'")
+    response = client.send_message("My website is https://www.google.com")
+    print_response(response)
+
+    # Should not mention domain issue
+    stats.total += 1
+    if "domain" not in response.get("reply", "").lower():
+        print_success("Valid domain accepted")
+        stats.passed += 1
+    else:
+        print_error("Valid domain incorrectly rejected")
+        stats.failed += 1
+        stats.failed_tests.append(test_name)
+
+    client.end_session()
+
+
+def test_invalid_domain_format():
+    """Test 5.6: Invalid domain format"""
+    test_name = "Invalid Domain Format"
+    print_test_name(test_name)
+
+    client = CampaignTestClient()
+    client.start_session()
+
+    print_step(1, "Send invalid domain: 'invalid@@@.com'")
+    response = client.send_message("My website is invalid@@@.com")
+    print_response(response)
+
+    # Should indicate format or validation issue
+    reply = response.get("reply", "").lower()
+    if "website" in reply or "url" in reply or "domain" in reply:
+        print_success("AI recognized invalid domain format and asked for correction")
+        stats.passed += 1
+    else:
+        print_error("AI didn't handle invalid domain format properly")
+        stats.failed += 1
+        stats.failed_tests.append(test_name)
+    
+    collected = response.get("collected_data") or {}
+    stats.total += 1
+    if "websiteURL" not in collected:
+        print_success("Invalid domain format correctly rejected")
+        stats.passed += 1
+    else:
+        print_error("Invalid domain format was accepted")
+        stats.failed += 1
+        stats.failed_tests.append(test_name)
+
+    client.end_session()
+
+
+def test_domain_with_no_dns_records():
+    """Test 5.7: Domain with no DNS records"""
+    test_name = "Domain with No DNS Records"
+    print_test_name(test_name)
+
+    client = CampaignTestClient()
+    client.start_session()
+
+    print_step(1, "Send domain with no DNS records: 'example.invalid'")
+    response = client.send_message("My website is example.invalid")
+    print_response(response)
+
+    reply = response.get("reply","").lower()
+    if "website" in reply or "url" in reply or "domain" in reply:
+        print_success("AI recognized domain with no DNS records and asked for correction")
+        stats.passed += 1
+    else:
+        print_error("AI didn't handle domain with no DNS records properly")
+        stats.failed += 1
+        stats.failed_tests.append(test_name)
+
+
+    collected = response.get("collected_data") or {}
+    stats.total += 1
+    if "websiteURL" not in collected:
+        print_success("Domain with no DNS records correctly rejected")
+        stats.passed += 1
+    else:
+        print_error("Domain with no DNS records was accepted")
+        stats.failed += 1
+        stats.failed_tests.append(test_name)
+
+    client.end_session()
+
 # TEST CATEGORY 6: CONFIRMATION FLOW
-# ============================================================================ 
 
 def test_positive_confirmation_variations():
     """Test 6.1: Various positive confirmation responses"""
@@ -698,6 +820,7 @@ def test_positive_confirmation_variations():
         
         # Send confirmation
         response = client.send_message(word)
+        print_response(response)
         
         stats.total += 1
         if response.get("status") == "completed":
@@ -769,9 +892,7 @@ def test_direct_correction():
     client.end_session()
 
 
-# ============================================================================ 
 # TEST CATEGORY 7: MID-FLOW CORRECTIONS
-# ============================================================================ 
 
 def test_mid_flow_correction():
     """Test 7.1: Correction before completion"""
@@ -846,9 +967,7 @@ def test_multiple_corrections():
     client.end_session()
 
 
-# ============================================================================ 
 # TEST CATEGORY 8: EDGE CASES
-# ============================================================================ 
 
 def test_unrelated_query():
     """Test 8.1: Unrelated query handling"""
@@ -1013,9 +1132,7 @@ def test_special_characters():
     client.end_session()
 
 
-# ============================================================================ 
 # TEST CATEGORY 9: SESSION MANAGEMENT
-# ============================================================================ 
 
 def test_invalid_session():
     """Test 9.1: Invalid session ID"""
@@ -1066,9 +1183,7 @@ def test_session_persistence():
     client.end_session()
 
 
-# ============================================================================ 
 # TEST CATEGORY 10: COMPLETE END-TO-END FLOWS
-# ============================================================================ 
 
 def test_e2e_happy_path_all_at_once():
     """Test 10.1: Complete E2E - All at once"""
@@ -1173,23 +1288,24 @@ def test_e2e_with_corrections():
     client = CampaignTestClient()
     client.start_session()
     
-    print_step(1, "Provide all details (with typo)")
+    print_step(1, "Provide all details (with typo and invalid domain)")
     response = client.send_message("I run gloe Boutique, glowboutique.in, 4000, 6 days", login_customer_id="123-456-7890")
+    print_response(response)
     
-    # This test is for a feature (typo detection) that is not in the prompt.
-    # It will likely fail unless the feature is added.
-    # For now, we check for the current behavior, which is to accept the name as is.
+    assert_status(response.get("status"), "in_progress", test_name)
+
+    assert_contains(
+        response.get("reply", ""), 
+        "website", 
+        "Reply mentions website issue", 
+        test_name
+    )
+    
+    print_step(2, "User corrects the domain")
+    response = client.send_message("Website is glowboutique.com")
     assert_status(response.get("status"), "awaiting_confirmation", test_name)
 
-    print_step(2, "User says no")
-    response = client.send_message("no")
-    assert_status(response.get("status"), "in_progress", test_name)
-    
-    print_step(3, "Change budget")
-    response = client.send_message("change budget to 6000")
-    assert_status(response.get("status"), "awaiting_confirmation", test_name)
-    
-    print_step(4, "Confirm")
+    print_step(3, "User confirms")
     response = client.send_message("yes")
     assert_status(response.get("status"), "completed", test_name)
     
@@ -1204,8 +1320,8 @@ def test_e2e_with_corrections():
         stats.failed += 1
         stats.failed_tests.append(test_name)
     
-    if data.get("budget") == "6000":
-        print_success("Corrected budget: 6000")
+    if data.get("budget") == "4000":
+        print_success("Corrected budget: 4000")
         stats.passed += 1
     else:
         print_error(f"Budget not corrected: {data.get('budget')}")
@@ -1215,9 +1331,7 @@ def test_e2e_with_corrections():
     client.end_session()
 
 
-# ============================================================================ 
 # TEST RUNNER
-# ============================================================================ 
 
 def run_all_tests():
     """Run all test categories"""
@@ -1254,7 +1368,11 @@ def run_all_tests():
         print_header("CATEGORY 5: VALIDATION & ERROR HANDLING")
         test_invalid_url()
         test_vague_business_name()
-        # test_name_domain_mismatch()  # CRITICAL TEST - Commented out as it tests a feature not in the prompt.
+        #test_name_domain_mismatch()  # CRITICAL TEST - Commented out as it tests a feature not in the prompt.
+        test_non_existent_domain()
+        test_valid_domain()
+        test_invalid_domain_format()
+        test_domain_with_no_dns_records()
         
         # Category 6: Confirmation
         print_header("CATEGORY 6: CONFIRMATION FLOW")

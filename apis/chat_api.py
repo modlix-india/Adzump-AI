@@ -6,7 +6,7 @@ router = APIRouter(prefix="/api/ds/chat", tags=["chat"])
 
 @router.post("/start-session")
 async def start_session():
-    return chat_service.start_session()
+    return await chat_service.start_session()
 
 @router.post("/{session_id}")
 async def chat(session_id: str, message: str, login_customer_id: Optional[str] = Query(None)):

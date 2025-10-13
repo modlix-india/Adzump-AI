@@ -10,6 +10,8 @@ from typing import List, Dict, Set, Any
 import oserver
 from utils.text_utils import normalize_text, safe_truncate_to_sentence, get_safety_patterns, setup_apis, get_fallback_negative_keywords
 from utils.prompt_loader import load_prompt
+from services.session_manager import sessions
+from fastapi import HTTPException
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -490,7 +492,7 @@ class GoogleKeywordService:
     def extract_positive_strategy(
         self,
         client_code: str,
-        login_customer_id:str,
+        session_id:str,
         scraped_data: str,
         customer_id: str,
         location_ids: List[str],
@@ -504,6 +506,15 @@ class GoogleKeywordService:
         logger.info("Starting strategic keyword research pipeline")
 
         try:
+            if session_id not in sessions:
+                raise HTTPException(status_code=404, detail="Invalid or expired session.")
+
+            session = sessions[session_id]
+            login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
+
+            if not login_customer_id:
+                raise HTTPException(status_code=400, detail="loginCustomerId not found in session.")
+        
             # STEP 1: Extract business foundation
             logger.info("STEP 1: Extracting business information and USPs")
             brand_info = self.extract_business_metadata(scraped_data, url)
