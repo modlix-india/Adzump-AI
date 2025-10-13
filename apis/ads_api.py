@@ -15,8 +15,8 @@ from services.summary_service import merge_summaries
 from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
-from services.sitelink_service import generate_sitelinks
-from oserver.connection import fetch_product_details
+from services.sitelink_service import generate_sitelinks , fetch_product_details
+
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
