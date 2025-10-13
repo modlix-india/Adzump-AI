@@ -253,8 +253,8 @@ class SitelinkRequest(BaseModel):
 @router.post("/generate_sitelinks")
 async def create_sitelinks(
     request: SitelinkRequest,
-    access_token: str = Header(..., alias="access_token"),
-    clientCode: str = Header(..., alias="clientCode"),
+    access_token: str = Header(..., alias="accessToken"),
+    client_code: str = Header(..., alias="clientCode"),
 ):
     """
     Generate high-quality, lead-focused Google Ads sitelinks.
@@ -265,7 +265,7 @@ async def create_sitelinks(
         sitelinks = await generate_sitelinks_service(
             data_object_id=request.data_object_id,
             access_token=access_token,
-            clientCode=clientCode
+            client_code=client_code
         )
         return {"sitelinks": sitelinks}
 
