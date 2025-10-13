@@ -11,11 +11,11 @@ from oserver.connection import fetch_product_details
 
 
 # ---------------- Core: Generate sitelinks (after fetching data) ---------------- #
-async def generate_sitelinks_service(data_object_id: str, access_token: str, clientCode: str):
+async def generate_sitelinks_service(data_object_id: str, access_token: str, client_code: str):
     """
     Fetch data from CoreServices and generate sitelinks using LLM.
     """
-    product_data = fetch_product_details(data_object_id, access_token, clientCode)
+    product_data = fetch_product_details(data_object_id, access_token, client_code)
 
     if not product_data or not isinstance(product_data, list):
         raise HTTPException(status_code=500, detail="Invalid product data response")

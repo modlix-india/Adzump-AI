@@ -30,7 +30,7 @@ def fetch_google_api_token_simple(client_code: str, appcode: str = None) -> str:
     
 
 
-def fetch_product_details(data_object_id: str,access_token:str, clientCode:str):
+def fetch_product_details(data_object_id: str,access_token:str, client_code:str):
 
     base = (os.getenv("NOCODE_PLATFORM_HOST") or "").rstrip("/")
     if not base:
@@ -41,7 +41,8 @@ def fetch_product_details(data_object_id: str,access_token:str, clientCode:str):
     headers = {
         "authorization": access_token,
         "content-type": "application/json",
-        "clientCode": clientCode
+        "clientCode": client_code,
+        "appcode": "marketingai"
     }
 
     payload = {
