@@ -32,11 +32,11 @@ def fetch_google_api_token_simple(client_code: str, appcode: str = None) -> str:
 
 def fetch_product_details(data_object_id: str,access_token:str, client_code:str):
 
-    # base = (os.getenv("NOCODE_PLATFORM_HOST") or "").rstrip("/")
-    # if not base:
-    #     raise RuntimeError("NOCODE_PLATFORM_HOST is not set")
+    base = (os.getenv("NOCODE_PLATFORM_HOST") or "").rstrip("/")
+    if not base:
+        raise RuntimeError("NOCODE_PLATFORM_HOST is not set")
     
-    url = "https://dev.adzump.ai/api/core/function/execute/CoreServices.Storage/Read"
+    url = f"{base}/api/core/function/execute/CoreServices.Storage/Read"
 
     headers = {
         "authorization": access_token,
