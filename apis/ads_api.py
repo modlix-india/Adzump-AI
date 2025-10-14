@@ -253,7 +253,7 @@ class SitelinkRequest(BaseModel):
 @router.post("/generate_sitelinks")
 async def create_sitelinks(
     request: SitelinkRequest,
-    access_token: str = Header(..., alias="accessToken"),
+    access_token: str = Header(..., alias="access-token"),
     client_code: str = Header(..., alias="clientCode"),
 ):
     """
