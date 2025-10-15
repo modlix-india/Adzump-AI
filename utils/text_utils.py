@@ -2,6 +2,7 @@ import os
 import re
 import textwrap
 from openai import OpenAI
+from urllib.parse import urlparse
 
 
 def setup_apis():
@@ -74,3 +75,16 @@ def get_fallback_negative_keywords():
         {"keyword": "broken", "reason": "Universal condition filter"},
         {"keyword": "repair", "reason": "Universal service type filter"},
     ]
+
+# ---------------- Helper: Check if link is internal ---------------- #
+def is_internal_link(href: str, base_domain: str) -> bool:
+    """Return True if href belongs to the same domain, subdomain, or is relative."""
+    if not href or href.startswith(("javascript:void(0)", "tel:")):
+        return False
+
+    parsed = urlparse(href)
+    if not parsed.netloc:  # relative or hash (#gallery, /about)
+        return True
+
+    href_domain = parsed.netloc.replace("www.", "").lower()
+    return base_domain in href_domain
