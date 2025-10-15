@@ -50,7 +50,7 @@ def build_google_ads_payloads(customer_id, ads):
         g = str(g or "").lower()
         if g == "male": return "MALE"
         if g == "female": return "FEMALE"
-        if g == "unknown": return "UNKNOWN"
+        if g == "undetermined": return "UNDETERMINED"
         return None
 
     def match_type(mt):
