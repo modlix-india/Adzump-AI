@@ -1,7 +1,7 @@
 import re
 from typing import Optional
 from pydantic import Field, field_validator
-from openai_function_call import OpenAISchema
+from instructor import OpenAISchema
 from word2number import w2n
 from urllib.parse import urlparse
 
