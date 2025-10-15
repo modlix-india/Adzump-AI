@@ -1,16 +1,14 @@
 # syntax=docker/dockerfile:1
-
-# Base image
 FROM python:3.12-slim AS base
 
-# Environment (split ENV lines to avoid multiline + comments issues)
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
-# Store Playwright browsers in a shared path (not in a user’s home)
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+# Environment tuning
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-# System dependencies (build and runtime)
+# System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     poppler-utils \
@@ -20,27 +18,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python deps first for better caching
+# Copy only requirements first to leverage Docker cache
+# If you also use a lock/constraints file, include it here.
 COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Install Playwright Chromium into /ms-playwright
+# Optional cache-busting arg (bump to force fresh dependency install)
+ARG PIP_REFRESH=0
+
+# Install Python deps
+# The echo line ensures changing PIP_REFRESH invalidates this layer.
+# If BuildKit is enabled, the cache mount speeds up rebuilds.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    echo "PIP_REFRESH=${PIP_REFRESH}" \
+ && python -m pip install --upgrade pip \
+ && pip install --upgrade --upgrade-strategy eager -r requirements.txt
+
+# Playwright (ensure `playwright` is in your requirements)
 RUN python -m playwright install --with-deps chromium \
   && mkdir -p /app/uploads \
   && useradd -ms /bin/bash appuser \
   && chown -R appuser:appuser /app /ms-playwright
 
-# Copy application code last
+# Copy the rest of the app (kept after deps to maximize cache re-use)
 COPY . .
 
-# Drop privileges
+# Runtime config
 USER appuser
-
-# Expose container port (internal)
 EXPOSE 8000
-
-# Optional healthcheck (adjust endpoint if you have /health)
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://localhost:8000/health || exit 1
 
-# Start command: FastAPI/Starlette with Uvicorn
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
