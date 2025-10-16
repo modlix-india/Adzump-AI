@@ -16,6 +16,7 @@ async def generate_sitelinks_service(data_object_id: str, access_token: str, cli
     Fetch data from CoreServices and generate sitelinks using LLM.
     """
     product_data = fetch_product_details(data_object_id, access_token, client_code)
+    
 
     if not product_data or not isinstance(product_data, list):
         raise HTTPException(status_code=500, detail="Invalid product data response")
@@ -24,7 +25,7 @@ async def generate_sitelinks_service(data_object_id: str, access_token: str, cli
     summary = product_result.get("summary", "")
     base_url = product_result.get("businessUrl", "")
     links = product_result.get("siteLinks", [])
-
+ 
     if not base_url or not summary:
         raise HTTPException(status_code=400, detail="Missing 'summary' or 'businessUrl' in product data")
 
@@ -72,7 +73,7 @@ async def generate_sitelinks(links: List[Dict[str, Any]], base_url: str, summary
         model="gpt-4o-mini"
     )
 
-    content = response.strip()
+    content = response.choices[0].message.content.strip()
     # print("🔹 LLM raw response:", content)
 
     # Step 4: Safely parse JSON

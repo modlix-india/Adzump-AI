@@ -253,7 +253,7 @@ class SitelinkRequest(BaseModel):
     data_object_id: str
 
 
-@router.post("/generate_sitelinks")
+@router.post("/generate-sitelinks")
 async def create_sitelinks(
     request: SitelinkRequest,
     access_token: str = Header(..., alias="access-token"),
