@@ -10,6 +10,8 @@ from typing import List, Dict, Set, Any
 import oserver
 from utils.text_utils import normalize_text, safe_truncate_to_sentence, get_safety_patterns, setup_apis, get_fallback_negative_keywords
 from utils.prompt_loader import load_prompt
+from services.session_manager import sessions
+from fastapi import HTTPException
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -90,7 +92,7 @@ class GoogleKeywordService:
     def generate_seed_keywords(self, scraped_data: str, url: str = None, brand_info: Dict[str, Any] = None, unique_features: List[str] = None, max_kw: int = 40) -> List[str]:
         try:
             content_summary = safe_truncate_to_sentence(str(scraped_data), 2000)
-            
+
             brand_name = brand_info.get("brand_name", "Unknown")
             primary_location = brand_info.get("primary_location", "Unknown")
             service_areas = brand_info.get("service_areas", [])
@@ -118,7 +120,7 @@ class GoogleKeywordService:
                 primary_location=primary_location,
                 service_areas=service_areas,
                 unique_features=unique_features
-                )
+            )
 
             resp = self.openai_client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -134,7 +136,6 @@ class GoogleKeywordService:
                 if not isinstance(parsed, list):
                     raise ValueError("Response not a list")
             except Exception:
-
                 parts = re.findall(r'"([^"]+)"', raw)
                 if not parts:
                     parts = re.split(r'[\n,•;]+', raw)
@@ -159,6 +160,7 @@ class GoogleKeywordService:
     def fetch_google_ads_suggestions(
             self,
             customer_id: str,
+            login_customer_id:str,
             client_code: str,
             seed_keywords: List[str],
             url: str = None,
@@ -178,7 +180,6 @@ class GoogleKeywordService:
 
             # Google Ads API endpoint
             developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-            login_customer_id = os.getenv("GOOGLE_ADS_LOGIN_CUSTOMER_ID")
 
             if not developer_token:
                 raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
@@ -491,6 +492,7 @@ class GoogleKeywordService:
     def extract_positive_strategy(
         self,
         client_code: str,
+        session_id:str,
         scraped_data: str,
         customer_id: str,
         location_ids: List[str],
@@ -504,6 +506,15 @@ class GoogleKeywordService:
         logger.info("Starting strategic keyword research pipeline")
 
         try:
+            if session_id not in sessions:
+                raise HTTPException(status_code=404, detail="Invalid or expired session.")
+
+            session = sessions[session_id]
+            login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
+
+            if not login_customer_id:
+                raise HTTPException(status_code=400, detail="loginCustomerId not found in session.")
+        
             # STEP 1: Extract business foundation
             logger.info("STEP 1: Extracting business information and USPs")
             brand_info = self.extract_business_metadata(scraped_data, url)
@@ -523,6 +534,7 @@ class GoogleKeywordService:
             logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(seed_keywords))
             all_suggestions = self.fetch_google_ads_suggestions(
                 customer_id=customer_id,
+                login_customer_id = login_customer_id,
                 client_code=client_code,
                 seed_keywords=seed_keywords,
                 url=url,
