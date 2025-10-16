@@ -18,6 +18,8 @@ from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
 
+
+
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
 class BannerRequest(BaseModel):
@@ -197,12 +199,14 @@ class GoogleNegativeRequest(BaseModel):
 async def gks_positive(
         google_keyword_request: GoogleKeywordsRequest,
         client_code: str = Header(..., alias="clientCode"),
+        session_id: str = Header(..., alias="sessionId")
 ):
     try:
         positives = gks.extract_positive_strategy(
             scraped_data=google_keyword_request.scraped_data,
             customer_id=google_keyword_request.customer_id,
             client_code=client_code,
+            session_id=session_id,
             location_ids=google_keyword_request.location_ids,
             url=google_keyword_request.url,
             language_id=google_keyword_request.language_id,
