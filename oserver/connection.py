@@ -28,7 +28,7 @@ def fetch_google_api_token_simple(client_code: str, appcode: str = None) -> str:
     except ValueError:
         return resp.text.strip()
     
-
+    
 
 def fetch_product_details(data_object_id: str,access_token:str, client_code:str):
 
