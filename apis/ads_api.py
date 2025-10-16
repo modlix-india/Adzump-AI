@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
-from services.search_term_analyzer import classify_search_terms
+from services.keywords_fetch_service import SearchTermPipeline
 from services.summarise_external_links import summarize_with_context
 from services.summary import make_readable
 from services.ads_service import generate_ad_assets
@@ -17,7 +17,6 @@ from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
-
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
@@ -246,16 +245,79 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
         raise HTTPException(status_code=500, detail=str(e))
     
 
-@router.post("/search_term_analyzer")
-async def analyze_search_terms(request: Request):
+class AnalyzeSearchTermRequest(BaseModel):
+    client_code: str
+    customer_id: str
+    login_customer_id: str
+    campaign_id: str
+    duration: str  # e.g., "LAST_30_DAYS" or "01/01/2025,31/01/2025"
+
+
+@router.post("/search_term")
+async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
+    """
+    Endpoint to analyze search terms and classify them as positive or negative.
+    """
     try:
-        payload = await request.json()
-        results = classify_search_terms(payload)
-        return JSONResponse(content=results, status_code=200)
-    except Exception as e:
-        return JSONResponse(
-            content={"error": str(e)}, status_code=400
+        # Initialize pipeline
+        pipeline = SearchTermPipeline(
+            client_code=request.client_code,
+            customer_id=request.customer_id,
+            login_customer_id=request.login_customer_id,
+            campaign_id=request.campaign_id,
+            duration=request.duration
         )
+
+        # Run pipeline asynchronously (fetch keywords → fetch search terms → classify)
+        results = await pipeline.run_pipeline()
+
+        return JSONResponse(
+            content={
+                "status": "success",
+                "data": results
+            },
+            status_code=200
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# previous version
+#  ------ analyze Search term Endpoint ------
+# class AnalyzeSearchTermRequest(BaseModel):
+#     client_code: str
+#     customer_id: str
+#     login_customer_id: str
+#     campaign_id: str
+#     duration: str  
+
+# @router.post("/search_term")
+# async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
+#     try:
+        
+#         pipeline = SearchTermPipeline(
+#             client_code=request.client_code,
+#             customer_id=request.customer_id,
+#             login_customer_id=request.login_customer_id,
+#             campaign_id=request.campaign_id,
+#             duration=request.duration
+#         )
+
+#         # Run pipeline asynchronously
+#         results = await pipeline.run_pipeline()
+
+#         return JSONResponse(
+#             content={
+#                 "status": "success",
+#                 "data": results
+#             },
+#             status_code=200
+#         )
+    
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 # ----- Router Endpoint For Generete Site Lins -----
 
