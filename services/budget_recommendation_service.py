@@ -2,15 +2,13 @@ from fastapi import HTTPException
 from typing import Dict, Any
 import json
 import httpx
-import re
 import os
-from dotenv import load_dotenv
 
+from models.budget_model import BudgetRecommendationResponse
 from services.openai_client import chat_completion
 from utils.prompt_loader import load_prompt
 from oserver.connection import fetch_google_api_token_simple
 
-load_dotenv()
 
 DEVELOPER_TOKEN = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
@@ -109,21 +107,15 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
                                                  campaign_id: str, start_date: str, end_date: str,
                                                  client_code: str) -> Dict[str, Any]:
     try:
-        # 1️⃣ Fetch access token
-        access_token = fetch_google_api_token_simple(client_code=client_code)
+        # Fetch access token
+        # access_token = fetch_google_api_token_simple(client_code=client_code)
+        access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
 
-        # 2️⃣ Fetch data
         audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
         metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
 
-        print("\n========= AUDIT LOGS =========")
-        print(json.dumps(audit_logs, indent=2))
-        print("\n========= METRICS DATA =========")
-        print(json.dumps(metrics, indent=2))
-
-        # 3️⃣ Handle Case 3: No audit logs & all-zero metrics
+        # Handle No audit logs & all-zero metrics
         if (not audit_logs or len(audit_logs) == 0) and _metrics_all_zero(metrics):
-            print("⚠️ No audit logs or all-zero metrics → returning 'No budget suggestions'")
             return {
                 "campaign_id": campaign_id,
                 "recommended_budget": {
@@ -132,7 +124,7 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
                 }
             }
 
-        # 4️⃣ Case 1 or 2: Data present → Send to LLM for recommendation
+        # Data present → Send to LLM for recommendation
         prompt_template = load_prompt("budget_recommendation_prompt.txt")
         formatted_prompt = prompt_template.format(
             audit_logs=json.dumps(audit_logs, indent=2),
@@ -142,57 +134,33 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
 
         response = await chat_completion(
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert Google Ads budget analyst. "
-                        "Analyze the provided audit logs and campaign metrics. "
-                        "Recommend a new daily budget that can increase, decrease, or maintain, "
-                        "based purely on performance insights and budget history."
-                    )
-                },
+                {"role": "system", "content": "You are an expert Google Ads budget analyst."},
                 {"role": "user", "content": formatted_prompt}
             ],
             model="gpt-4o-mini"
         )
-
-        # 5️⃣ Parse LLM response safely
-        parsed = {}
-        if isinstance(response, dict):
-            parsed = response
-        else:
-            content_clean = response.strip().replace('\\"', '"')
-            try:
-                parsed = json.loads(content_clean)
-            except json.JSONDecodeError:
-                campaign_id_match = re.search(r'"campaign_id"\s*:\s*"([^"]*)"', content_clean)
-                suggested_amount_match = re.search(r'"suggested_amount"\s*:\s*("[^"]*"|\d+)', content_clean)
-                rationale_match = re.search(r'"rationale"\s*:\s*"([^"]*)"', content_clean)
-                parsed = {
-                    "campaign_id": campaign_id_match.group(1) if campaign_id_match else campaign_id,
-                    "recommended_budget": {
-                        "suggested_amount": suggested_amount_match.group(1) if suggested_amount_match else "",
-                        "rationale": rationale_match.group(1) if rationale_match else "No rationale provided."
-                    }
-                }
-
-        # 6️⃣ Validate and finalize amounts
-        suggested_amount = parsed["recommended_budget"].get("suggested_amount", "")
+        
+        # Parse response using Pydantic schema
         try:
-            if isinstance(suggested_amount, str):
-                suggested_amount = suggested_amount.replace('"', '').strip()
-            suggested_amount_value = float(suggested_amount)
-        except (ValueError, TypeError):
-            raise HTTPException(status_code=500, detail=f"Invalid suggested_amount value: {suggested_amount}")
+            if isinstance(response, dict):
+                parsed_response = BudgetRecommendationResponse(**response)
+            else:
+                content = response.choices[0].message.content.strip()
+                # Strip markdown code block if present
+                if content.startswith("```"):
+                    content = "\n".join(content.splitlines()[1:-1]).strip()
+                    
+                parsed_response = BudgetRecommendationResponse.model_validate_json(content)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"LLM response parsing failed: {str(e)}")
 
-        # Convert to micros
-        suggested_amount_micros = int(suggested_amount_value)
+        suggested_amount_micros = int(parsed_response.recommended_budget.suggested_amount)
 
         return {
-            "campaign_id": parsed.get("campaign_id", campaign_id),
+            "campaign_id": parsed_response.campaign_id,
             "recommended_budget": {
                 "suggested_amount_micros": suggested_amount_micros,
-                "rationale": parsed["recommended_budget"].get("rationale", "No rationale provided.")
+                "rationale": parsed_response.recommended_budget.rationale
             }
         }
 
