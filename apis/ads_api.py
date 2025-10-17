@@ -258,7 +258,7 @@ class AnalyzeSearchTermRequest(BaseModel):
 
 
 # ✅ New helper function to initialize the class
-def initialize_search_term_pipeline(request: AnalyzeSearchTermRequest):
+def start_search_term_pipeline(request: AnalyzeSearchTermRequest):
     return SearchTermPipeline(
         client_code=request.client_code,
         customer_id=request.customer_id,
@@ -272,7 +272,7 @@ def initialize_search_term_pipeline(request: AnalyzeSearchTermRequest):
 async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
     """Endpoint to analyze search terms and classify them as positive or negative."""
     try:
-        pipeline = initialize_search_term_pipeline(request)
+        pipeline = start_search_term_pipeline(request)
         results = await pipeline.run_pipeline()
         return JSONResponse(
             content={"status": "success", "data": results},

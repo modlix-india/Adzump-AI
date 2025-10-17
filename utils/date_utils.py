@@ -17,4 +17,4 @@ def format_duration_clause(duration: str) -> str:
         end_date = normalize(end_raw)
         return f"BETWEEN '{start_date}' AND '{end_date}'"
     else:
-        return duration
+        return f"DURING {duration}"

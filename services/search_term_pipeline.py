@@ -5,6 +5,7 @@ from services.search_term_analyzer import analyze_search_term_performance
 import httpx
 from utils.date_utils import format_duration_clause
 import logging
+from oserver.connection import fetch_google_api_token_simple
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,8 @@ class SearchTermPipeline:
         self.campaign_id = campaign_id
         self.duration = duration.strip()
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self.access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+
+        self.access_token = fetch_google_api_token_simple(client_code=client_code)
 
     # STEP 1: FETCH KEYWORDS
     async def fetch_keywords(self) -> list:
@@ -45,7 +47,6 @@ class SearchTermPipeline:
             }
 
             duration_clause = format_duration_clause(self.duration)
-
             query = f"""
             SELECT
                 ad_group.id,
@@ -65,13 +66,11 @@ class SearchTermPipeline:
             FROM keyword_view
             WHERE campaign.id = {self.campaign_id}
             AND segments.date {duration_clause}
-            AND ad_group_criterion.status != 'REMOVED'
+            AND ad_group_criterion.status = 'ENABLED'
             ORDER BY ad_group.id, segments.date
             """
-
             async with httpx.AsyncClient() as client:
                 response = await client.post(endpoint, headers=headers, json={"query": query})
-                response.raise_for_status()
 
             data = response.json()
             keywords = []
@@ -96,7 +95,6 @@ class SearchTermPipeline:
                 if keyword_text:
                     clicks = _safe_int(metric.get("clicks"))
                     conversions = _safe_float(metric.get("conversions"))
-                    conversion_rate = (conversions / clicks * 100) if clicks > 0 else 0.0
 
                     keywords.append({
                         "keyword": keyword_text,
@@ -111,7 +109,6 @@ class SearchTermPipeline:
                         "average_cpc": _safe_float(metric.get("average_cpc")),
                         "cost_micros": _safe_int(metric.get("cost_micros")),
                         "conversions": conversions,
-                        "conversion_rate": round(conversion_rate, 2),
                         "date": row.get("segments", {}).get("date"),
                     })
 
@@ -128,7 +125,6 @@ class SearchTermPipeline:
     def fetch_search_terms(self, keywords: list) -> list:
         """Fetch all search terms for multiple keywords in one API call (with safe error handling)."""
         logger.info("Fetching search terms...")
-
         if not keywords:
             logger.warning("No keywords provided.")
             return []
@@ -183,9 +179,7 @@ class SearchTermPipeline:
                 AND segments.date {duration_clause}
                 AND segments.keyword.info.text IN {in_clause}
             """
-
             response = requests.post(endpoint, headers=headers, json={"query": query})
-            response.raise_for_status()
 
             data = response.json()
 
@@ -241,13 +235,8 @@ class SearchTermPipeline:
             logger.exception(f"Unexpected error: {e}")
             return []
 
-    # STEP 3: CLASSIFY SEARCH TERMS (Metric-based)
-    async def analyze_search_term_performance(self, search_terms: list) -> list:
-        """Classify search terms using cost-per-conversion rule."""
-        logger.info("Classifying search terms (cost_per_conversion-based)...")
-        return await analyze_search_term_performance(search_terms)
 
-    # STEP 4: RUN PIPELINE
+    # STEP 3: RUN PIPELINE
     async def run_pipeline(self) -> list:
         """Full flow: fetch keywords → fetch search terms → classify."""
         logger.info("Running full search term analysis pipeline...")
@@ -262,5 +251,5 @@ class SearchTermPipeline:
             logger.warning("No search terms found — skipping classification.")
             return []
 
-        classified_terms = await self.analyze_search_term_performance(search_terms)
+        classified_terms = await analyze_search_term_performance(search_terms)
         return classified_terms
