@@ -108,9 +108,8 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
                                                  client_code: str) -> Dict[str, Any]:
     try:
         # Fetch access token
-        # access_token = fetch_google_api_token_simple(client_code=client_code)
-        access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
-
+        access_token = fetch_google_api_token_simple(client_code=client_code)
+        
         audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
         metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
 
