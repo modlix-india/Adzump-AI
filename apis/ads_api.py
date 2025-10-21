@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
+from services.search_term_pipeline import SearchTermPipeline
 from services.summarise_external_links import summarize_with_context
 from services.summary import make_readable
 from services.ads_service import generate_ad_assets
@@ -245,6 +246,39 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
             "status": "success",
             "optimizedData": result
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+class AnalyzeSearchTermRequest(BaseModel):
+    client_code: str
+    customer_id: str
+    login_customer_id: str
+    campaign_id: str
+    duration: str  # e.g., "LAST_30_DAYS" or "01/01/2025,31/01/2025"
+
+
+# ✅ New helper function to initialize the class
+def start_search_term_pipeline(request: AnalyzeSearchTermRequest):
+    return SearchTermPipeline(
+        client_code=request.client_code,
+        customer_id=request.customer_id,
+        login_customer_id=request.login_customer_id,
+        campaign_id=request.campaign_id,
+        duration=request.duration,
+    )
+
+
+@router.post("/search_term")
+async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
+    """Endpoint to analyze search terms and classify them as positive or negative."""
+    try:
+        pipeline = start_search_term_pipeline(request)
+        results = await pipeline.run_pipeline()
+        return JSONResponse(
+            content={"status": "success", "data": results},
+            status_code=200
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
