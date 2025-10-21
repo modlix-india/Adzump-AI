@@ -17,6 +17,7 @@ from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
+from services.budget_recommendation_service import generate_budget_recommendation_service
 
 
 
@@ -287,7 +288,7 @@ class SitelinkRequest(BaseModel):
     data_object_id: str
 
 
-@router.post("/generate_sitelinks")
+@router.post("/generate-sitelinks")
 async def create_sitelinks(
     request: SitelinkRequest,
     access_token: str = Header(..., alias="access-token"),
@@ -306,6 +307,34 @@ async def create_sitelinks(
         )
         return {"sitelinks": sitelinks}
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+# -------------------- Budget Recommendation --------------------
+
+class BudgetRequest(BaseModel):
+    clientCode: str
+    loginCustomerId: str
+    customerId: str
+    campaignId: str
+    startDate: str
+    endDate: str
+
+@router.post("/generate_budget_recommendation")
+async def generate_budget_recommendation(request: BudgetRequest):
+    try:
+        result = await generate_budget_recommendation_service(
+            customer_id=request.customerId,
+            login_customer_id=request.loginCustomerId,
+            campaign_id=request.campaignId,
+            start_date=request.startDate,
+            end_date=request.endDate,
+            client_code=request.clientCode
+        )
+        return {"status": "success", "data": result}
     except HTTPException:
         raise
     except Exception as e:
