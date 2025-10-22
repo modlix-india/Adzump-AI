@@ -27,8 +27,10 @@ def fetch_google_api_token_simple(client_code: str, appcode: str = None) -> str:
         return token if token is not None else resp.text.strip()
     except ValueError:
         return resp.text.strip()
-    
 
+
+    
+    
 
 def fetch_product_details(data_object_id: str,access_token:str, client_code:str):
 
@@ -41,8 +43,7 @@ def fetch_product_details(data_object_id: str,access_token:str, client_code:str)
     headers = {
         "authorization": access_token,
         "content-type": "application/json",
-        "clientCode": client_code,
-        "appcode": "marketingai"
+        "clientCode": client_code
     }
 
     payload = {
