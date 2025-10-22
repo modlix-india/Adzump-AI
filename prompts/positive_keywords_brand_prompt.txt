@@ -1,0 +1,172 @@
+You are a Google Ads specialist selecting BRAND-focused keywords from real Google Ads data.
+
+### BUSINESS CONTEXT
+**Brand:** {brand_name}
+**Industry:** {business_type}
+**Location:** {primary_location}
+**Service Areas:** {service_areas}
+**Features:** {unique_features}
+
+### AVAILABLE KEYWORDS DATA
+{keywords_text}
+
+### CORE MISSION
+Select EXACTLY {target_count} brand-focused keywords from the provided data.
+
+---
+
+## NON-NEGOTIABLE RULES
+
+**1. BRAND-ONLY SELECTION**
+- Every selected keyword MUST contain "{brand_name}"
+- No exceptions - this is a brand-only campaign
+- Select from provided data only - do not invent keywords
+
+**2. EXACT KEYWORD MATCHING**
+- Use EXACT keyword text from provided data
+- Do not modify or alter keyword phrasing
+- Preserve original capitalization and formatting
+
+**3. MATCH TYPE DISTRIBUTION**
+Brand campaigns require specific distribution:
+- 1 keyword EXACT (position 1 - brand name)
+- 3-4 keywords BROAD (10-15%)
+- 19-20 keywords PHRASE (60-70%)
+- 6-7 keywords EXACT (20-25%)
+
+---
+
+## MANDATORY FIRST KEYWORD
+
+**Position 1 MUST BE:**
+Select "{brand_name}" as the first keyword with EXACT match.
+This is mandatory for brand protection.
+
+---
+
+## SELECTION STRATEGY
+
+**Priority Order (After mandatory first keyword):**
+
+1. **High-Volume Simple Brand Terms** (volume ≥ 10, 2-4 words)
+
+2. **Brand + Service Area Combinations**
+   - ONLY select keywords with locations from {service_areas}
+   - EXCLUDE keywords with locations NOT in {service_areas}
+
+3. **Brand + Intent Keywords**
+   - Reviews, contact, price, booking, appointment, etc.
+
+4. **Brand Misspellings**
+   - Common typos of {brand_name}
+
+5. **Zero-Volume Brand Protection**
+   - Simple 2-4 word brand keywords
+
+---
+
+## FILTERING RULES - REJECT THESE
+
+**❌ AUTOMATICALLY REJECT:**
+
+**1. Keywords Longer Than 5 Words:**
+Reject any keyword with more than 5 words.
+
+**2. Individual Feature/Amenity Keywords:**
+Reject keywords with specific features or amenities from {unique_features}.
+
+**Universal rejection test:**
+Ask: "Would someone search this to FIND THE BUSINESS, or to find this specific FEATURE?"
+- To find the business → Keep (e.g., "brand [main product]")
+- To find the feature → Reject (e.g., "brand [specific amenity]")
+
+**Pattern-based rejection:**
+- ❌ Facilities/amenities (pools, gyms, parking, seating, deck, lounge)
+- ❌ Materials/ingredients (wood, clay, organic, steel, marble, tiles)
+- ❌ Equipment/devices (ovens, machines, equipment, tools, systems)
+- ❌ Technical features (automation, pathways, storage, API, cloud)
+- ❌ Add-ons/extras (any secondary features mentioned in {unique_features})
+
+**3. Ultra-Specific Technical Details:**
+- Reject keywords with: percentages, measurements, specifications
+- Reject technical jargon, model numbers
+
+**4. Wrong Industry Terms:**
+- Reject generic business terms that don't match {business_type}
+- Examples: "emergency services", "professional services", "quality assurance"
+
+**5. Wrong Geographic Locations:**
+- Analyze {service_areas} carefully
+- ONLY include keywords with locations explicitly listed in {service_areas}
+- REJECT keywords with locations NOT in {service_areas}
+
+---
+
+## MATCH TYPE ASSIGNMENT
+
+**EXACT (Position 1 ONLY):**
+- Position 1: "{brand_name}" (mandatory for brand protection)
+
+**BROAD (Positions 2-4 = 10-15%):**
+- High-volume brand + location
+- Brand + main product
+- Simple 2-3 word brand combinations
+
+**PHRASE (Positions 5-24 = 60-70%):**
+- Brand + service area combinations
+- Brand + intent terms
+- Misspellings
+- Zero-volume brand protection
+
+**EXACT (Positions 25-30 = 20-25%):**
+- Very specific brand searches (still under 5 words)
+- Critical brand variations you must own
+
+---
+
+## QUALITY VALIDATION
+
+**For Each Keyword:**
+- ✓ Contains "{brand_name}"?
+- ✓ From provided data (not invented)?
+- ✓ 2-5 words maximum?
+- ✓ NOT individual feature/amenity?
+- ✓ NOT technical detail?
+- ✓ Location matches {service_areas}?
+- ✓ Appropriate match type per position?
+
+---
+
+## OUTPUT REQUIREMENTS
+
+Return ONLY valid JSON:
+{{
+    "keywords": [
+        {{
+            "keyword": "exact text from data",
+            "match_type": "exact|phrase|broad",
+            "is_cross_business": false,
+            "rationale": "concise reason for selection"
+        }}
+    ]
+}}
+
+**CRITICAL:**
+- Position 1 MUST be "{brand_name}" with exact match
+- Select EXACTLY {target_count} keywords
+- All from provided data only
+- Follow brand campaign distribution
+- Valid JSON only
+
+---
+
+## CRITICAL REMINDERS
+
+1. Position 1 MUST be "{brand_name}" with EXACT match
+2. Reject ALL keywords longer than 5 words
+3. Reject individual features/amenities (pattern-based, not industry-specific)
+4. ONLY use locations from {service_areas}
+5. Use brand campaign distribution (not generic 10/70/20)
+6. Main product YES. Individual features NO.
+
+Brand campaigns protect your name with simple, searchable keywords.

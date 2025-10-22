@@ -17,6 +17,11 @@ from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
 
+from models.keyword_model import (
+    KeywordResearchRequest,
+    OptimizedKeyword,
+)
+
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -179,56 +184,61 @@ async def fetch_exteranl_summary(req: SummaryRequest):
 
 gks = GoogleKeywordService()
 
-class GoogleKeywordsRequest(BaseModel):
-    scraped_data: str
-    customer_id: str
-    url: str = None
-    location_ids: List[str] = []
-    language_id: int = 1000
-    seed_count: int = 40
-    target_positive_count: int = 30
+class GoogleKeywordsRequest(KeywordResearchRequest):
+    """Inherits all the fields from KeywordResearchRequest"""
+    pass
 
 class GoogleNegativeRequest(BaseModel):
-    scraped_data: str
-    url: str = None
-    positive_keywords: List[Dict[str, Any]]
-
+    data_object_id:str
+    positive_keywords:List[OptimizedKeyword]
 
 @router.post("/gks/positive")
 async def gks_positive(
         google_keyword_request: GoogleKeywordsRequest,
         client_code: str = Header(..., alias="clientCode"),
-        session_id: str = Header(..., alias="sessionId")
+        session_id: str = Header(..., alias="sessionId"),
+        access_token:str = Header(...,alias="access-token")
 ):
     try:
-        positives = gks.extract_positive_strategy(
-            scraped_data=google_keyword_request.scraped_data,
-            customer_id=google_keyword_request.customer_id,
+        request_dict = google_keyword_request.model_dump()
+
+        positives = await gks.extract_positive_strategy(
+            customer_id=request_dict["customer_id"],
             client_code=client_code,
             session_id=session_id,
-            location_ids=google_keyword_request.location_ids,
-            url=google_keyword_request.url,
-            language_id=google_keyword_request.language_id,
-            seed_count=google_keyword_request.seed_count,
-            target_positive_count=google_keyword_request.target_positive_count,
+            access_token=access_token,
+            keyword_type=request_dict["keyword_type"],
+            data_object_id=request_dict["data_object_id"],
+            location_ids=request_dict["location_ids"],
+            language_id=request_dict["language_id"],
+            seed_count=request_dict["seed_count"],
+            target_positive_count=request_dict["target_positive_count"],
         )
-        return {"status": "success", "positive_keywords": positives}
+        return {"status": "success", "data": positives}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/gks/negative")
-async def gks_negative(google_keyword_request: GoogleNegativeRequest, ):
+async def gks_negative(google_keyword_request:GoogleNegativeRequest,
+                    client_code:str = Header(...,alias="clientCode"),
+                    access_token:str = Header(...,alias="access-token")
+):
     try:
-        negatives = gks.generate_negative_keywords(
-            optimized_positive_keywords=google_keyword_request.positive_keywords,
-            scraped_data=google_keyword_request.scraped_data,
-            url=google_keyword_request.url
+        negatives = await gks.extract_negative_strategy(
+            client_code=client_code,
+            access_token=access_token,
+            positive_keywords=google_keyword_request.positive_keywords,
+            data_object_id=google_keyword_request.data_object_id
         )
-        return {"status": "success", "negative_keywords": negatives}
+        return{
+            "status":"success",
+            "data":{
+                "negative_keywords":negatives,
+                "total_negatives":len(negatives)
+            }
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
+        raise HTTPException(status_code=500,detail=str(e))
 class OptimizeCampaignRequest(BaseModel):
     campaignData: List[Dict]
     basicData: Dict
