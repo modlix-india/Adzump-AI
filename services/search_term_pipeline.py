@@ -31,9 +31,7 @@ class SearchTermPipeline:
         self.campaign_id = campaign_id
         self.duration = duration.strip()
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self.access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
-
-        # self.access_token = fetch_google_api_token_simple(client_code=client_code)
+        self.access_token = fetch_google_api_token_simple(client_code=client_code)
 
     # STEP 1: FETCH KEYWORDS
     async def fetch_keywords(self) -> list:
