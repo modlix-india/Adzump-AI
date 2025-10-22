@@ -31,7 +31,6 @@ class SearchTermPipeline:
         self.campaign_id = campaign_id
         self.duration = duration.strip()
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-
         self.access_token = fetch_google_api_token_simple(client_code=client_code)
 
     # STEP 1: FETCH KEYWORDS
@@ -160,6 +159,7 @@ class SearchTermPipeline:
 
             query = f"""
             SELECT
+                ad_group.id,
                 search_term_view.ad_group,
                 search_term_view.resource_name,
                 search_term_view.search_term,
@@ -180,7 +180,6 @@ class SearchTermPipeline:
                 AND segments.keyword.info.text IN {in_clause}
             """
             response = requests.post(endpoint, headers=headers, json={"query": query})
-
             data = response.json()
 
             if "error" in data:
@@ -197,6 +196,13 @@ class SearchTermPipeline:
                 term = search_view.get("searchTerm")
                 status = (search_view.get("status") or "").strip().upper()
                 keyword_text = segments.get("keyword", {}).get("info", {}).get("text")
+                ad_group_id = row.get("adGroup", {}).get("resourceName")
+                # match_type = segments.get("search_term_match_type")
+                match_type = (
+                segments.get("searchTermMatchType")
+                or segments.get("search_term_match_type")
+                or segments.get("searchterm_match_type")
+            )
 
                 if status in ["EXCLUDED", "ADDED_EXCLUDED", "ADDED"]:
                     continue
@@ -209,6 +215,8 @@ class SearchTermPipeline:
                     "searchterm": term,
                     "keyword": keyword_text,
                     "status": status,
+                    "adGroupId": ad_group_id,
+                    "matchType": match_type,
                     "metrics": {
                         "impressions": _safe_int(metrics.get("impressions")),
                         "clicks": _safe_int(metrics.get("clicks")),
