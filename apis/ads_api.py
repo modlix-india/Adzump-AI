@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request, Header
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
+from services.search_term_pipeline import SearchTermPipeline
 from services.summarise_external_links import summarize_with_context
 from services.summary import make_readable
 from services.ads_service import generate_ad_assets
@@ -17,6 +18,7 @@ from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
 from services.budget_recommendation_service import generate_budget_recommendation_service
+from services.age_optimization_service import generate_age_optimization_service
 
 
 
@@ -247,6 +249,39 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+class AnalyzeSearchTermRequest(BaseModel):
+    client_code: str
+    customer_id: str
+    login_customer_id: str
+    campaign_id: str
+    duration: str  # e.g., "LAST_30_DAYS" or "01/01/2025,31/01/2025"
+
+
+# ✅ New helper function to initialize the class
+def start_search_term_pipeline(request: AnalyzeSearchTermRequest):
+    return SearchTermPipeline(
+        client_code=request.client_code,
+        customer_id=request.customer_id,
+        login_customer_id=request.login_customer_id,
+        campaign_id=request.campaign_id,
+        duration=request.duration,
+    )
+
+
+@router.post("/search_term")
+async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
+    """Endpoint to analyze search terms and classify them as positive or negative."""
+    try:
+        pipeline = start_search_term_pipeline(request)
+        results = await pipeline.run_pipeline()
+        return JSONResponse(
+            content={"status": "success", "data": results},
+            status_code=200
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ----- Router Endpoint For Generete Site Lins -----
 
@@ -293,6 +328,34 @@ class BudgetRequest(BaseModel):
 async def generate_budget_recommendation(request: BudgetRequest):
     try:
         result = await generate_budget_recommendation_service(
+            customer_id=request.customerId,
+            login_customer_id=request.loginCustomerId,
+            campaign_id=request.campaignId,
+            start_date=request.startDate,
+            end_date=request.endDate,
+            client_code=request.clientCode
+        )
+        return {"status": "success", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+# -------------------- Age Optimization --------------------
+
+class AgeOptimizationRequest(BaseModel):
+    clientCode: str
+    loginCustomerId: str
+    customerId: str
+    campaignId: str
+    startDate: str
+    endDate: str
+    
+@router.post("/generate_age_optimization")
+async def generate_age_optimization(request: AgeOptimizationRequest):
+    try:
+        result = await generate_age_optimization_service(
             customer_id=request.customerId,
             login_customer_id=request.loginCustomerId,
             campaign_id=request.campaignId,

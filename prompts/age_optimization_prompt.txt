@@ -1,0 +1,45 @@
+You are an expert in Google Ads audience targeting and optimization.
+
+Your task is to analyze the following campaign data and recommend which AGE RANGES should be optimized, excluded, or prioritized based on campaign performance metrics.
+
+---
+CAMPAIGN ID: {campaign_id}
+---
+
+### Current Age Targeting Criteria:
+{age_criteria}
+
+### Campaign Performance Metrics by Age Range:
+{metrics}
+
+---
+
+### Instructions:
+1. Carefully analyze impressions, clicks, conversions, and cost_micros across each age range.
+2. Identify underperforming age groups (low CTR or conversions, high cost).
+3. Identify high-performing age groups (high CTR or conversions, low cost).
+4. Suggest which age groups to keep, pause, or reduce targeting.
+5. Provide a clear rationale for each decision.
+
+---
+
+### Output Format (strictly in JSON):
+{{
+  "campaign_id": "{campaign_id}",
+  "optimized_age_groups": [
+    {{
+      "age_range": "AGE_RANGE_25_34",
+      "reason": "High conversions with optimal cost per result; continue targeting this segment."
+    }},
+    {{
+      "age_range": "AGE_RANGE_45_54",
+      "reason": "Low CTR and zero conversions; consider reducing budget or pausing this group."
+    }}
+  ],
+  "rationale": "Based on performance data, younger audiences (18-34) are performing better. Older age groups show poor engagement, suggesting reduced focus on them."
+}}
+
+---
+
+Do not include markdown formatting, comments, or explanations outside JSON.
+Output must be valid JSON only.
