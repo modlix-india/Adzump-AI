@@ -18,6 +18,8 @@ from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
 from services.budget_recommendation_service import generate_budget_recommendation_service
+from services.callout_service import generate_callouts_service
+from services.structured_snippet_service import generate_structured_snippets_service
 
 
 
@@ -335,6 +337,57 @@ async def generate_budget_recommendation(request: BudgetRequest):
             client_code=request.clientCode
         )
         return {"status": "success", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+class CalloutRequest(BaseModel):
+    data_object_id: str
+
+
+@router.post("/generate-callouts")
+async def create_callouts(
+    request: CalloutRequest,
+    access_token: str = Header(..., alias="access-token"),
+    client_code: str = Header(..., alias="clientCode"),
+):
+    """
+    Generate AI-powered Google Ads Callout extensions from product summary.
+    """
+    try:
+        callouts = await generate_callouts_service(
+            data_object_id=request.data_object_id,
+            access_token=access_token,
+            client_code=client_code
+        )
+        return {"callouts": callouts}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+class StructuredSnippetRequest(BaseModel):
+    data_object_id: str
+
+
+@router.post("/generate-structured-snippets")
+async def create_structured_snippets(
+    request: StructuredSnippetRequest,
+    access_token: str = Header(..., alias="access-token"),
+    client_code: str = Header(..., alias="clientCode"),
+):
+    """
+    Generate structured snippet assets (using valid Google headers only).
+    """
+    try:
+        structured_snippets = await generate_structured_snippets_service(
+            data_object_id=request.data_object_id,
+            access_token=access_token,
+            client_code=client_code
+        )
+        return {"structured_snippets": structured_snippets}
+
     except HTTPException:
         raise
     except Exception as e:
