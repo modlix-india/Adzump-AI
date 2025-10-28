@@ -14,7 +14,7 @@ DEVELOPER_TOKEN = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 # ---------------------- Fetch Campaign Metrics ----------------------
 async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, access_token: str,
                                  campaign_id: str, start_date: str, end_date: str) -> List[dict]:
-    url = f"https://googleads.googleapis.com/v20/customers/{customer_id}/googleAds:searchStream"
+    url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:searchStream"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "developer-token": DEVELOPER_TOKEN,
@@ -23,61 +23,69 @@ async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, acces
     }
 
     query = f"""
-    SELECT campaign.id, campaign.name, metrics.clicks, metrics.impressions,
-           metrics.conversions, metrics.cost_micros
-    FROM campaign
-    WHERE campaign.id = {campaign_id}
-      AND segments.date BETWEEN '{start_date}' AND '{end_date}'
+    SELECT campaign.id,
+           campaign.name,
+           ad_group.id,
+           ad_group.name,
+           age_range_view.resource_name,
+           ad_group_criterion.age_range.type,
+           metrics.impressions,
+           metrics.clicks,
+           metrics.conversions,
+           metrics.cost_micros
+    FROM age_range_view
+    WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+      AND campaign.id = {campaign_id}
     """
+
     payload = {"query": query}
 
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(url, headers=headers, json=payload)
+
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code,
-                                detail=f"Metrics fetch failed: {response.text}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Metrics fetch failed: {response.text}"
+            )
 
         metrics_data = []
-        for chunk in response.json():
-            metrics_data.extend(chunk.get("results", []))
+        try:
+            for chunk in response.json():
+                metrics_data.extend(chunk.get("results", []))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse metrics response: {str(e)}")
+
         return metrics_data
 
 
-# ---------------------- Fetch Age Targeting ----------------------
-async def fetch_age_criteria(customer_id: str, login_customer_id: str, access_token: str,
-                             campaign_id: str) -> List[dict]:
-    url = f"https://googleads.googleapis.com/v20/customers/{customer_id}/googleAds:search"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "developer-token": DEVELOPER_TOKEN,
-        "login-customer-id": login_customer_id,
-        "Content-Type": "application/json"
-    }
+# ---------------------- Calculate Performance Metrics ----------------------
+def calculate_performance_metrics(metrics_data: List[dict]) -> List[dict]:
+    calculated = []
+    for entry in metrics_data:
+        metrics = entry.get("metrics", {})
+        cost_micros = float(metrics.get("costMicros", 0))
+        clicks = float(metrics.get("clicks", 0))
+        impressions = float(metrics.get("impressions", 0))
+        conversions = float(metrics.get("conversions", 0))
 
-    query = f"""
-    SELECT ad_group_criterion.criterion_id, ad_group_criterion.type, ad_group_criterion.age_range.type,
-           campaign.name, campaign.id
-    FROM ad_group_criterion
-    WHERE ad_group_criterion.type = 'AGE_RANGE'
-      AND campaign.id = {campaign_id}
-    """
-    payload = {"query": query}
+        cost = cost_micros / 1_000_000  # Convert micros to standard currency unit
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(url, headers=headers, json=payload)
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code,
-                                detail=f"Age criteria fetch failed: {response.text}")
-        return response.json().get("results", [])
+        # Avoid division by zero
+        cpa = cost / conversions if conversions > 0 else 0.0
+        ctr = (clicks / impressions * 100) if impressions > 0 else 0.0
+        cpc = cost / clicks if clicks > 0 else 0.0
 
+        entry["calculated_metrics"] = {
+            "cost": round(cost, 2),
+            "CPA": round(cpa, 2),
+            "CTR": round(ctr, 2),
+            "CPC": round(cpc, 2)
+        }
 
-# ---------------------- Utility: Check Zero Metrics ----------------------
-def _metrics_all_zero(metrics_data: List[dict]) -> bool:
-    if not metrics_data:
-        return True
-    metrics = metrics_data[0].get("metrics", {})
-    keys = ["clicks", "impressions", "conversions", "costMicros"]
-    return all(float(metrics.get(k, 0)) == 0 for k in keys)
+        calculated.append(entry)
+
+    return calculated
 
 
 # ---------------------- Generate Age Optimization ----------------------
@@ -89,25 +97,31 @@ async def generate_age_optimization_service(customer_id: str, login_customer_id:
         access_token = fetch_google_api_token_simple(client_code=client_code)
 
         metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
-        age_criteria = await fetch_age_criteria(customer_id, login_customer_id, access_token, campaign_id)
-
-        # ---------------- Handle zero metrics / no age criteria ----------------
-        if _metrics_all_zero(metrics):
-            reason = "Metrics are all zero"
-            if not age_criteria or len(age_criteria) == 0:
-                reason += " and no age targeting found"
+        calculated_metrics = calculate_performance_metrics(metrics)
+        
+        if not calculated_metrics:
             return {
-                "campaign_id": campaign_id,
-                "optimized_age_groups": [{"age_range": "", "reason": reason}],
-                "rationale": reason
+                "campaigns": [
+                    {
+                        "campaign_id": campaign_id,
+                        "campaign_name": "",
+                        "ad_groups": [
+                            {
+                                "ad_group_id": "",
+                                "ad_group_name": "",
+                                "optimized_age_groups": [],
+                                "rationale_summary": "No metrics data found for this campaign."
+                            }
+                        ]
+                    }
+                ]
             }
-
+            
+            
         # Prepare LLM prompt
         prompt_template = load_prompt("age_optimization_prompt.txt")
         formatted_prompt = prompt_template.format(
-            campaign_id=campaign_id,
-            age_criteria=json.dumps(age_criteria, indent=2),
-            metrics=json.dumps(metrics, indent=2)
+            metrics=json.dumps(calculated_metrics, indent=2),
         )
 
         # Call OpenAI
