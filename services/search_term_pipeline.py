@@ -35,8 +35,13 @@ class SearchTermPipeline:
 
     # STEP 1: FETCH KEYWORDS
     async def fetch_keywords(self) -> list:
-        """Fetch all active non-removed keywords for the campaign (async)."""
+        """Fetch all active keywords for the campaign (async),
+        merge keyword_view (with metrics) + ad_group_criterion (all keywords).
+        Ensures all keywords appear, metrics default to 0 if missing.
+        """
         try:
+            import httpx
+
             endpoint = f"https://googleads.googleapis.com/v20/customers/{self.customer_id}/googleAds:search"
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
@@ -46,7 +51,10 @@ class SearchTermPipeline:
             }
 
             duration_clause = format_duration_clause(self.duration)
-            query = f"""
+
+           # Fetch from keyword_view 
+
+            keyword_view_query = f"""
             SELECT
                 ad_group.id,
                 ad_group.name,
@@ -66,59 +74,139 @@ class SearchTermPipeline:
             WHERE campaign.id = {self.campaign_id}
             AND segments.date {duration_clause}
             AND ad_group_criterion.status = 'ENABLED'
+            AND ad_group_criterion.negative = FALSE
             ORDER BY ad_group.id, segments.date
             """
+
             async with httpx.AsyncClient() as client:
-                response = await client.post(endpoint, headers=headers, json={"query": query})
+                kw_response = await client.post(endpoint, headers=headers, json={"query": keyword_view_query})
+            kw_data = kw_response.json().get("results", [])
+            logger.info(f"Keyword View returned {len(kw_data)} rows")
 
-            data = response.json()
-            keywords = []
+            # Fetch from ad_group_criterion (all keywords)
 
-            def _safe_float(value):
-                try:
-                    return float(value)
-                except (TypeError, ValueError):
-                    return 0.0
+            ad_group_criterion_query = f"""
+            SELECT
+                ad_group.id,
+                ad_group.name,
+                ad_group_criterion.criterion_id,
+                ad_group_criterion.keyword.text,
+                ad_group_criterion.keyword.match_type,
+                ad_group_criterion.status,
+                ad_group_criterion.negative
+            FROM ad_group_criterion
+            WHERE ad_group_criterion.type = 'KEYWORD'
+            AND ad_group_criterion.status = 'ENABLED'
+            AND campaign.id = {self.campaign_id}
+            AND ad_group.status = 'ENABLED'
+            AND ad_group_criterion.negative = FALSE
+            """
 
-            def _safe_int(value):
-                try:
-                    return int(float(value))
-                except (TypeError, ValueError):
-                    return 0
+            async with httpx.AsyncClient() as client:
+                crit_response = await client.post(endpoint, headers=headers, json={"query": ad_group_criterion_query})
+            crit_data = crit_response.json().get("results", [])
+            logger.info(f" Ad Group Criterion returned {len(crit_data)} keywords")
 
-            for row in data.get("results", []):
+            # Helper utilities
+
+            def _safe_int(v):
+                try: return int(float(v))
+                except: return 0
+
+            def _safe_float(v):
+                try: return float(v)
+                except: return 0.0
+
+            def normalize(t: str) -> str:
+                if not t:
+                    return ""
+                t = t.lower().strip()
+                for ch in ["-", "_", "+", ".", ","]:
+                    t = t.replace(ch, " ")
+                return " ".join(t.split())
+
+            # Aggregate Keyword View metrics
+
+            kw_metrics = {}
+            for row in kw_data:
                 metric = row.get("metrics", {})
                 keyword_info = row.get("adGroupCriterion", {}).get("keyword", {})
+                ad_group = row.get("adGroup", {})
 
-                keyword_text = keyword_info.get("text")
-                if keyword_text:
-                    clicks = _safe_int(metric.get("clicks"))
-                    conversions = _safe_float(metric.get("conversions"))
+                text = normalize(keyword_info.get("text"))
+                match_type = keyword_info.get("matchType")
+                if not text or not match_type:
+                    continue
 
-                    keywords.append({
-                        "keyword": keyword_text,
-                        "ad_group_id": row.get("adGroup", {}).get("id"),
-                        "ad_group_name": row.get("adGroup", {}).get("name"),
-                        "match_type": keyword_info.get("match_type"),
-                        "quality_score": row.get("adGroupCriterion", {}).get("quality_info", {}).get("quality_score"),
-                        "negative": row.get("adGroupCriterion", {}).get("negative"),
-                        "impressions": _safe_int(metric.get("impressions")),
-                        "clicks": clicks,
-                        "ctr": _safe_float(metric.get("ctr")),
-                        "average_cpc": _safe_float(metric.get("average_cpc")),
-                        "cost_micros": _safe_int(metric.get("cost_micros")),
-                        "conversions": conversions,
-                        "date": row.get("segments", {}).get("date"),
-                    })
+                key = (text, match_type)
+                if key not in kw_metrics:
+                    kw_metrics[key] = {
+                        "impressions": 0,
+                        "clicks": 0,
+                        "cost_micros": 0,
+                        "conversions": 0.0,
+                        "quality_score": row.get("adGroupCriterion", {}).get("qualityInfo", {}).get("qualityScore"),
+                    }
 
-            return keywords
+                kw_metrics[key]["impressions"] += _safe_int(metric.get("impressions"))
+                kw_metrics[key]["clicks"] += _safe_int(metric.get("clicks"))
+                kw_metrics[key]["cost_micros"] += _safe_int(metric.get("costMicros"))
+                kw_metrics[key]["conversions"] += _safe_float(metric.get("conversions"))
+
+            # Merge both sources
+
+            merged = []
+            for row in crit_data:
+                keyword_info = row.get("adGroupCriterion", {}).get("keyword", {})
+                ad_group = row.get("adGroup", {})
+                text = normalize(keyword_info.get("text"))
+                match_type = keyword_info.get("matchType")
+                if not text or not match_type:
+                    continue
+
+                key = (text, match_type)
+                metrics = kw_metrics.get(key, {
+                    "impressions": 0,
+                    "clicks": 0,
+                    "cost_micros": 0,
+                    "conversions": 0.0,
+                    "quality_score": None,
+                })
+
+                imp = metrics["impressions"]
+                clk = metrics["clicks"]
+                cost = metrics["cost_micros"]
+                ctr = round((clk / imp) * 100, 2) if imp > 0 else 0.0
+                avg_cpc = round((cost / clk / 1_000_000), 2) if clk > 0 else 0.0
+
+                merged.append({
+                    "keyword": keyword_info.get("text"),
+                    "match_type": match_type,
+                    "ad_group_id": ad_group.get("id"),
+                    "ad_group_name": ad_group.get("name"),
+                    "impressions": imp,
+                    "clicks": clk,
+                    "ctr": ctr,
+                    "average_cpc": avg_cpc,
+                    "cost_micros": cost,
+                    "conversions": metrics["conversions"],
+                    "quality_score": metrics["quality_score"],
+                    "status": row.get("adGroupCriterion", {}).get("status"),
+                    "negative": row.get("adGroupCriterion", {}).get("negative"),
+                })
+
+            logger.info(f"Final merged keyword count: {len(merged)}")
+            count_with_metrics = sum(1 for x in merged if x["impressions"] > 0)
+            logger.info(f"Keywords with metrics: {count_with_metrics}, without metrics: {len(merged) - count_with_metrics}")
+
+            return merged
+
         except httpx.RequestError as e:
             logger.error(f"Request failed: {e}")
             return []
         except Exception as e:
             logger.exception(f"Unexpected error: {e}")
             return []
-
 
     # STEP 2: FETCH SEARCH TERMS
     def fetch_search_terms(self, keywords: list) -> list:
@@ -197,7 +285,6 @@ class SearchTermPipeline:
                 status = (search_view.get("status") or "").strip().upper()
                 keyword_text = segments.get("keyword", {}).get("info", {}).get("text")
                 ad_group_id = row.get("adGroup", {}).get("resourceName")
-                # match_type = segments.get("search_term_match_type")
                 match_type = (
                 segments.get("searchTermMatchType")
                 or segments.get("search_term_match_type")

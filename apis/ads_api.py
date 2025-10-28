@@ -281,6 +281,25 @@ async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+# Fetch keywords
+@router.post("/keywords")
+async def fetch_keywords_route(request: AnalyzeSearchTermRequest):
+    """Endpoint to fetch all campaign keywords with merged metrics (keyword_view + ad_group_criterion)."""
+    try:
+        pipeline = start_search_term_pipeline(request)
+        keywords = await pipeline.fetch_keywords()
+
+        return JSONResponse(
+            content={
+                "status": "success",
+                "data": keywords
+            },
+            status_code=200
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ----- Router Endpoint For Generete Site Lins -----
 
