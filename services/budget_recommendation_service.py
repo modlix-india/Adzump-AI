@@ -90,6 +90,41 @@ async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, acces
         return metrics
 
 
+# ---------------------- Fetch Old Budget ----------------------
+async def fetch_old_budget(customer_id: str, login_customer_id: str, access_token: str,
+                           campaign_id: str) -> dict:
+    """Fetch existing campaign budget settings."""
+    url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:search"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "developer-token": DEVELOPER_TOKEN,
+        "login-customer-id": login_customer_id,
+        "Content-Type": "application/json"
+    }
+
+    query = f"""
+    SELECT
+      campaign.id,
+      campaign_budget.amount_micros,
+      campaign_budget.name
+    FROM campaign
+    WHERE campaign.id = {campaign_id}
+    """
+
+    payload = {"query": query}
+    
+
+    async with httpx.AsyncClient(timeout=60) as client:
+        response = await client.post(url, headers=headers, json=payload)
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Old budget fetch failed: {response.text}"
+            )
+
+        return response.json()
+        
+
 # ---------------------- Utility: Metrics Check ----------------------
 def _metrics_all_zero(metrics_data: list) -> bool:
     """Return True if metrics are empty or all key metrics are zero."""
@@ -112,8 +147,8 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
         
         audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
         metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
-
-        # Handle No audit logs & all-zero metrics
+        
+        # CASE 4: Audit Logs empty + Metrics all zeros
         if (not audit_logs or len(audit_logs) == 0) and _metrics_all_zero(metrics):
             return {
                 "campaign_id": campaign_id,
@@ -122,14 +157,44 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
                     "rationale": "No audit logs or campaign performance metrics available to generate recommendation."
                 }
             }
+            
+        # CASE 3: Audit Logs + Metrics all zeros
+        if audit_logs and _metrics_all_zero(metrics):
+            return {
+                "campaign_id": campaign_id,
+                "recommended_budget": {
+                    "suggested_amount": "No budget suggestions",
+                    "rationale": "Campaign metrics are all zeros; unable to determine performance-based recommendations."
+                }
+            }
+            
+        # CASE 2: Audit Logs empty + Metrics present
+        if (not audit_logs or len(audit_logs) == 0) and not _metrics_all_zero(metrics):
+            results = await fetch_old_budget(customer_id, login_customer_id, access_token, campaign_id)
+            old_budget = (
+            results.get("results", [{}])[0]
+            .get("campaignBudget", {})
+            .get("amountMicros")
+            )
+            
+            # Prepare prompt using old budget + metrics
+            prompt_template = load_prompt("budget_recommendation_prompt.txt")
+            formatted_prompt = prompt_template.format(
+                audit_logs=json.dumps([]),
+                old_budget=json.dumps(old_budget, indent=2),
+                metrics=json.dumps(metrics, indent=2),
+                campaign_id=campaign_id
+            )
 
-        # Data present → Send to LLM for recommendation
-        prompt_template = load_prompt("budget_recommendation_prompt.txt")
-        formatted_prompt = prompt_template.format(
-            audit_logs=json.dumps(audit_logs, indent=2),
-            metrics=json.dumps(metrics, indent=2),
-            campaign_id=campaign_id
-        )
+        # CASE 1: Audit Logs present + Metrics present
+        else:
+            prompt_template = load_prompt("budget_recommendation_prompt.txt")
+            formatted_prompt = prompt_template.format(
+                audit_logs=json.dumps(audit_logs, indent=2),
+                old_budget=json.dumps({}, indent=2),
+                metrics=json.dumps(metrics, indent=2),
+                campaign_id=campaign_id
+            )
 
         response = await chat_completion(
             messages=[
