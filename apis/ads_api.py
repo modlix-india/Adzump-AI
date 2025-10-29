@@ -249,7 +249,6 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-
 class AnalyzeSearchTermRequest(BaseModel):
     client_code: str
     customer_id: str
@@ -258,7 +257,7 @@ class AnalyzeSearchTermRequest(BaseModel):
     duration: str  # e.g., "LAST_30_DAYS" or "01/01/2025,31/01/2025"
 
 
-# ✅ New helper function to initialize the class
+# New helper function to initialize the class
 def start_search_term_pipeline(request: AnalyzeSearchTermRequest):
     return SearchTermPipeline(
         client_code=request.client_code,
@@ -267,7 +266,6 @@ def start_search_term_pipeline(request: AnalyzeSearchTermRequest):
         campaign_id=request.campaign_id,
         duration=request.duration,
     )
-
 
 @router.post("/search_term")
 async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
@@ -279,25 +277,6 @@ async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
             content={"status": "success", "data": results},
             status_code=200
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-# Fetch keywords
-@router.post("/keywords")
-async def fetch_keywords_route(request: AnalyzeSearchTermRequest):
-    """Endpoint to fetch all campaign keywords with merged metrics (keyword_view + ad_group_criterion)."""
-    try:
-        pipeline = start_search_term_pipeline(request)
-        keywords = await pipeline.fetch_keywords()
-
-        return JSONResponse(
-            content={
-                "status": "success",
-                "data": keywords
-            },
-            status_code=200
-        )
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
