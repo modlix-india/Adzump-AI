@@ -19,6 +19,7 @@ from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
 from services.budget_recommendation_service import generate_budget_recommendation_service
 from services.age_optimization_service import generate_age_optimization_service
+from services.gender_optimization_service import generate_gender_optimization_service
 
 
 
@@ -356,6 +357,34 @@ class AgeOptimizationRequest(BaseModel):
 async def generate_age_optimization(request: AgeOptimizationRequest):
     try:
         result = await generate_age_optimization_service(
+            customer_id=request.customerId,
+            login_customer_id=request.loginCustomerId,
+            campaign_id=request.campaignId,
+            start_date=request.startDate,
+            end_date=request.endDate,
+            client_code=request.clientCode
+        )
+        return {"status": "success", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+# -------------------- Gender Optimization --------------------
+
+class GenderOptimizationRequest(BaseModel):
+    clientCode: str
+    loginCustomerId: str
+    customerId: str
+    campaignId: str
+    startDate: str
+    endDate: str
+
+@router.post("/generate_gender_optimization")
+async def generate_gender_optimization(request: GenderOptimizationRequest):
+    try:
+        result = await generate_gender_optimization_service(
             customer_id=request.customerId,
             login_customer_id=request.loginCustomerId,
             campaign_id=request.campaignId,

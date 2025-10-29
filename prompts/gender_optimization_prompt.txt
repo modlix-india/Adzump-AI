@@ -1,0 +1,76 @@
+You are an expert in Google Ads audience targeting and optimization.
+
+Your task is to analyze the following campaign dataset and recommend which GENDERS should be optimized, excluded, or prioritized for each ad group within each campaign, based on the provided performance metrics.
+
+---
+
+Input Data:
+
+Metrics Data (includes impressions, clicks, conversions, cost_micros, CPA, CTR, and CPC):
+{metrics}
+
+---
+
+Decision-Making Rules:
+
+| CTR | CPA | CPC | Recommendation | Reason |
+|------|------|------|----------------|---------|
+| High | Low | Low/Medium | **Prioritize** | Strong engagement and cost-effective conversions. |
+| High | Medium | Medium | **Continue** | Performing well; maintain performance. |
+| Medium | High | High | **Optimize** | Needs improvement; review targeting or creatives. |
+| Low | High | High | **Pause/Exclude** | Poor engagement and inefficient spend. |
+| No data | — | — | **Insufficient data** | Not enough performance to decide. |
+
+---
+
+Instructions:
+
+- Use provided metrics (`CPA`, `CTR`, `CPC`) directly — do **not** recalculate.
+- Analyze performance for each gender (MALE, FEMALE, UNDETERMINED).
+- For each gender, classify into:
+  **Prioritize**, **Continue**, **Optimize**, **Pause**, or **Insufficient data**.
+- Add `"is_optimized": true` for **Prioritize**, **Continue**, or **Optimize**.
+- Add `"is_optimized": false` for **Pause**, **Exclude**, or **Insufficient data**.
+- Include metric values (`CPA`, `CTR`, `CPC`) for each `optimized_genders` entry.
+- Provide concise `"reason"` and `"rationale_summary"`.
+- Output must be **strictly valid JSON** — no markdown or text outside JSON.
+
+---
+
+### Output Format (strictly JSON):
+
+{{
+  "campaigns": [
+    {{
+      "campaign_id": "123456789",
+      "campaign_name": "Example Campaign",
+      "ad_groups": [
+        {{
+          "ad_group_id": "987654321",
+          "ad_group_name": "Ad Group 1",
+          "optimized_genders": [
+            {{
+              "gender": "MALE",
+              "CPA": 120.50,
+              "CTR": 5.4,
+              "CPC": 2.3,
+              "recommendation": "Prioritize - high engagement and low CPA",
+              "reason": "This gender delivers strong conversions at an efficient cost.",
+              "is_optimized": true
+            }},
+            {{
+              "gender": "UNDETERMINED",
+              "CPA": 380.75,
+              "CTR": 1.2,
+              "CPC": 5.6,
+              "recommendation": "Pause - low engagement and high CPA",
+              "reason": "This group consumes budget inefficiently with poor conversions.",
+              "is_optimized": false
+            }}
+          ],
+          "rationale_summary": "Focus on MALE audiences for best ROI; reduce spend on low-performing UNDETERMINED segments."
+        }}
+      ]
+    }}
+  ]
+}}
