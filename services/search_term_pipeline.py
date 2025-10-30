@@ -2,8 +2,8 @@ import os
 import json
 import logging
 import requests
+import utils.date_utils as date_utils
 from services.search_term_analyzer import analyze_search_term_performance
-from utils.date_utils import format_duration_clause
 from third_party.google.services.keywords_service import fetch_keywords_service  # import new service
 from oserver.connection import fetch_google_api_token_simple
 
@@ -64,8 +64,8 @@ class SearchTermPipeline:
                 return 0
 
         try:
-            duration_clause = format_duration_clause(self.duration)
-            sanitized_keywords = [kw.replace("'", "\\'") for kw in keywords]
+            duration_clause = date_utils.format_duration_clause(self.duration)
+            sanitized_keywords = [kw.keyword.replace("'", "\\'") for kw in keywords if kw.keyword]
             keyword_list = "', '".join(sanitized_keywords)
             in_clause = f"('{keyword_list}')"
 
@@ -88,6 +88,9 @@ class SearchTermPipeline:
                 campaign.id = {self.campaign_id}
                 AND segments.date {duration_clause}
                 AND segments.keyword.info.text IN {in_clause}
+                AND ad_group.status = 'ENABLED'
+                AND campaign.status = 'ENABLED'
+                ORDER BY ad_group.id
             """
             response = requests.post(endpoint, headers=headers, json={"query": query})
             data = response.json()
@@ -102,7 +105,8 @@ class SearchTermPipeline:
                 metrics = row.get("metrics", {})
                 search_view = row.get("searchTermView", {})
                 segments = row.get("segments", {})
-
+                ad_group = row.get("adGroup", {})
+                ad_group_id = ad_group.get("resourceName")
                 term = search_view.get("searchTerm")
                 keyword_text = segments.get("keyword", {}).get("info", {}).get("text")
                 match_type = segments.get("searchTermMatchType")
@@ -111,8 +115,10 @@ class SearchTermPipeline:
 
                 search_terms.append({
                     "searchterm": term,
+                    "status": search_view.get("status"), 
                     "keyword": keyword_text,
                     "matchType": match_type,
+                    "adGroupId":ad_group_id,
                     "metrics": {
                         "impressions": _safe_int(metrics.get("impressions")),
                         "clicks": _safe_int(metrics.get("clicks")),
