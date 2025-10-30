@@ -20,7 +20,7 @@ def format_prompt(
     
     try:
         template = load_prompt(prompt_file)
-        format_dict = process_context(template,context)
+        format_dict = build_template_variables(template,context)
         formatted_prompt = template.format(**format_dict)
         logger.debug(f"Successfully formatted prompt:{prompt_file}")
         return formatted_prompt
@@ -35,12 +35,10 @@ def format_prompt(
         logger.error(f"Error formatting prompt file {prompt_file}:{e}")
         raise
 
-def process_context(template:str,context:Dict[str,Any])->Dict[str,Any]:
+def build_template_variables(template:str,context:Dict[str,Any])->Dict[str,Any]:
     format_dict = {}
     for key ,value in context.items():
         if value is None:
-            if key == "url":
-                format_dict["url"] = "Not provided"
             continue
         if key == "scraped_data":
             if '{content_summary}' in template:
@@ -55,7 +53,6 @@ def process_context(template:str,context:Dict[str,Any])->Dict[str,Any]:
             format_dict['business_type'] = value.business_type
             format_dict['primary_location'] = value.primary_location
             format_dict['service_areas'] = ", ".join(value.service_areas) or "Not provided"
-            format_dict['brand_keywords'] = ", ".join(value.brand_keywords) or "Not provided"
 
             if '{location_context}' in template:
                 location_context = ""

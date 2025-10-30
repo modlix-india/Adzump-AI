@@ -14,6 +14,23 @@ logger = logging.getLogger(__name__)
 WORD_PATTERN = re.compile(r"\w+")
 
 class KeywordUtils:
+    
+    @staticmethod
+    def parse_and_normalize_seed_keywords(raw: str, limit: int) -> List[str]:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                keywords = parsed
+            else:
+                raise ValueError("Response not a list")
+        except Exception:
+            parts = re.findall(r'"([^"]+)"', raw)
+            if not parts:
+                parts = re.split(r'[\n,•;]+', raw)
+            keywords = [p.strip().strip('"\'') for p in parts if p.strip()]
+        
+        return KeywordUtils.normalize_keywords(keywords, limit)
+    
     @staticmethod
     def normalize_keywords(keywords: List[str], limit: int) -> List[str]:
         normalized, seen = [], set()
@@ -25,23 +42,6 @@ class KeywordUtils:
                 normalized.append(k)
                 seen.add(k)
         return normalized[:limit]
-    
-    @staticmethod
-    def parse_seed_keywords(raw: str) -> List[str]:
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, list):
-                return parsed
-            else:
-                raise ValueError("Response not a list")
-        except Exception:
-            pass
-
-        parts = re.findall(r'"([^"]+)"', raw)
-        if not parts:
-            parts = re.split(r'[\n,•;]+', raw)
-        parsed = [p.strip().strip('"\'') for p in parts if p.strip()]
-        return parsed
 
     @staticmethod
     def create_distributed_keywords(

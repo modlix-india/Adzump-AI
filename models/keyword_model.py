@@ -4,6 +4,7 @@ Provides type safety and validation for keyword research operations
 """
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field, field_validator, model_validator
+from models.business_model import BusinessMetadata
 from enum import Enum
 
 # ENUMS
@@ -21,65 +22,6 @@ class CompetitionLevel(str, Enum):
 class KeywordType(str, Enum):
     BRAND = "brand"
     GENERIC = "generic"
-    BOTH = "both"
-
-# BUSINESS METADATA MODELS
-class BusinessMetadata(BaseModel):
-    brand_name: str = Field(default="Unknown", description="Business brand name")
-    business_type: str = Field(default="Unknown", description="Type of business")
-    primary_location: str = Field(default="Unknown", description="Primary business location")
-    service_areas: List[str] = Field(default_factory=list, description="Service area locations")
-    brand_keywords: List[str] = Field(default_factory=list, description="Brand-related keywords")
-    
-    @field_validator('brand_name', 'business_type', 'primary_location')
-    @classmethod
-    def validate_not_empty(cls, v: str) -> str:
-        if not isinstance(v, str):
-            raise ValueError("Must be a string")
-        return v if v.strip() else "Unknown"
-    
-    @field_validator('service_areas', 'brand_keywords')
-    @classmethod
-    def validate_string_lists(cls, v: List[Any]) -> List[str]:
-        if not isinstance(v, list):
-            raise ValueError("Must be a list")
-        return [item.strip() for item in v if isinstance(item, str) and item.strip()]
-    
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "brand_name": "Acme Plumbing",
-                "business_type": "Plumbing Services",
-                "primary_location": "Bangalore",
-                "service_areas": ["Koramangala", "Indiranagar", "Whitefield"],
-                "brand_keywords": ["acme", "acme plumbing", "acme plumbers"]
-            }
-        }
-    }
-
-class BusinessUniqueFeatures(BaseModel):
-    features: List[str] = Field(default_factory=list, description="Unique business features")
-    
-    @field_validator('features')
-    @classmethod
-    def validate_features(cls, v: List[Any]) -> List[str]:
-        """Validate and clean feature list"""
-        if not isinstance(v, list):
-            raise ValueError("Must be a list")
-        return [f.strip() for f in v if isinstance(f, str) and f.strip()]
-    
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "features": [
-                    "24/7 emergency service",
-                    "licensed plumbers", 
-                    "same day service",
-                    "free estimates"
-                ]
-            }
-        }
-    }
 
 # KEYWORD SUGGESTION MODELS
 class KeywordSuggestion(BaseModel):
@@ -205,10 +147,8 @@ class KeywordResearchRequest(BaseModel):
             "example": {
                 "customer_id": "1234567890",
                 "data_object_id": "abc123xyz", 
-                "scraped_data": "Acme Plumbing provides 24/7 emergency plumbing services...",
                 "keyword_type": "brand",
                 "location_ids": ["geoTargetConstants/2356"],
-                "url": "https://acmeplumbing.com",
                 "language_id": 1000,
                 "seed_count": 40,
                 "target_positive_count": 30
@@ -218,7 +158,6 @@ class KeywordResearchRequest(BaseModel):
 
 class KeywordResearchResult(BaseModel):
     positive_keywords: List[OptimizedKeyword] = Field(default_factory=list, description="Optimized positive keywords")
-    negative_keywords: Optional[List[NegativeKeyword]] = Field(default=None, description="Negative keywords")
     brand_info: BusinessMetadata = Field(default_factory=BusinessMetadata, description="Business metadata")
     unique_features: List[str] = Field(default_factory=list, description="Business unique features")
     

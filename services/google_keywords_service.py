@@ -2,19 +2,17 @@ import os,logging,time,asyncio,json
 import httpx
 from typing import List
 
-from utils.text_utils import normalize_text
-from utils.text_utils import get_safety_patterns, get_fallback_negative_keywords
-from utils.prompt_loader import format_prompt
+from utils import text_utils,prompt_loader
 from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
-from oserver.connection import fetch_google_api_token_simple,fetch_product_details
+from oserver import connection
+from services.business_info_service import BusinessInfoService
 
 # Import Pydantic models
 from models.keyword_model import (
     BusinessMetadata,
-    BusinessUniqueFeatures,
     KeywordSuggestion,
     OptimizedKeyword,
     NegativeKeyword,
@@ -32,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 class GoogleKeywordService:
 
-    SERVICE_MODEL = "gpt-4o-mini"
+    OPENAI_MODEL = "gpt-4o-mini"
     DEFAULT_LOCATION_IDS = ["geoTargetConstants/2840"]
     MIN_KEYWORD_LENGTH = 2
     MAX_KEYWORD_WORDS = 6
@@ -48,75 +46,16 @@ class GoogleKeywordService:
     SEED_PROMPT_MAP = {
         KeywordType.BRAND: 'seed_keywords_brand_prompt.txt',
         KeywordType.GENERIC: 'seed_keywords_generic_prompt.txt', 
-        KeywordType.BOTH: 'seed_keywords_prompt.txt'
     }
     
     POSITIVE_PROMPT_MAP = {
         KeywordType.BRAND: 'positive_keywords_brand_prompt.txt',
         KeywordType.GENERIC: 'positive_keywords_generic_prompt.txt',
-        KeywordType.BOTH: 'positive_keywords_prompt.txt'
     }
 
     def __init__(self):
-        self.safety_patterns = get_safety_patterns()
-
-    def _get_prompt_file(self, prompt_map: dict, keyword_type: KeywordType) -> str:
-        return prompt_map.get(keyword_type, prompt_map[KeywordType.BOTH])
-
-    async def extract_business_metadata(self, scraped_data: str, url: str = None) -> BusinessMetadata:
-        try:
-            prompt = format_prompt('business_metadata_prompt.txt', scraped_data=scraped_data, url=url)
-
-            resp = await chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                model=self.SERVICE_MODEL,
-                max_tokens=500,
-                temperature=0.1,
-                response_format={"type": "json_object"}
-            )
-
-            raw = resp.choices[0].message.content.strip()
-            data = json.loads(raw)
-
-            brand_info = BusinessMetadata(**data)
-            logger.info(f"Extracted brand info: {brand_info.model_dump()}")
-            return brand_info
-
-        except json.JSONDecodeError as e:
-            logger.warning(f"JSON parsing failed: {e}, using defaults")
-            return BusinessMetadata()
-        except ValidationError as e:
-            logger.warning(f"Model validation failed: {e}, using partial data")
-            valid_data = {}
-            for field in BusinessMetadata.model_fields:
-                if field in data and isinstance(data[field], (str, list, int, float)):
-                    valid_data[field] = data[field]
-            return BusinessMetadata(**valid_data)
-        except Exception as e:
-            logger.warning(f"Brand extraction failed: {e}, using defaults")
-            return BusinessMetadata()
-
-    async def extract_business_unique_features(self, scraped_data: str) -> List[str]:
-        prompt = format_prompt('business_usp_prompt.txt',scraped_data=scraped_data)
-
-        try:
-            resp = await chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                model=self.SERVICE_MODEL,
-                max_tokens=400,
-                temperature=0.1,
-                response_format={"type": "json_object"}
-            )
-            usp_data = json.loads(resp.choices[0].message.content.strip())
-            unique_features = usp_data.get("features", [])
-            validated_unique_features = BusinessUniqueFeatures(features=unique_features)
-
-            logger.info(f"Extracted and validated USPs: {validated_unique_features.features}")
-            return validated_unique_features.features
-
-        except Exception as e:
-            logger.warning(f"USP extraction failed: {e}")
-            return []
+        self.safety_patterns = text_utils.get_safety_patterns()
+        self.business_extractor = BusinessInfoService()
     async def generate_seed_keywords(
         self,
         scraped_data: str,
@@ -124,13 +63,11 @@ class GoogleKeywordService:
         brand_info: BusinessMetadata = None,
         unique_features: List[str] = None,
         max_kw: int = DEFAULT_SEED_COUNT,
-        keyword_type: KeywordType = KeywordType.BOTH
+        keyword_type: KeywordType = KeywordType.GENERIC
     ) -> List[str]:
         
-        try:
-            prompt_file = self._get_prompt_file(self.SEED_PROMPT_MAP, keyword_type)
-
-            prompt = format_prompt(
+        prompt_file = GoogleKeywordService._get_prompt_file(self.SEED_PROMPT_MAP, keyword_type)
+        prompt = prompt_loader.format_prompt(
                 prompt_file,
                 scraped_data=scraped_data,
                 url=url,
@@ -139,20 +76,20 @@ class GoogleKeywordService:
                 max_kw=max_kw,
             )
 
+        try:
             resp = await chat_completion(
                 messages=[{"role": "user", "content": prompt}],
-                model=self.SERVICE_MODEL,
+                model=self.OPENAI_MODEL,
                 max_tokens=800,
                 temperature=0.2
             )
             raw = resp.choices[0].message.content.strip()
 
-            parsed = KeywordUtils.parse_seed_keywords(raw)
-            normalized = KeywordUtils.normalize_keywords(parsed, max_kw)
+            seed_keywords = KeywordUtils.parse_and_normalize_seed_keywords(raw,max_kw)
 
-            logger.info(f"Generated {len(normalized)} strategic seed keywords for type '{keyword_type.value}'")
-            print("generated seed keywords",normalized)
-            return normalized[:max_kw]
+            logger.info(f"Generated {len(seed_keywords)} strategic seed keywords for type '{keyword_type.value}'")
+            logger.info("seed keywords generated: " + str(seed_keywords))
+            return seed_keywords
 
         except Exception as e:
             logger.exception("Strategic seed generation failed: %s", e)
@@ -170,7 +107,7 @@ class GoogleKeywordService:
             chunk_size: int = CHUNK_SIZE,
     ) -> List[KeywordSuggestion]:
 
-        access_token = fetch_google_api_token_simple(client_code)
+        access_token = connection.fetch_google_api_token_simple(client_code)
 
         location_ids = location_ids or self.DEFAULT_LOCATION_IDS  # India
         all_suggestions: List[KeywordSuggestion] = []
@@ -242,7 +179,7 @@ class GoogleKeywordService:
                                 if not text_val:
                                     continue
 
-                                text_norm = normalize_text(text_val)
+                                text_norm = text_utils.normalize_text(text_val)
                                 if len(text_norm) < self.MIN_KEYWORD_LENGTH or len(text_norm.split()) > self.MAX_KEYWORD_WORDS:
                                     continue
 
@@ -291,7 +228,7 @@ class GoogleKeywordService:
 
             all_suggestions.sort(key=lambda x: x.volume, reverse=True)
             logger.info("TOTAL: %d suggestions from Google Ads API for %d locations", len(all_suggestions), len(location_ids))
-            print("all suggestion from google ads api",all_suggestions)
+            logger.info("all suggestion from google ads api :", all_suggestions)
             return all_suggestions
 
         except Exception as e:
@@ -309,9 +246,9 @@ class GoogleKeywordService:
         target_count: int = TARGET_POSITIVE_COUNT
     ) -> List[OptimizedKeyword]:
 
-        prompt_file = self._get_prompt_file(self.POSITIVE_PROMPT_MAP, keyword_type)
+        prompt_file = GoogleKeywordService._get_prompt_file(self.POSITIVE_PROMPT_MAP, keyword_type)
 
-        prompt = format_prompt(
+        prompt = prompt_loader.format_prompt(
             prompt_file,
             scraped_data=scraped_data,
             url=url,
@@ -323,7 +260,7 @@ class GoogleKeywordService:
 
         resp = await chat_completion(
             messages=[{"role": "user", "content": prompt}],
-            model=self.SERVICE_MODEL,
+            model=self.OPENAI_MODEL,
             max_tokens=3000,
             temperature=0.1,
             response_format={"type": "json_object"}
@@ -337,7 +274,7 @@ class GoogleKeywordService:
         seen = set()
 
         for item in response_data.keywords:
-            kw_text = normalize_text(item.get("keyword", ""))
+            kw_text = text_utils.normalize_text(item.get("keyword", ""))
             if kw_text in suggestion_map and kw_text not in seen:
                 base_suggestion = suggestion_map[kw_text]
 
@@ -362,6 +299,7 @@ class GoogleKeywordService:
                 
 
         logger.info(f"Final optimization: {len(final_optimized)} keywords selected")
+        logger.info(f"Final optimized keywords: {final_optimized}")
         return final_optimized[:target_count]
 
     async def generate_negative_keywords(
@@ -373,7 +311,7 @@ class GoogleKeywordService:
 
         try:
             logger.info(f"Generating negative keywords for {len(optimized_positive_keywords)} positive keywords")
-            prompt = format_prompt(
+            prompt = prompt_loader.format_prompt(
                 "negative_keywords_prompt.txt",
                 scraped_data=scraped_data,
                 url=url,
@@ -382,7 +320,7 @@ class GoogleKeywordService:
 
             response = await chat_completion(
                 messages=[{"role": "user", "content": prompt}],
-                model=self.SERVICE_MODEL,
+                model=self.OPENAI_MODEL,
                 max_tokens=1500,
                 temperature=0.0,
                 response_format={"type": "json_object"}
@@ -394,7 +332,7 @@ class GoogleKeywordService:
                 negatives_raw = response_data.negative_keywords
             except Exception as e:
                 logger.error(f"Negative keyword JSON parsing failed: {e}, using fallback")
-                negatives_raw = get_fallback_negative_keywords()
+                negatives_raw = text_utils.get_fallback_negative_keywords()
 
             cleaned_negatives = KeywordUtils.filter_and_validate_negatives(
                 negatives_raw,
@@ -403,31 +341,12 @@ class GoogleKeywordService:
             )
 
             logger.info(f"Generated {len(cleaned_negatives)} validated negative keywords")
+            logger.info(f"Final negative keywords: {cleaned_negatives}")
             return cleaned_negatives
 
         except Exception as e:
             logger.error(f"Negative keyword generation failed: {e}")
             return []
-        
-
-    def get_business_details(
-        self,
-        data_object_id: str,
-        access_token: str,
-        client_code: str
-    ) -> tuple[str, str]:
-        try:
-            business_data = fetch_product_details(data_object_id, access_token, client_code)
-            result = business_data[0].get("result", {}).get("result", {})
-            scraped_data = result.get("summary", "")
-            url = result.get("businessUrl", "")
-            
-            logger.info(f"Fetched business details for data_object_id: {data_object_id}")
-            return scraped_data, url
-            
-        except Exception as e:
-            logger.exception(f"Failed to fetch business details: {e}")
-            return "", ""  # Return empty strings 
 
     async def extract_positive_strategy(
         self,
@@ -457,7 +376,10 @@ class GoogleKeywordService:
             raise HTTPException(status_code=401, detail="loginCustomerId not found in session.")
         
         #get business details
-        scraped_data, url = self.get_business_details(data_object_id=data_object_id, access_token=access_token,client_code=client_code)
+        scraped_data, url = self.business_extractor.get_business_details(
+            data_object_id=data_object_id, 
+            access_token=access_token,
+            client_code=client_code)
 
         #validate we got data
         if not scraped_data:
@@ -471,8 +393,8 @@ class GoogleKeywordService:
         try:
             logger.info("STEP 1: Extracting business information and USPs")
             brand_info, unique_features = await asyncio.gather(
-                self.extract_business_metadata(scraped_data, url),
-                self.extract_business_unique_features(scraped_data),
+                self.business_extractor.extract_business_metadata(scraped_data, url),
+                self.business_extractor.extract_business_unique_features(scraped_data),
                 return_exceptions=True
             )
 
@@ -571,7 +493,7 @@ class GoogleKeywordService:
         
         try:
             # Fetch business details
-            scraped_data, url = self.get_business_details(
+            scraped_data, url = self.business_extractor.get_business_details(
                 data_object_id=data_object_id,
                 access_token=access_token,
                 client_code=client_code
@@ -597,5 +519,9 @@ class GoogleKeywordService:
         except Exception as e:
             logger.exception(f"Negative keyword generation failed: {e}")
             return []
+        
+    @staticmethod
+    def _get_prompt_file(prompt_map: dict, keyword_type: KeywordType) -> str:
+        return prompt_map.get(keyword_type, prompt_map[KeywordType.GENERIC])
 
         

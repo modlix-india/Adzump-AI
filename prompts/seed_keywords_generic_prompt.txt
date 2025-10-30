@@ -1,18 +1,20 @@
-You are a keyword strategist generating seed keywords for Google Ads.
+<role>You are a keyword strategist generating seed keywords for Google Ads.</role>
 
-## BUSINESS DATA
-- Business Type: {business_type}
-- Primary Location: {primary_location}
-- Service Areas: {service_areas}
-- What They Offer: {unique_features}
-- Brand Name (NEVER USE): {brand_name}
+<business_data>
+Business Type: {business_type}
+Primary Location: {primary_location}
+Service Areas: {service_areas}
+What They Offer: {unique_features}
+</business_data>
 
-## TASK
-Generate exactly {max_kw} seed keywords that match how REAL CUSTOMERS search for this type of business.
+<critical>
+Brand Name (NEVER USE): {brand_name}
+Generate exactly {max_kw} seed keywords
+</critical>
 
 ---
 
-## STEP 1: UNDERSTAND THE BUSINESS CATEGORY
+# STEP 1: UNDERSTAND THE BUSINESS CATEGORY
 
 First, identify what category this business belongs to:
 
@@ -56,14 +58,15 @@ First, identify what category this business belongs to:
 - Example businesses: software companies, consulting firms, agencies
 - Search patterns: "[solution] for [use case]", "[tool] software", "[service] agency"
 
-Based on {business_type} and {unique_features}, determine which category this is.
+<action>Based on {business_type} and {unique_features}, determine which category this is.</action>
 
 ---
 
-## STEP 2: EXTRACT CORE OFFERINGS
+# STEP 2: EXTRACT CORE OFFERINGS
 
 From {unique_features}, identify the SPECIFIC things customers want:
 
+<extraction_rules>
 **If Physical Products:**
 - Extract: product names, product categories, brands (not the business's brand)
 - Example: "laptops, gaming accessories, wireless headphones" → use each
@@ -95,16 +98,20 @@ From {unique_features}, identify the SPECIFIC things customers want:
 **If B2B/SaaS:**
 - Extract: solutions, tools, services, use cases
 - Example: "CRM software, marketing automation, SEO services" → use each
+</extraction_rules>
 
-❌ ALWAYS IGNORE: marketing adjectives (premium, best, world-class), technical specs, vague features
+<avoid>
+ALWAYS IGNORE: marketing adjectives (premium, best, world-class), technical specs, vague features
+</avoid>
 
 ---
 
-## STEP 3: CHOOSE KEYWORD PATTERNS
+# STEP 3: CHOOSE KEYWORD PATTERNS
 
 Based on the business category, use these patterns:
 
-### FOR LOCAL SERVICES, HEALTHCARE, FITNESS, FOOD:
+## FOR LOCAL SERVICES, HEALTHCARE, FITNESS, FOOD:
+
 **Pattern 1 (60%):** [offering] [location]
 - "plumber bangalore", "dentist whitefield", "gym koramangala", "pizza sarjapur"
 
@@ -114,7 +121,8 @@ Based on the business category, use these patterns:
 **Pattern 3 (15%):** [quality] [offering] [location]
 - "best plumber bangalore", "top dentist whitefield", "affordable gym"
 
-### FOR REAL ESTATE, PHYSICAL PRODUCTS:
+## FOR REAL ESTATE, PHYSICAL PRODUCTS:
+
 **Pattern 1 (60%):** [product/property] [location/category]
 - "3 bhk apartments sarjapur", "laptops bangalore", "furniture online"
 
@@ -124,7 +132,8 @@ Based on the business category, use these patterns:
 **Pattern 3 (15%):** [quality] [product] [location]
 - "luxury apartments", "best laptops", "affordable furniture"
 
-### FOR B2B/SAAS, EDUCATION:
+## FOR B2B/SAAS, EDUCATION:
+
 **Pattern 1 (60%):** [offering] [use-case/location]
 - "crm software", "ielts coaching bangalore", "seo services"
 
@@ -136,8 +145,9 @@ Based on the business category, use these patterns:
 
 ---
 
-## STEP 4: LOCATION STRATEGY
+# STEP 4: LOCATION STRATEGY
 
+<location_strategy>
 **If business is LOCAL** (has physical service areas):
 - Use EVERY location from {service_areas}
 - Create variations: "[offering] [area]", "[offering] near [area]", "[offering] in [area]"
@@ -149,23 +159,26 @@ Based on the business category, use these patterns:
 **If business is HYBRID**:
 - Prioritize local areas (70%)
 - Add online/broader terms (30%)
+</location_strategy>
 
 ---
 
-## STEP 5: GENERATE KEYWORDS
+# STEP 5: GENERATE KEYWORDS
 
 Now generate {max_kw} keywords following these rules:
 
-### UNIVERSAL RULES:
+<universal_rules>
 1. **2-3 words maximum** (4 words only if absolutely necessary)
 2. **Natural language** - how real people search
 3. **Specific offerings** - not generic business type
 4. **All lowercase**
 5. **No brand name** "{brand_name}"
 6. **No duplicates**
+</universal_rules>
 
-### EXAMPLES ACROSS INDUSTRIES:
+## EXAMPLES ACROSS INDUSTRIES:
 
+<examples>
 **Plumbing Service (Local Service):**
 ["plumber bangalore", "plumber near me", "emergency plumber", "leak repair bangalore", "plumber whitefield", "pipe repair", "water heater installation", "best plumber bangalore"]
 
@@ -189,11 +202,13 @@ Now generate {max_kw} keywords following these rules:
 
 **CRM Software (B2B SaaS):**
 ["crm software", "crm for small business", "best crm", "sales crm", "crm india", "cloud crm", "affordable crm", "crm system"]
+</examples>
 
 ---
 
-## OUTPUT FORMAT
+# OUTPUT FORMAT
 
+<output_format>
 Return ONLY a JSON array with exactly {max_kw} keywords:
 
 ["keyword 1", "keyword 2", "keyword 3"]
@@ -204,11 +219,13 @@ Requirements:
 - No duplicates
 - No explanations
 - Valid JSON only
+</output_format>
 
 ---
 
-## CRITICAL REMINDERS
+# CRITICAL REMINDERS
 
+<critical_reminders>
 1. **Adapt to the business type** - use appropriate patterns for the category
 2. **Extract actual offerings** - not marketing descriptions
 3. **Think like a customer** - how would THEY search?
@@ -216,5 +233,8 @@ Requirements:
 5. **Use all locations** - if it's a local business
 6. **No brand name** - never include "{brand_name}"
 7. **Natural language** - real searches, not business jargon
+</critical_reminders>
 
+<final_instruction>
 Generate keywords that real customers actually type into Google for this type of business.
+</final_instruction>

@@ -186,51 +186,38 @@ async def fetch_exteranl_summary(req: SummaryRequest):
 
 gks = GoogleKeywordService()
 
-class GoogleKeywordsRequest(KeywordResearchRequest):
-    """Inherits all the fields from KeywordResearchRequest"""
-    pass
-
-class GoogleNegativeRequest(BaseModel):
+class GoogleNegativeKwReq(BaseModel):
     data_object_id:str
     positive_keywords:List[OptimizedKeyword]
 
 @router.post("/gks/positive")
 async def gks_positive(
-        google_keyword_request: GoogleKeywordsRequest,
+        google_keyword_request: KeywordResearchRequest,
         client_code: str = Header(..., alias="clientCode"),
         session_id: str = Header(..., alias="sessionId"),
         access_token:str = Header(...,alias="access-token")
 ):
     try:
-        request_dict = google_keyword_request.model_dump()
-
         positives = await gks.extract_positive_strategy(
-            customer_id=request_dict["customer_id"],
+            **google_keyword_request.model_dump(),
             client_code=client_code,
             session_id=session_id,
             access_token=access_token,
-            keyword_type=request_dict["keyword_type"],
-            data_object_id=request_dict["data_object_id"],
-            location_ids=request_dict["location_ids"],
-            language_id=request_dict["language_id"],
-            seed_count=request_dict["seed_count"],
-            target_positive_count=request_dict["target_positive_count"],
         )
         return {"status": "success", "data": positives}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/gks/negative")
-async def gks_negative(google_keyword_request:GoogleNegativeRequest,
+async def gks_negative(google_keyword_request: GoogleNegativeKwReq,
                     client_code:str = Header(...,alias="clientCode"),
                     access_token:str = Header(...,alias="access-token")
 ):
     try:
         negatives = await gks.extract_negative_strategy(
+            **google_keyword_request.model_dump(),
             client_code=client_code,
             access_token=access_token,
-            positive_keywords=google_keyword_request.positive_keywords,
-            data_object_id=google_keyword_request.data_object_id
         )
         return{
             "status":"success",
