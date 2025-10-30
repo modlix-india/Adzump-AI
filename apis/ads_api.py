@@ -1,8 +1,8 @@
 import os
 import tempfile
-from typing import List,Dict,Any
+from typing import List,Dict,Any,Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Request, Header
+from fastapi import APIRouter, HTTPException, Request, Header,status
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
@@ -18,7 +18,7 @@ from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
 from services.budget_recommendation_service import generate_budget_recommendation_service
-
+from services.create_campaign_service import create_and_post_campaign, CampaignServiceError
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -339,3 +339,47 @@ async def generate_budget_recommendation(request: BudgetRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+# ---------------- Pydantic Model ----------------
+class GenerateCampaignRequest(BaseModel):
+    customer_id: str
+    loginCustomerId: str
+    businessName: str
+    budget: float
+    startDate: str
+    endDate: str
+    goal: str
+    websiteURL: str
+    geoTargetTypeSetting: Dict[str, Any]
+    locations: List[Dict[str, str]]
+    targeting: List[Dict[str, Any]]
+    # Assets optional, we will handle inside service if provided
+    assets: Dict[str, Any] = None
+
+# ------------------ Router ------------------
+@router.post("/generate_campaign")
+async def generate_campaign(
+    request: GenerateCampaignRequest,
+    clientCode: str = Header(..., alias="clientCode"),
+):
+    """
+    Router endpoint:
+    - Accepts GenerateCampaignRequest body
+    - Requires clientCode header
+    - Delegates work to campaign service
+    """
+    try:
+        # Convert Pydantic model to dict (preserves original keys)
+        request_body = request.model_dump()
+
+        # Call service to create payload and post to Google Ads
+        result = await create_and_post_campaign(request_body=request_body, client_code=clientCode)
+
+        return {"status": "success", "data": result}
+
+    except CampaignServiceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        # unexpected errors
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
