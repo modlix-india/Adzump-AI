@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+from datetime import date, timedelta
 from typing import Dict, Any
 import json
 import httpx
@@ -13,8 +14,12 @@ from oserver.connection import fetch_google_api_token_simple
 DEVELOPER_TOKEN = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
 # ---------------------- Fetch Audit Logs ----------------------
-async def fetch_audit_logs(customer_id: str, login_customer_id: str, access_token: str,
-                           campaign_id: str, start_date: str, end_date: str) -> list:
+async def fetch_audit_logs(customer_id: str, login_customer_id: str, access_token: str, campaign_id: str) -> list:
+    
+    # Calculate last 30 days range
+    end_date = date.today()
+    start_date = end_date - timedelta(days=29)
+    
     url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:searchStream"
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -52,8 +57,7 @@ async def fetch_audit_logs(customer_id: str, login_customer_id: str, access_toke
 
 
 # ---------------------- Fetch Campaign Metrics ----------------------
-async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, access_token: str,
-                                 campaign_id: str, start_date: str, end_date: str) -> list:
+async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, access_token: str, campaign_id: str) -> list:
     url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:searchStream"
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -64,6 +68,7 @@ async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, acces
 
     query = f"""
     SELECT
+      segments.date,
       campaign.id,
       campaign.name,
       metrics.clicks,
@@ -72,8 +77,10 @@ async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, acces
       metrics.cost_micros
     FROM campaign
     WHERE campaign.id = {campaign_id}
-      AND segments.date BETWEEN '{start_date}' AND '{end_date}'
+      AND segments.date DURING LAST_30_DAYS
+    ORDER BY segments.date DESC
     """
+    
     payload = {"query": query}
 
     async with httpx.AsyncClient(timeout=60) as client:
@@ -122,62 +129,50 @@ async def fetch_old_budget(customer_id: str, login_customer_id: str, access_toke
                 detail=f"Old budget fetch failed: {response.text}"
             )
 
-        return response.json()
-        
-
-# ---------------------- Utility: Metrics Check ----------------------
-def _metrics_all_zero(metrics_data: list) -> bool:
-    """Return True if metrics are empty or all key metrics are zero."""
-    if not metrics_data:
-        return True
-
-    metrics = metrics_data[0].get("metrics", {})
-    keys = ["clicks", "impressions", "conversions", "costMicros"]
-
-    return all(float(metrics.get(k, 0)) == 0 for k in keys)
+        data = response.json()
+        return (
+            data.get("results", [{}])[0]
+            .get("campaignBudget", {})
+            .get("amountMicros", 0)
+        )
 
 
 # ---------------------- Generate Budget Recommendation ----------------------
 async def generate_budget_recommendation_service(customer_id: str, login_customer_id: str,
-                                                 campaign_id: str, start_date: str, end_date: str,
-                                                 client_code: str) -> Dict[str, Any]:
+                                                 campaign_id: str, client_code: str) -> Dict[str, Any]:
     try:
         # Fetch access token
-        # access_token = fetch_google_api_token_simple(client_code=client_code)
-        access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+        access_token = fetch_google_api_token_simple(client_code=client_code)
         
-        audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
-        metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id, start_date, end_date)
-        
-        # CASE 4: Audit Logs empty + Metrics all zeros
-        if (not audit_logs or len(audit_logs) == 0) and _metrics_all_zero(metrics):
+        audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id)
+        metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id)
+        old_budget = await fetch_old_budget(customer_id, login_customer_id, access_token, campaign_id)
+
+
+        # CASE 4: Audit Logs empty + Metrics empty array
+        if (not audit_logs or len(audit_logs) == 0) and (not metrics or len(metrics) == 0):
             return {
                 "campaign_id": campaign_id,
                 "recommended_budget": {
                     "suggested_amount": "No budget suggestions",
-                    "rationale": "No audit logs or campaign performance metrics available to generate recommendation."
+                    "old_budget": old_budget,
+                    "rationale": "No audit logs or campaign metrics found for the last 30 days."
                 }
             }
             
-        # CASE 3: Audit Logs + Metrics all zeros
-        if audit_logs and _metrics_all_zero(metrics):
+        # CASE 3: Audit Logs + Metrics empty array
+        if audit_logs and (not metrics or len(metrics) == 0):
             return {
                 "campaign_id": campaign_id,
                 "recommended_budget": {
                     "suggested_amount": "No budget suggestions",
-                    "rationale": "Campaign metrics are all zeros; unable to determine performance-based recommendations."
+                    "old_budget": old_budget,
+                    "rationale": "Audit logs found, but campaign metrics are missing for the last 30 days."
                 }
             }
             
-        # CASE 2: Audit Logs empty + Metrics present
-        if (not audit_logs or len(audit_logs) == 0) and not _metrics_all_zero(metrics):
-            results = await fetch_old_budget(customer_id, login_customer_id, access_token, campaign_id)
-            old_budget = (
-            results.get("results", [{}])[0]
-            .get("campaignBudget", {})
-            .get("amountMicros")
-            )
-            
+        # CASE 2: Audit Logs empty + Metrics available
+        if (not audit_logs or len(audit_logs) == 0) and metrics:
             # Prepare prompt using old budget + metrics
             prompt_template = load_prompt("budget_recommendation_prompt.txt")
             formatted_prompt = prompt_template.format(
@@ -187,7 +182,7 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
                 campaign_id=campaign_id
             )
 
-        # CASE 1: Audit Logs present + Metrics present
+        # CASE 1: Audit Logs and Metrics both available
         else:
             prompt_template = load_prompt("budget_recommendation_prompt.txt")
             formatted_prompt = prompt_template.format(
@@ -225,6 +220,7 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
             "campaign_id": parsed_response.campaign_id,
             "recommended_budget": {
                 "suggested_amount_micros": suggested_amount_micros,
+                "old_budget": old_budget,
                 "rationale": parsed_response.recommended_budget.rationale
             }
         }

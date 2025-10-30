@@ -322,18 +322,14 @@ class BudgetRequest(BaseModel):
     loginCustomerId: str
     customerId: str
     campaignId: str
-    startDate: str
-    endDate: str
 
-@router.post("/generate_budget_recommendation")
+@router.post("/optimize/budget")
 async def generate_budget_recommendation(request: BudgetRequest):
     try:
         result = await generate_budget_recommendation_service(
             customer_id=request.customerId,
             login_customer_id=request.loginCustomerId,
             campaign_id=request.campaignId,
-            start_date=request.startDate,
-            end_date=request.endDate,
             client_code=request.clientCode
         )
         return {"status": "success", "data": result}
