@@ -2,7 +2,7 @@ import os
 import tempfile
 from typing import List,Dict,Any
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Request, Header
+from fastapi import APIRouter, HTTPException, Request, Header, Query
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
@@ -317,20 +317,19 @@ async def create_sitelinks(
     
 # -------------------- Budget Recommendation --------------------
 
-class BudgetRequest(BaseModel):
-    clientCode: str
-    loginCustomerId: str
-    customerId: str
-    campaignId: str
-
 @router.post("/optimize/budget")
-async def generate_budget_recommendation(request: BudgetRequest):
+async def generate_budget_recommendation(
+    clientCode: str = Header(...),
+    loginCustomerId: str = Header(...),
+    customerId: str = Header(...),
+    campaignId: str = Query(...)
+):
     try:
         result = await generate_budget_recommendation_service(
-            customer_id=request.customerId,
-            login_customer_id=request.loginCustomerId,
-            campaign_id=request.campaignId,
-            client_code=request.clientCode
+            customer_id=customerId,
+            login_customer_id=loginCustomerId,
+            campaign_id=campaignId,
+            client_code=clientCode
         )
         return {"status": "success", "data": result}
     except HTTPException:
