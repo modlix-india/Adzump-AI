@@ -27,7 +27,7 @@ An effective LLM-based recommender should shift more spend toward strong-perform
 ---
 
 
-Handle the following scenarios:
+Handle the following scenarios: 
 
 1️⃣ Audit Logs present + Daily Metrics present:
    - Correlate historical budget changes with daily performance patterns.

@@ -141,7 +141,7 @@ async def fetch_old_budget(customer_id: str, login_customer_id: str, access_toke
 async def generate_budget_recommendation_service(customer_id: str, login_customer_id: str,
                                                  campaign_id: str, client_code: str) -> Dict[str, Any]:
     try:
-        # Fetch access token
+        #Fetch access token
         access_token = fetch_google_api_token_simple(client_code=client_code)
         
         audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id)

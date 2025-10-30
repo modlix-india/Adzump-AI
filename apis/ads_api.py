@@ -328,7 +328,7 @@ async def generate_budget_recommendation(
         result = await generate_budget_recommendation_service(
             customer_id=customerId,
             login_customer_id=loginCustomerId,
-            campaign_id=campaignId,
+            campaign_id=campaignId, 
             client_code=clientCode
         )
         return {"status": "success", "data": result}
