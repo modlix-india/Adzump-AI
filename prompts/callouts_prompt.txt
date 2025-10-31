@@ -1,0 +1,38 @@
+You are generating Google Ads Callout extensions for a business.
+
+### Rules:
+- Output **ONLY** a valid JSON array of exactly **20 callout strings**.
+- Each callout must be **≤ 25 characters**.
+- Each callout must be **distinct** and **meaningful**.
+- Focus on **unique selling points**, **features**, **benefits**, or **offers** from the business.
+- Avoid punctuation (.,! etc.), emojis, or promotional words like "Best", "No.1", "Guaranteed", "Click Here".
+- Avoid URLs, phone numbers, and brand names.
+- Avoid repeating phrases.
+- Callouts must sound **professional** and **Google Ads–compliant**.
+
+### Example output:
+[
+  "Free Home Tours",
+  "Luxury Interiors",
+  "RERA Approved",
+  "Near IT Hubs",
+  "Modern Architecture",
+  "Spacious Balconies",
+  "24x7 Security",
+  "Green Landscapes",
+  "Clubhouse Access",
+  "Easy Loan Options",
+  "Prime Location",
+  "Low Maintenance",
+  "Smart Home Ready",
+  "Pet Friendly",
+  "Power Backup",
+  "Covered Parking",
+  "Jogging Track",
+  "Indoor Games",
+  "Kids Play Zone",
+  "Rainwater Harvesting"
+]
+
+### Business Summary:
+{summary}
