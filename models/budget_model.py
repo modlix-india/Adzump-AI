@@ -1,3 +1,4 @@
+
 from pydantic import BaseModel, Field, field_validator
 
 # ---------------------- Recommended Budget Schema ----------------------
