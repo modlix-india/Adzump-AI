@@ -21,7 +21,7 @@ from services.budget_recommendation_service import generate_budget_recommendatio
 
 from models.keyword_model import (
     KeywordResearchRequest,
-    OptimizedKeyword,
+    GoogleNegativeKwReq
 )
 
 
@@ -186,10 +186,6 @@ async def fetch_exteranl_summary(req: SummaryRequest):
 
 gks = GoogleKeywordService()
 
-class GoogleNegativeKwReq(BaseModel):
-    data_object_id:str
-    positive_keywords:List[OptimizedKeyword]
-
 @router.post("/gks/positive")
 async def gks_positive(
         google_keyword_request: KeywordResearchRequest,
@@ -199,7 +195,7 @@ async def gks_positive(
 ):
     try:
         positives = await gks.extract_positive_strategy(
-            **google_keyword_request.model_dump(),
+            keyword_request=google_keyword_request,
             client_code=client_code,
             session_id=session_id,
             access_token=access_token,
@@ -215,7 +211,7 @@ async def gks_negative(google_keyword_request: GoogleNegativeKwReq,
 ):
     try:
         negatives = await gks.extract_negative_strategy(
-            **google_keyword_request.model_dump(),
+            keyword_request=google_keyword_request,
             client_code=client_code,
             access_token=access_token,
         )

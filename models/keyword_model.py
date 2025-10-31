@@ -116,7 +116,11 @@ class KeywordSelectionResponse(BaseModel):
                 kw.setdefault('rationale', 'AI selected')
                 validated.append(kw)
         return validated
-
+    
+class GoogleNegativeKwReq(BaseModel):
+    data_object_id: str = Field(..., description="Data object ID for business context")
+    positive_keywords: List[OptimizedKeyword] = Field(..., description="List of positive keywords to analyze")
+    
 class NegativeKeywordResponse(BaseModel):
     negative_keywords: List[Dict[str, str]] = Field(default_factory=list, description="Negative keywords")
     

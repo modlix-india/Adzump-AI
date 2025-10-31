@@ -1,7 +1,8 @@
-from typing import List, Any
-from pydantic import BaseModel, Field, field_validator
+from typing import List
+from pydantic import BaseModel, Field
+import logging
 
-# BUSINESS METADATA MODELS
+logger = logging.getLogger(__name__)
 class BusinessMetadata(BaseModel):
     brand_name: str = Field(default="Unknown", description="Business brand name")
     business_type: str = Field(default="Unknown", description="Type of business")
@@ -9,19 +10,39 @@ class BusinessMetadata(BaseModel):
     service_areas: List[str] = Field(default_factory=list, description="Service area locations")
     unique_features: List[str] = Field(default_factory=list, description="Unique business features")
     
-    @field_validator('brand_name', 'business_type', 'primary_location')
     @classmethod
-    def validate_not_empty(cls, v: str) -> str:
-        if not isinstance(v, str):
-            raise ValueError("Must be a string")
-        return v if v.strip() else "Unknown"
-    
-    @field_validator('service_areas','unique_features')
-    @classmethod
-    def validate_string_lists(cls, v: List[Any]) -> List[str]:
-        if not isinstance(v, list):
-            raise ValueError("Must be a list")
-        return [item.strip() for item in v if isinstance(item, str) and item.strip()]
+    def from_raw_data(cls, data: dict) -> "BusinessMetadata":
+        
+        if not isinstance(data, dict):
+            logger.warning(f"Expected dict, got {type(data)}. Using defaults.")
+            return cls()
+        
+        valid_data = {}
+        
+        # String fields
+        for field in ['brand_name', 'business_type', 'primary_location']:
+            value = data.get(field)
+            if isinstance(value, str) and value.strip():
+                valid_data[field] = value.strip()
+            else:
+                valid_data[field] = "Unknown"
+        
+        # List fields
+        for field in ['service_areas', 'unique_features']:
+            value = data.get(field)
+            if isinstance(value, list):
+                valid_data[field] = [
+                    item.strip() for item in value 
+                    if isinstance(item, str) and item.strip()
+                ]
+            else:
+                valid_data[field] = []
+        
+        try:
+            return cls(**valid_data)
+        except Exception as e:
+            logger.warning(f"Failed to create BusinessMetadata: {e}. Using defaults.")
+            return cls()
     
     model_config = {
         "json_schema_extra": {
@@ -34,4 +55,3 @@ class BusinessMetadata(BaseModel):
             }
         }
     }
-

@@ -19,13 +19,12 @@ class BusinessInfoService:
     async def extract_business_metadata(
         self, scraped_data: str, url: str = None
     ) -> BusinessMetadata:
-        try:
-            prompt = prompt_loader.format_prompt(
+        prompt = prompt_loader.format_prompt(
                 'business_metadata_prompt.txt',
                 scraped_data=scraped_data,
                 url=url
             )
-
+        try:
             resp = await chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 model=self.OPENAI_MODEL,
@@ -37,20 +36,13 @@ class BusinessInfoService:
             raw = resp.choices[0].message.content.strip()
             data = json.loads(raw)
 
-            brand_info = BusinessMetadata(**data)
+            brand_info = BusinessMetadata.from_raw_data(data)
             logger.info(f"Extracted brand info: {brand_info.model_dump()}")
             return brand_info
 
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parsing failed: {e}, using defaults")
             return BusinessMetadata()
-        except ValidationError as e:
-            logger.warning(f"Model validation failed: {e}, using partial data")
-            valid_data = {}
-            for field in BusinessMetadata.model_fields:
-                if field in data and isinstance(data[field], (str, list, int, float)):
-                    valid_data[field] = data[field]
-            return BusinessMetadata(**valid_data)
         except Exception as e:
             logger.warning(f"Brand extraction failed: {e}, using defaults")
             return BusinessMetadata()
@@ -72,12 +64,11 @@ class BusinessInfoService:
             )
             usp_data = json.loads(resp.choices[0].message.content.strip())
             unique_features = usp_data.get("features", [])
-            validated_unique_features = BusinessMetadata(unique_features=unique_features)
 
             logger.info(
-                f"Extracted and validated USPs: {validated_unique_features.unique_features}"
+                f"Extracted and validated USPs: {unique_features}"
             )
-            return validated_unique_features.unique_features
+            return unique_features
 
         except Exception as e:
             logger.warning(f"USP extraction failed: {e}")

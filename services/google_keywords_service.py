@@ -16,8 +16,10 @@ from models.keyword_model import (
     KeywordSuggestion,
     OptimizedKeyword,
     NegativeKeyword,
+    KeywordResearchRequest,
     KeywordResearchResult,
     KeywordSelectionResponse,
+    GoogleNegativeKwReq,
     NegativeKeywordResponse,
     MatchType,
     KeywordType,
@@ -350,17 +352,17 @@ class GoogleKeywordService:
 
     async def extract_positive_strategy(
         self,
+        keyword_request: KeywordResearchRequest,
         client_code: str,
         session_id: str,
-        customer_id: str,
         access_token: str,
-        data_object_id: str,
-        keyword_type: KeywordType,
-        location_ids: List[str],
-        language_id: int = DEFAULT_LANGUAGE_ID,
-        seed_count: int = DEFAULT_SEED_COUNT,
-        target_positive_count: int = TARGET_POSITIVE_COUNT
     ) -> KeywordResearchResult:
+        
+        location_ids = keyword_request.location_ids or self.DEFAULT_LOCATION_IDS
+        language_id = keyword_request.language_id or self.DEFAULT_LANGUAGE_ID
+        seed_count = keyword_request.seed_count or self.DEFAULT_SEED_COUNT
+        keyword_type = keyword_request.keyword_type or KeywordType.GENERIC
+        target_positive_count = keyword_request.target_positive_count or self.TARGET_POSITIVE_COUNT
 
         start_time = time.time()
         logger.info("Starting strategic keyword research pipeline")
@@ -377,13 +379,13 @@ class GoogleKeywordService:
         
         #get business details
         scraped_data, url = self.business_extractor.get_business_details(
-            data_object_id=data_object_id, 
+            data_object_id=keyword_request.data_object_id, 
             access_token=access_token,
             client_code=client_code)
 
         #validate we got data
         if not scraped_data:
-            logger.error(f"No scraped data found for data_object_id: {data_object_id}")
+            logger.error(f"No scraped data found for data_object_id: {keyword_request.data_object_id}")
             return KeywordResearchResult(positive_keywords=[], brand_info=BusinessMetadata(), unique_features=[])
         
         brand_info = BusinessMetadata()
@@ -422,7 +424,7 @@ class GoogleKeywordService:
 
             logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(seed_keywords))
             all_suggestions = await self.fetch_google_ads_suggestions(
-                customer_id=customer_id,
+                customer_id=keyword_request.customer_id,
                 login_customer_id=login_customer_id,
                 client_code=client_code,
                 seed_keywords=seed_keywords,
@@ -485,11 +487,13 @@ class GoogleKeywordService:
             )
     async def extract_negative_strategy(
         self,
+        keyword_request: GoogleNegativeKwReq,
         client_code: str,
         access_token: str,
-        positive_keywords: List[OptimizedKeyword],
-        data_object_id: str,
     ) -> List[NegativeKeyword]:
+        
+        data_object_id = keyword_request.data_object_id
+        positive_keywords = keyword_request.positive_keywords
         
         try:
             # Fetch business details
