@@ -120,7 +120,7 @@ class KeywordSelectionResponse(BaseModel):
 class GoogleNegativeKwReq(BaseModel):
     data_object_id: str = Field(..., description="Data object ID for business context")
     positive_keywords: List[OptimizedKeyword] = Field(..., description="List of positive keywords to analyze")
-    
+
 class NegativeKeywordResponse(BaseModel):
     negative_keywords: List[Dict[str, str]] = Field(default_factory=list, description="Negative keywords")
     
@@ -140,7 +140,7 @@ class NegativeKeywordResponse(BaseModel):
 class KeywordResearchRequest(BaseModel):
     customer_id: str = Field(..., description="Google Ads customer ID")
     data_object_id:str = Field(..., description="Data object ID")
-    keyword_type: KeywordType = Field(default=KeywordType.BOTH, description="Type of keywords to generate")
+    keyword_type: KeywordType = Field(default=KeywordType.GENERIC, description="Type of keywords to generate")
     location_ids: List[str] = Field(default_factory=lambda: ["geoTargetConstants/2840"], description="Target location IDs")
     language_id: int = Field(default=1000, description="Target language ID")
     seed_count: int = Field(default=40, ge=10, le=100, description="Number of seed keywords")
