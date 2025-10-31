@@ -4,10 +4,10 @@ You are generating Google Ads Structured Snippet assets.
 - Output only valid JSON. No explanations, comments, or markdown.
 - Return an array of objects.
 - Each object must follow this format exactly:
-  {
+  {{
     "header": "<Header Name>",
     "values": ["<Value 1>", "<Value 2>", "<Value 3>"]
-  }
+  }}
 
 ### Header Rules:
 - Header must be chosen only from Google-approved list:
@@ -26,14 +26,14 @@ You are generating Google Ads Structured Snippet assets.
 
 ### Example Output:
 [
-  {
+  {{
     "header": "Amenities",
     "values": ["Clubhouse", "Gym", "Pool", "Jogging Track"]
-  },
-  {
+  }},
+  {{
     "header": "Neighborhoods",
     "values": ["Bannerghatta", "JP Nagar", "Electronic City"]
-  }
+  }}
 ]
 
 ### Business Summary:

@@ -5,7 +5,7 @@ from services.search_term_analyzer import analyze_search_term_performance
 import httpx
 from utils.date_utils import format_duration_clause
 import logging
-from oserver.connection import fetch_google_api_token_simple
+from oserver.services.connection import fetch_google_api_token_simple
 
 
 logger = logging.getLogger(__name__)
