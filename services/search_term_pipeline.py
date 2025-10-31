@@ -3,6 +3,7 @@ import json
 import logging
 import requests
 import utils.date_utils as date_utils
+from third_party.google.services import keywords_service
 from services.search_term_analyzer import analyze_search_term_performance
 from third_party.google.services.keywords_service import fetch_keywords_service  # import new service
 from oserver.connection import fetch_google_api_token_simple
@@ -50,18 +51,6 @@ class SearchTermPipeline:
             "login-customer-id": self.login_customer_id,
             "Content-Type": "application/json",
         }
-
-        def _safe_float(value):
-            try:
-                return float(value)
-            except (ValueError, TypeError):
-                return 0.0
-
-        def _safe_int(value):
-            try:
-                return int(value)
-            except (ValueError, TypeError):
-                return 0
 
         try:
             duration_clause = date_utils.format_duration_clause(self.duration)
@@ -120,14 +109,14 @@ class SearchTermPipeline:
                     "matchType": match_type,
                     "adGroupId":ad_group_id,
                     "metrics": {
-                        "impressions": _safe_int(metrics.get("impressions")),
-                        "clicks": _safe_int(metrics.get("clicks")),
-                        "ctr": _safe_float(metrics.get("ctr")),
-                        "conversions": _safe_float(metrics.get("conversions")),
-                        "costMicros": _safe_int(metrics.get("costMicros")),
-                        "averageCpc": _safe_float(metrics.get("averageCpc")),
-                        "cost": _safe_float(metrics.get("costMicros", 0)) / 1_000_000,
-                        "costPerConversion": _safe_float(metrics.get("costPerConversion")),
+                        "impressions": metrics.get("impressions"),
+                        "clicks": metrics.get("clicks"),
+                        "ctr": metrics.get("ctr"),
+                        "conversions": metrics.get("conversions"),
+                        "costMicros": metrics.get("costMicros"),
+                        "averageCpc": metrics.get("averageCpc"),
+                        "cost": (metrics.get("costMicros", 0) or 0) / 1_000_000,
+                        "costPerConversion": metrics.get("costPerConversion"),
                     },
                 })
 
@@ -141,8 +130,7 @@ class SearchTermPipeline:
         """Full flow: fetch keywords (via new service) → fetch search terms → classify."""
         logger.info("Running full search term analysis pipeline...")
 
-        # Directly call the new fetch_keywords_service
-        keywords = await fetch_keywords_service(
+        keywords = await keywords_service.fetch_keywords_service(
             client_code=self.client_code,
             customer_id=self.customer_id,
             login_customer_id=self.login_customer_id,
