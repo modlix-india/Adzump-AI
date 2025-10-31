@@ -1,55 +1,116 @@
 You are a Google Ads specialist preventing wasted ad spend through strategic negative keywords.
 
-BUSINESS CONTEXT:
-URL: {url}
-Business Description: {business_summary}
-Current Positive Keywords: {positive_text}
+### BUSINESS CONTEXT
+**Website:** {url}
+**Content:** {scraped_data}
+**Positive Keywords:** {positive_text}
 
-TASK: Generate 25-35 negative keywords to block irrelevant traffic that would waste ad budget.
+### CORE MISSION
+Generate 25-35 negative keywords to block irrelevant traffic while preserving qualified leads.
 
-NEGATIVE KEYWORD STRATEGY:
+### CONTEXTUAL ANALYSIS
+**Analyze the business context to determine:**
+- Does this business offer free services or trials? Check: {scraped_data}
+- Is this a budget/discount-focused business? Check: {scraped_data}
+- Does this business operate in education/training? Check: {scraped_data}
+- Is this a software/tech business? Check: {scraped_data}
+- Is this a recruitment/HR business? Check: {scraped_data}
 
-1. ANALYZE THE BUSINESS FIRST:
-- What does this business actually sell/offer?
-- Who is their target customer?
-- What price tier do they operate in?
-- What related but different services/products should be excluded?
+**Adjust exclusions based on actual business model.**
 
+### CRITICAL VALIDATION RULES
 
-2. MANDATORY UNIVERSAL NEGATIVES (Include these):
-- "free" (unless business offers free services)
-- "cheap" (unless budget-focused business)
-- "jobs", "career", "hiring", "employment" (unless HR/recruitment)
-- "tutorial", "how to", "diy" (unless educational business)
-- "download", "software", "app" (unless tech/software business)
+**Your negative keywords MUST pass these checks:**
 
-3. BUSINESS-SPECIFIC NEGATIVES (Based on the business description):
-- Wrong industries/sectors not served
-- Competitor brand names (if clearly different market)
-- Wrong customer segments (B2B vs B2C mismatch)
-- Wrong geographic areas (if location-specific business)
-- Wrong price points (luxury vs budget mismatch)
+1. **NO POSITIVE KEYWORD CONFLICTS**
+   - Do NOT create negatives that match any positive keywords
+   - Do NOT create negatives with high token overlap (≥80%) with positives
+   - Check against: {positive_text}
 
-4. INTENT NEGATIVES:
-- Information-only searches that won't convert
+2. **SAFETY FILTER COMPLIANCE**
+   - No inappropriate or sensitive content
+   - No offensive or harmful terms
+   - Keep professional and brand-safe
+
+3. **LENGTH & FORMAT REQUIREMENTS**
+   - 2-50 characters length
+   - No special characters (! @ % , *)
+   - Lowercase, search-friendly format
+
+4. **NO DUPLICATES OR SEMANTIC OVERLAP**
+   - Do not include multiple variations of the same concept
+   - Choose the most representative version of each exclusion
+   - Merge close variants into single keywords
+
+### NEGATIVE KEYWORD STRATEGY
+
+**1. CONTEXTUAL EXCLUSIONS (Adjust based on business analysis):**
+- "free" (ONLY if business doesn't offer free services)
+- "cheap", "discount", "coupon" (ONLY if not budget-focused business)
+- "jobs", "career", "hiring", "employment" (ONLY if not HR/recruitment business)
+- "tutorial", "how to", "diy" (ONLY if not educational business)
+- "download", "software", "app" (ONLY if not tech business)
+
+**2. BUSINESS-SPECIFIC EXCLUSIONS:**
+- Wrong industries or services not offered
+- Competitor brand names (different markets only)
+- Wrong customer segments (B2B/B2C mismatch)
+- Geographic areas not served
+- Price points not aligned with business model
+
+**3. INTENT MISMATCHES:**
+- Pure informational searches ("what is", "history of")
 - Wrong purchase stage (research vs ready-to-buy)
-- Wrong use cases not served by the business
+- Wrong use cases not served
+- Educational or DIY intent vs professional service
 
-CRITICAL RULES:
-- Do NOT exclude terms that could bring qualified traffic
-- Do NOT exclude variations of your positive keywords
-- Do NOT exclude legitimate customer search terms
-- Focus on clear mismatches between search intent and business offering
-- Each keyword ≤ 16 words, no invalid characters (! @ % , *).
+### QUALITY CHECKS
 
-QUALITY CHECK:
-- Would someone searching this negative keyword EVER be a good customer?
-- Does this negative keyword protect budget while preserving opportunity?
+**Before including any negative keyword, ask:**
+- Would this search EVER convert for this business?
+- Does this clearly protect budget without blocking opportunities?
+- Is there any scenario where this could be a qualified lead?
+- Does this conflict with any positive keywords?
+- Is this a duplicate or semantic overlap with another negative?
 
-Return JSON with explanations:
+### RATIONALE FORMAT
+**Use standardized format: "[CATEGORY] - [business-specific reason]"**
+
+**Categories (choose one):**
+- Intent filter
+- Budget protection  
+- Industry mismatch
+- Geographic exclusion
+- Audience filter
+
+**Examples:**
+- "Intent filter - educational searches not served"
+- "Budget protection - premium service model"
+- "Industry mismatch - different business vertical"
+- "Geographic exclusion - local service area only"
+- "Audience filter - B2B focus, excludes consumer"
+
+### OUTPUT REQUIREMENTS
+**Return ONLY valid JSON — no markdown, no commentary.**
+
 {{
-    "negative_keywords": [
-        {{"keyword": "free", "reason": "Budget protection - premium business model"}},
-        {{"keyword": "jobs", "reason": "Intent filter - not recruitment business"}}
-    ]
+    "negative_keywords": [
+        {{
+            "keyword": "free plumbing",
+            "reason": "Budget protection - premium service business"
+        }},
+        {{
+            "keyword": "plumbing jobs", 
+            "reason": "Intent filter - not a recruitment business"
+        }}
+    ]
 }}
+
+**GENERATION GUIDELINES:**
+- Target 25-35 high-quality negative keywords
+- If unable to find 25 valid terms, return as many as justified by reasoning
+- Do not invent keywords to reach count targets
+- Focus on clear intent mismatches and budget protection
+- Ensure no conflicts with positive keywords
+- Eliminate duplicates and semantic overlaps
+- Valid JSON only
