@@ -56,8 +56,6 @@ Respond strictly in **valid JSON format** only:
 
 {{
   "campaign_id": "{campaign_id}",
-  "recommended_budget": {{
-    "suggested_amount": "<new_budget_value>",
-    "rationale": "<one-sentence explanation of why this budget is recommended>"
-  }}
+  "suggested_amount": "<new_budget_value>",
+  "rationale": "<one-sentence explanation of why this budget is recommended>"
 }}

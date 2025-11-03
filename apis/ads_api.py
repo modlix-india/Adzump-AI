@@ -17,7 +17,7 @@ from services.google_ads_builder import build_google_ads_payloads
 from services.banners import generate_banners
 from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
-from services.budget_recommendation_service import generate_budget_recommendation_service
+from services.budget_recommendation_service import generate_budget_recommendations
 
 from models.keyword_model import (
     KeywordResearchRequest,
@@ -314,10 +314,10 @@ async def generate_budget_recommendation(
     campaignId: str = Query(...)
 ):
     try:
-        result = await generate_budget_recommendation_service(
+        result = await generate_budget_recommendations(
             customer_id=customerId,
             login_customer_id=loginCustomerId,
-            campaign_id=campaignId, 
+            campaign_id=campaignId,
             client_code=clientCode
         )
         return {"status": "success", "data": result}

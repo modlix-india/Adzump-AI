@@ -16,7 +16,6 @@ DEVELOPER_TOKEN = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 # ---------------------- Fetch Audit Logs ----------------------
 async def fetch_audit_logs(customer_id: str, login_customer_id: str, access_token: str, campaign_id: str) -> list:
     
-    # Calculate last 30 days range
     end_date = date.today()
     start_date = end_date - timedelta(days=29)
     
@@ -138,12 +137,10 @@ async def fetch_old_budget(customer_id: str, login_customer_id: str, access_toke
 
 
 # ---------------------- Generate Budget Recommendation ----------------------
-async def generate_budget_recommendation_service(customer_id: str, login_customer_id: str,
+async def generate_budget_recommendations(customer_id: str, login_customer_id: str,
                                                  campaign_id: str, client_code: str) -> Dict[str, Any]:
     try:
-        #Fetch access token
-        # access_token = fetch_google_api_token_simple(client_code=client_code)
-        access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+        access_token = fetch_google_api_token_simple(client_code=client_code)
         
         audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id)
         metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id)
@@ -207,7 +204,6 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
                 parsed_response = BudgetRecommendationResponse(**response)
             else:
                 content = response.choices[0].message.content.strip()
-                # Strip markdown code block if present
                 if content.startswith("```"):
                     content = "\n".join(content.splitlines()[1:-1]).strip()
                     
@@ -215,14 +211,14 @@ async def generate_budget_recommendation_service(customer_id: str, login_custome
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"LLM response parsing failed: {str(e)}")
 
-        suggested_amount_micros = int(parsed_response.recommended_budget.suggested_amount)
+        suggested_amount_micros = int(parsed_response.suggested_amount)
 
         return {
             "campaign_id": parsed_response.campaign_id,
             "recommended_budget": {
                 "suggested_amount_micros": suggested_amount_micros,
                 "old_budget": old_budget,
-                "rationale": parsed_response.recommended_budget.rationale
+                "rationale": parsed_response.rationale
             }
         }
 
