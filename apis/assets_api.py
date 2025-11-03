@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException,Header
+import asyncio
+from fastapi import APIRouter, HTTPException, Header
 from models.assets_models.assets_request_model import AssetRequest
 from models.assets_models.assets_response_model import AssetResponse
 from services.assets.call_assets_service import CallAssetsService
@@ -9,22 +10,34 @@ from services.assets.structured_snippet_service import StructuredSnippetsService
 router = APIRouter(prefix="/api/ds/ads/assets", tags=["Assets"])
 
 ASSET_SERVICE_MAP = {
-    "callouts": CalloutsService.generate,
-    "sitelinks": SitelinksService.generate,
-    "structured_snippets": StructuredSnippetsService.generate,
-    "callassets":CallAssetsService.generate
+    "CALLOUTS": CalloutsService.generate,
+    "SITE_LINKS": SitelinksService.generate,
+    "STRUCTURED_SNIPPETS": StructuredSnippetsService.generate,
+    "CALL_ASSETS": CallAssetsService.generate
 }
 
 @router.post("/generate", response_model=AssetResponse)
-async def generate_asset(request: AssetRequest, access_token: str = Header(...),
-    clientCode: str = Header(...)):
-    service = ASSET_SERVICE_MAP.get(request.asset_type.lower())
-
-    if not service:
-        raise HTTPException(status_code=400, detail=f"Invalid asset_type '{request.asset_type}'")
-
+async def generate_asset(request: AssetRequest,access_token: str = Header(...),clientCode: str = Header(...)):
+    results = {}
+    invalid_assets = [a for a in request.asset_type if a not in ASSET_SERVICE_MAP]
+    if invalid_assets:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid asset types: {', '.join(invalid_assets)}"
+        )
     try:
-        result = await service(request.data_object_id, access_token, clientCode)
-        return AssetResponse(success=True, result=result)
+        tasks = [
+            ASSET_SERVICE_MAP[asset](request.data_object_id, access_token, clientCode)
+            for asset in request.asset_type
+        ]
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        for asset, response in zip(request.asset_type, responses): 
+            if isinstance(response, Exception):
+                results[asset] = {"success": False, "error": str(response)}
+            else:
+                results[asset] = {"success": True, "result": response}
+
+        return AssetResponse(success=True, result=results)
+
     except Exception as e:
         return AssetResponse(success=False, result=None, error=str(e))
