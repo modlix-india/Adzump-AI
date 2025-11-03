@@ -5,7 +5,7 @@ import json
 from models.budget_model import BudgetRecommendationResponse
 from services.openai_client import chat_completion
 from utils.prompt_loader import load_prompt
-from oserver.connection import fetch_google_api_token_simple
+from oserver.services.connection import fetch_google_api_token_simple
 from third_party.google.services.budget_service import (
     fetch_audit_logs,
     fetch_campaign_metrics,

@@ -2,12 +2,12 @@ import os,logging,time,asyncio,json
 import httpx
 from typing import List
 
+from oserver.services import connection
 from utils import text_utils,prompt_loader
 from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
-from oserver import connection
 from services.business_info_service import BusinessInfoService
 
 # Import Pydantic models
