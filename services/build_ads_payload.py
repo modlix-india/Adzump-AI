@@ -190,6 +190,28 @@ def generate_google_ads_mutate_operations(customer_id: str, ads: Dict[str, Any])
         asset_body = {"callAsset": {"phoneNumber": phone, "countryCode": country}}
         add_asset_and_link("CALL", asset_body)
 
+        # 4. Image Assets (expects base64 or preexisting resourceName)
+    for ia in assets.get("imageAssets", []):
+        # ia may contain 'resourceName' to reuse an existing asset or 'data' (base64) and 'mimeType'
+        if isinstance(ia, dict) and ia.get("resourceName"):
+            # link existing asset
+            mutate_ops.append({
+                "campaignAssetOperation": {
+                    "create": {
+                        "asset": ia["resourceName"],
+                        "campaign": f"customers/{customer_id}/campaigns/{campaign_resource}",
+                        "fieldType": "AD_IMAGE"
+                    }
+                }
+            })
+        else:
+            mime = ia.get("mimeType") if isinstance(ia, dict) else None
+            data = ia.get("data") if isinstance(ia, dict) else None
+            if not data:
+                continue
+            asset_body = {"imageAsset": {"mimeType": mime, "data": data}}
+            add_asset_and_link("IMAGE", asset_body)
+
 
     # ---------- 5) Ad Groups + Criteria + Ads ----------
     AGE_BUCKETS = [

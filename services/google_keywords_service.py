@@ -1,540 +1,431 @@
-import os
-import logging
-import time
-import requests
-import json
-import re
+import os,logging,time,asyncio,json
+import httpx
+from typing import List
 
-from typing import List, Dict, Set, Any
-
-import oserver
-from utils.text_utils import normalize_text, safe_truncate_to_sentence, get_safety_patterns, setup_apis, get_fallback_negative_keywords
-from utils.prompt_loader import load_prompt
+from oserver.services import connection
+from utils import text_utils,prompt_loader
+from services.openai_client import chat_completion
+from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
+from services.business_info_service import BusinessInfoService
+
+# Import Pydantic models
+from models.keyword_model import (
+    BusinessMetadata,
+    KeywordSuggestion,
+    OptimizedKeyword,
+    NegativeKeyword,
+    KeywordResearchRequest,
+    KeywordResearchResult,
+    KeywordSelectionResponse,
+    GoogleNegativeKwReq,
+    NegativeKeywordResponse,
+    MatchType,
+    KeywordType,
+    CompetitionLevel,
+)
+from pydantic import ValidationError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-
-
 class GoogleKeywordService:
 
+    OPENAI_MODEL = "gpt-4o-mini"
+    DEFAULT_LOCATION_IDS = ["geoTargetConstants/2840"]
+    MIN_KEYWORD_LENGTH = 2
+    MAX_KEYWORD_WORDS = 6
+    DEFAULT_SEED_COUNT = 40  
+    TARGET_POSITIVE_COUNT = 30
+    DEFAULT_LANGUAGE_ID = 1000
+    HTTP_TIMEOUT = 30.0
+    CHUNK_SIZE = 15
+    RETRY_ATTEMPTS = 2
+    RETRY_DELAY = 1.0
+    CHUNK_DELAY = 0.5
+
+    SEED_PROMPT_MAP = {
+        KeywordType.BRAND: 'seed_keywords_brand_prompt.txt',
+        KeywordType.GENERIC: 'seed_keywords_generic_prompt.txt', 
+    }
+    
+    POSITIVE_PROMPT_MAP = {
+        KeywordType.BRAND: 'positive_keywords_brand_prompt.txt',
+        KeywordType.GENERIC: 'positive_keywords_generic_prompt.txt',
+    }
+
     def __init__(self):
-        self.openai_client = setup_apis()
-        self.safety_patterns = get_safety_patterns()
-
-    def extract_business_metadata(self, scraped_data: str, url: str = None) -> Dict[str, Any]:
-        try:
-
-            content_summary = safe_truncate_to_sentence(str(scraped_data), 2000)
-
-            prompt_template = load_prompt('business_metadata_prompt.txt')
-            prompt = prompt_template.format(url=url or 'Not provided', content_summary=content_summary)
-
-            resp = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=500,
-                temperature=0.0,
-                response_format={"type": "json_object"}
-            )
-
-            raw = resp.choices[0].message.content.strip()
-            brand_info = json.loads(raw)
-
-            if not brand_info.get("brand_name"):
-                brand_info["brand_name"] = "Unknown"
-            if not brand_info.get("primary_location"):
-                brand_info["primary_location"] = "Unknown"
-            if not isinstance(brand_info.get("service_areas"), list):
-                brand_info["service_areas"] = []
-            if not isinstance(brand_info.get("brand_keywords"), list):
-                brand_info["brand_keywords"] = []
-
-            logger.info(f"Extracted brand info: {brand_info}")
-            return brand_info
+        self.safety_patterns = text_utils.get_safety_patterns()
+        self.business_extractor = BusinessInfoService()
+    async def generate_seed_keywords(
+        self,
+        scraped_data: str,
+        url: str = None,
+        brand_info: BusinessMetadata = None,
+        unique_features: List[str] = None,
+        max_kw: int = DEFAULT_SEED_COUNT,
+        keyword_type: KeywordType = KeywordType.GENERIC
+    ) -> List[str]:
         
-        except Exception as e:
-            logger.warning(f"Brand extraction failed: {e}")
-            return {
-                "brand_name": "Unknown",
-                "primary_location": "Unknown",
-                "service_areas": [],
-                "business_type": "Unknown",
-                "brand_keywords": []
-            }
-
-    def extract_business_unique_features(self, scraped_data: str) -> List[str]:
-
-        usp_prompt_template = load_prompt('business_usp_prompt.txt')
-        usp_prompt = usp_prompt_template.format(scraped_data = scraped_data)
-
-        try:
-            resp = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": usp_prompt}],
-                max_tokens=400,
-                temperature=0.0,
-                response_format={"type": "json_object"}
-            )
-            usp_data = json.loads(resp.choices[0].message.content.strip())
-            unique_features = [str(f).lower().strip() for f in usp_data.get("features", []) 
-                                if isinstance(f, str) and len(str(f).strip()) > 0]
-            
-            logger.info(f"Extracted USPs: {unique_features}")
-        except Exception as e:
-            logger.warning(f"USP extraction failed: {e}")
-            unique_features = []
-        return unique_features
-
-    def generate_seed_keywords(self, scraped_data: str, url: str = None, brand_info: Dict[str, Any] = None, unique_features: List[str] = None, max_kw: int = 40) -> List[str]:
-        try:
-            content_summary = safe_truncate_to_sentence(str(scraped_data), 2000)
-
-            brand_name = brand_info.get("brand_name", "Unknown")
-            primary_location = brand_info.get("primary_location", "Unknown")
-            service_areas = brand_info.get("service_areas", [])
-            business_type = brand_info.get("business_type", "Unknown")
-
-            location_context = ""
-            if primary_location != "Unknown":
-                location_context += f"Primary Location: {primary_location}\n"
-            if service_areas:
-                location_context += f"Service Areas: {', '.join(service_areas)}\n"
-
-            features_context = ""
-            if unique_features:
-                features_context = f"Unique Features: {', '.join(unique_features)}\n"
-
-            seed_prompt_template = load_prompt('seed_keywords_prompt.txt')
-            prompt = seed_prompt_template.format(
-                url=url or 'Not provided',
-                content_summary=content_summary,
-                brand_name=brand_name,
-                business_type=business_type,
-                location_context=location_context,
-                features_context=features_context,
+        prompt_file = GoogleKeywordService._get_prompt_file(self.SEED_PROMPT_MAP, keyword_type)
+        prompt = prompt_loader.format_prompt(
+                prompt_file,
+                scraped_data=scraped_data,
+                url=url,
+                brand_info=brand_info,
+                unique_features=unique_features,
                 max_kw=max_kw,
-                primary_location=primary_location,
-                service_areas=service_areas,
-                unique_features=unique_features
             )
 
-            resp = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+        try:
+            resp = await chat_completion(
                 messages=[{"role": "user", "content": prompt}],
+                model=self.OPENAI_MODEL,
                 max_tokens=800,
-                temperature=0.2,
+                temperature=0.2
             )
             raw = resp.choices[0].message.content.strip()
 
-            parsed = []
-            try:
-                parsed = json.loads(raw)
-                if not isinstance(parsed, list):
-                    raise ValueError("Response not a list")
-            except Exception:
-                parts = re.findall(r'"([^"]+)"', raw)
-                if not parts:
-                    parts = re.split(r'[\n,•;]+', raw)
-                parsed = [p.strip().strip('"\'') for p in parts if p.strip()]
+            seed_keywords = KeywordUtils.parse_and_normalize_seed_keywords(raw,max_kw)
 
-            normalized = []
-            seen = set()
-            for kw in parsed:
-                if not isinstance(kw, str):
-                    continue
-                k = normalize_text(kw)
-                if 2 <= len(k) and k not in seen:
-                    normalized.append(k)
-                    seen.add(k)
-            logger.info(f"Generated {len(normalized)} strategic seed keywords")
-            return normalized[:max_kw]
+            logger.info(f"Generated {len(seed_keywords)} strategic seed keywords for type '{keyword_type.value}'")
+            logger.info("seed keywords generated: " + str(seed_keywords))
+            return seed_keywords
 
         except Exception as e:
             logger.exception("Strategic seed generation failed: %s", e)
             return []
 
-    def fetch_google_ads_suggestions(
+    async def fetch_google_ads_suggestions(
             self,
             customer_id: str,
-            login_customer_id:str,
+            login_customer_id: str,
             client_code: str,
             seed_keywords: List[str],
             url: str = None,
             location_ids: List[str] = None,
-            language_id: int = 1000,
-            chunk_size: int = 15,
-    ) -> List[Dict[str, Any]]:
+            language_id: int = DEFAULT_LANGUAGE_ID,
+            chunk_size: int = CHUNK_SIZE,
+    ) -> List[KeywordSuggestion]:
 
-        access_token = oserver.fetch_google_api_token_simple(client_code)
+        access_token = connection.fetch_google_api_token_simple(client_code)
+
+        location_ids = location_ids or self.DEFAULT_LOCATION_IDS  # India
+        all_suggestions: List[KeywordSuggestion] = []
+
+        competition_map = {
+            "LOW": CompetitionLevel.LOW,
+            "MEDIUM": CompetitionLevel.MEDIUM,
+            "HIGH": CompetitionLevel.HIGH
+        }
 
         try:
-            if location_ids is None or len(location_ids) == 0:
-                location_ids = ["geoTargetConstants/2840"]  # India
-
-            all_suggestions: List[Dict[str, Any]] = []
-            seen_keywords: Set[str] = set()
-
-            # Google Ads API endpoint
             developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-
             if not developer_token:
                 raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
 
             endpoint = f"https://googleads.googleapis.com/v20/customers/{customer_id}:generateKeywordIdeas"
-
-            # Headers for API call
             headers = {
                 "authorization": f"Bearer {access_token}",
                 "developer-token": developer_token,
                 "content-type": "application/json",
-                "login-customer-id":login_customer_id # without this i was getting permission denied
+                "login-customer-id": login_customer_id
             }
 
-            logger.info(f"Targeting {len(location_ids)} locations: {location_ids}")
+            async with httpx.AsyncClient(timeout=self.HTTP_TIMEOUT) as client:
+                for i in range(0, len(seed_keywords), chunk_size):
+                    chunk = seed_keywords[i: i + chunk_size]
+                    chunk_num = i // chunk_size + 1
+                    logger.info("Processing chunk %d (size=%d)",chunk_num, len(chunk))
 
-            # Process in chunks
-            total_chunks = (len(seed_keywords) + chunk_size - 1) // chunk_size
-
-            for i in range(0, len(seed_keywords), chunk_size):
-                chunk = seed_keywords[i: i + chunk_size]
-                chunk_num = i // chunk_size + 1
-
-                logger.info("Processing chunk %d/%d (size=%d)", chunk_num, total_chunks, len(chunk))
-
-                try:
-                    payload = {
-                        "language": f"languageConstants/{language_id}",
-                        "geoTargetConstants": [f"{loc_id}" for loc_id in location_ids],
-                        "includeAdultKeywords": False,
-                        "keywordPlanNetwork": "GOOGLE_SEARCH_AND_PARTNERS"
-                    }
-
-                    # Set seed keywords
-                    if url and url.strip():
-                        payload["keywordAndUrlSeed"] = {
-                            "keywords": chunk,
-                            "url": str(url).strip()
+                    try:
+                        payload = {
+                            "language": f"languageConstants/{language_id}",
+                            "geoTargetConstants": [f"{loc_id}" for loc_id in location_ids],
+                            "includeAdultKeywords": False,
+                            "keywordPlanNetwork": "GOOGLE_SEARCH_AND_PARTNERS"
                         }
-                    else:
-                        payload["keywordSeed"] = {
-                            "keywords": chunk
-                        }
+                        if url and url.strip():
+                            payload["keywordAndUrlSeed"] = {"keywords": chunk, "url": str(url).strip()}
+                        else:
+                            payload["keywordSeed"] = {"keywords": chunk}
 
-                    # API call with retries
-                    response = None
-                    for attempt in range(2):
-                        try:
-                            response = requests.post(
-                                endpoint,
-                                headers=headers,
-                                json=payload,
-                            )
-
-                            if response.status_code == 200:
-                                break
-                            else:
-                                logger.warning(f"API error attempt {attempt + 1}: {response.status_code} - {response.text}")
-                                if attempt == 0:
-                                    time.sleep(1)
-
-                        except requests.exceptions.RequestException as ex:
-                            logger.warning(f"Request error attempt {attempt + 1}: {str(ex)[:100]}")
-                            if attempt == 0:
-                                time.sleep(1)
-
-                    if not response or response.status_code != 200:
-                        logger.warning(f"No valid response for chunk {chunk_num}")
-                        continue
-
-                    response_data = response.json()
-                    results = response_data.get("results", [])
-
-                    if not results:
-                        logger.info(f"No results in chunk {chunk_num}")
-                        continue
-
-                    chunk_suggestions = []
-                    for kw_idea in results:
-                        try:
-                            text_val = kw_idea.get("text", "")
-                            if not text_val:
-                                continue
-
-                            text_norm = normalize_text(text_val)
-                            if text_norm in seen_keywords or len(text_norm) < 2 or len(text_norm.split()) > 6:
-                                continue
-
-                            metrics = kw_idea.get("keywordIdeaMetrics", {})
-
+                        response = None
+                        for attempt in range(self.RETRY_ATTEMPTS):
                             try:
-                                volume = int(metrics.get("avgMonthlySearches", 0))
-                            except (ValueError, TypeError):
-                                volume = 0
+                                response = await client.post(endpoint, headers=headers, json=payload)
+                                if response.status_code == 200:
+                                    break
+                                logger.warning(
+                                    f"API error attempt {attempt + 1}: {response.status_code}")
+                                await asyncio.sleep(self.RETRY_DELAY)
+                            except httpx.RequestError as ex:
+                                logger.warning(
+                                    f"Request error attempt {attempt + 1}: {str(ex)[:100]}")
+                                await asyncio.sleep(self.RETRY_DELAY)
 
-                            try:
-                                competition = metrics.get("competition", "UNKNOWN")
-                            except:
-                                competition = "UNKNOWN"
-
-                            try:
-                                competition_index = float(metrics.get("competitionIndex", 0)) / 100.0
-                            except (ValueError, TypeError):
-                                competition_index = 0.0
-
-                            seen_keywords.add(text_norm)
-                            chunk_suggestions.append({
-                                "keyword": text_norm,
-                                "volume": volume,
-                                "competition": competition,
-                                "competitionIndex": competition_index,
-                            })
-
-                        except Exception as e:
-                            logger.debug("Error processing keyword: %s", str(e)[:50])
+                        if not response or response.status_code != 200:
+                            logger.warning(
+                                f"Skipping chunk {chunk_num} due to invalid response")
                             continue
 
-                    all_suggestions.extend(chunk_suggestions)
-                    logger.info("Got %d quality suggestions from chunk %d", len(chunk_suggestions), chunk_num)
+                        results = response.json().get("results", [])
+                        if not results:
+                            logger.info(f"No results in chunk {chunk_num}")
+                            continue
 
-                    if i + chunk_size < len(seed_keywords):
-                        time.sleep(0.5)
+                        for kw_idea in results:
+                            try:
+                                text_val = kw_idea.get("text", "")
+                                if not text_val:
+                                    continue
 
-                except Exception as e:
-                    logger.exception("Failed chunk %d: %s", chunk_num, str(e)[:100])
-                    continue
+                                text_norm = text_utils.normalize_text(text_val)
+                                if len(text_norm) < self.MIN_KEYWORD_LENGTH or len(text_norm.split()) > self.MAX_KEYWORD_WORDS:
+                                    continue
 
-            final_suggestions = []
-            seen_final = set()
-            all_suggestions.sort(key=lambda x: x["volume"], reverse=True)
+                                metrics = kw_idea.get("keywordIdeaMetrics", {})
+                                raw_competition = metrics.get("competition", "UNKNOWN")
 
-            for suggestion in all_suggestions:
-                kw = suggestion["keyword"]
-                if kw not in seen_final:
-                    final_suggestions.append(suggestion)
-                    seen_final.add(kw)
+                                # Check for existing keyword
+                                existing_idx = next((idx for idx, s in enumerate(all_suggestions)
+                                                    if s.keyword == text_norm), None)
 
-            logger.info("TOTAL: %d suggestions from Google Ads API for %d locations", len(final_suggestions), len(location_ids))
-            return final_suggestions
+                                new_volume = int(metrics.get("avgMonthlySearches", 0) or 0)
+
+                                if existing_idx is not None:
+                                    # Replace if new volume is higher
+                                    if new_volume > all_suggestions[existing_idx].volume:
+                                        all_suggestions[existing_idx] = KeywordSuggestion(
+                                            keyword=text_norm,
+                                            volume=new_volume,
+                                            competition=competition_map.get(raw_competition, CompetitionLevel.UNKNOWN),
+                                            competitionIndex=float(metrics.get("competitionIndex", 0) or 0) / 100.0
+                                        )
+                                else:
+                                    # New keyword
+                                    suggestion = KeywordSuggestion(
+                                        keyword=text_norm,
+                                        volume=new_volume,
+                                        competition=competition_map.get(raw_competition, CompetitionLevel.UNKNOWN),
+                                        competitionIndex=float(metrics.get("competitionIndex", 0) or 0) / 100.0
+                                    )
+                                    all_suggestions.append(suggestion)
+
+                            except (ValueError, TypeError) as e:
+                                logger.warning(
+                                    f"Validation error for {text_norm}:{str(e)[:50]}")
+
+                            except Exception as e:
+                                logger.debug(
+                                    "Error processing keyword: %s", str(e)[:50])
+                                continue
+
+                        await asyncio.sleep(self.CHUNK_DELAY)
+
+                    except Exception as e:
+                        logger.exception("Failed chunk %d: %s",chunk_num, str(e)[:100])
+                        continue
+
+            all_suggestions.sort(key=lambda x: x.volume, reverse=True)
+            logger.info("TOTAL: %d suggestions from Google Ads API for %d locations", len(all_suggestions), len(location_ids))
+            logger.info("all suggestion from google ads api :", all_suggestions)
+            return all_suggestions
 
         except Exception as e:
             logger.exception("Google Ads suggestions failed: %s", e)
             return []
 
-    def select_positive_keywords(
+    async def select_positive_keywords(
         self,
-        all_suggestions: List[Dict[str, Any]],
-        business_info: Dict[str, Any],
+        all_suggestions: List[KeywordSuggestion],
+        business_info: BusinessMetadata,
         unique_features: List[str],
         scraped_data: str,
+        keyword_type: KeywordType,
         url: str = None,
-        target_count: int = 30
-    ) -> List[Dict[str, Any]]:
+        target_count: int = TARGET_POSITIVE_COUNT
+    ) -> List[OptimizedKeyword]:
 
-        try:
-            keyword_data = []
-            for s in all_suggestions:
-                kw = s.get("keyword", "")
-                vol = s.get("volume", 0)
-                comp =s.get("competitionIndex",0.0)
-                roi = vol / (1 + s.get("competitionIndex", 0.0))
+        prompt_file = GoogleKeywordService._get_prompt_file(self.POSITIVE_PROMPT_MAP, keyword_type)
+
+        prompt = prompt_loader.format_prompt(
+            prompt_file,
+            scraped_data=scraped_data,
+            url=url,
+            brand_info=business_info,
+            unique_features=unique_features,
+            target_count=target_count,
+            suggestions=all_suggestions
+        )
+
+        resp = await chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            model=self.OPENAI_MODEL,
+            max_tokens=3000,
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+
+        raw = resp.choices[0].message.content.strip()
+        response_data = KeywordSelectionResponse(**json.loads(raw))
+
+        suggestion_map = {s.keyword: s for s in all_suggestions}
+        final_optimized: List[OptimizedKeyword] = []
+        seen = set()
+
+        for item in response_data.keywords:
+            kw_text = text_utils.normalize_text(item.get("keyword", ""))
+            if kw_text in suggestion_map and kw_text not in seen:
+                base_suggestion = suggestion_map[kw_text]
+
+                match_type_str = item.get("match_type", "phrase")
+                try:
+                    match_type = MatchType(match_type_str.lower())
+                except ValueError:
+                    match_type = MatchType.PHRASE
+
+                optimized = OptimizedKeyword(
+                    keyword=base_suggestion.keyword,
+                    volume=base_suggestion.volume,
+                    competition=base_suggestion.competition,
+                    competitionIndex=base_suggestion.competitionIndex,
+                    match_type=match_type,
+                    rationale=item.get("rationale", "AI selected"),
+                    is_cross_business=item.get("is_cross_business", False)
+                )
+
+                final_optimized.append(optimized)
+                seen.add(kw_text)
                 
-                keyword_data.append(f"{kw} | Volume:{vol} | ROI:{roi:.0f} | Competition: {comp:.2f} ")
-            
-            keywords_text = "\n".join(keyword_data)
-            business_summary = safe_truncate_to_sentence(str(scraped_data), 2500)
 
+        logger.info(f"Final optimization: {len(final_optimized)} keywords selected")
+        logger.info(f"Final optimized keywords: {final_optimized}")
+        return final_optimized[:target_count]
 
-            prompt_template = load_prompt('positive_keywords_prompt.txt')
-            prompt = prompt_template.format(
-                business_summary=business_summary,
-                keywords_text=keywords_text,
-                target_count=target_count,
-                url=url or 'Not provided',
-                unique_features=unique_features,
-                brand_name = business_info.get("brand_name", "Unknown"),
-                business_type = business_info.get("business_type", "Unknown"),
-                primary_location = business_info.get("primary_location", "Unknown"),
-                service_areas = ", ".join(business_info.get("service_areas", [])) or "Not provided",
-                brand_keywords = ", ".join(business_info.get("brand_keywords", [])) or "Not provided"
-            )
-
-            resp = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=3000,
-                temperature=0.0,
-                response_format={"type": "json_object"}
-            )
-            
-            raw = resp.choices[0].message.content.strip()
-            response_data = json.loads(raw)
-            optimized_list = response_data.get("keywords", [])
-            
-            suggestion_map = {s["keyword"]: s for s in all_suggestions}
-            final_optimized = []
-            seen = set()
-            
-            for item in optimized_list:
-                kw = normalize_text(item.get("keyword", ""))
-                if kw in suggestion_map and kw not in seen:
-                    final_optimized.append({
-                        **suggestion_map[kw],
-                        "match_type": item.get("match_type", "phrase"),
-                        "rationale": item.get("rationale", "AI selected")
-                    })
-                    seen.add(kw)
-            
-            if len(final_optimized) < target_count:
-                remaining = [s for s in all_suggestions if s["keyword"] not in seen]
-                for s in remaining[:target_count - len(final_optimized)]:
-                    final_optimized.append({
-                        **s,
-                        "match_type": "phrase",
-                        "rationale": "Fallback selection"
-                    })
-
-            logger.info(f"Final optimization: {len(final_optimized)} keywords selected")
-            return final_optimized[:target_count]
-            
-        except Exception as e:
-            logger.exception("Final optimization failed: %s", e)
-            fallback = []
-            for i, s in enumerate(all_suggestions[:target_count]):
-                match_type = "exact" if i < target_count * 0.3 else ("phrase" if i < target_count * 0.6 else "broad")
-                fallback.append({
-                    **s,
-                    "match_type": match_type,
-                    "rationale": "Fallback selection"
-                })
-            return fallback
-
-    def generate_negative_keywords(self, optimized_positive_keywords: List[Dict[str, Any]], scraped_data: str,
-                                   url: str = None) -> List[Dict[str, Any]]:
+    async def generate_negative_keywords(
+        self,
+        optimized_positive_keywords: List[OptimizedKeyword],
+        scraped_data: str,
+        url: str = None
+    ) -> List[NegativeKeyword]:
 
         try:
-            business_summary = safe_truncate_to_sentence(str(scraped_data), 2500)
-            positive_terms = [kw.get("keyword", "") for kw in optimized_positive_keywords]
-            positive_text = ", ".join(positive_terms)
-
-            prompt_template = load_prompt('negative_keywords_prompt.txt')
-
-            prompt = prompt_template.format(
-                business_summary=business_summary,
-                positive_text=positive_text,
-                url=url or 'Not provided'
+            logger.info(f"Generating negative keywords for {len(optimized_positive_keywords)} positive keywords")
+            prompt = prompt_loader.format_prompt(
+                "negative_keywords_prompt.txt",
+                scraped_data=scraped_data,
+                url=url,
+                positive_keywords=optimized_positive_keywords
             )
 
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+            response = await chat_completion(
                 messages=[{"role": "user", "content": prompt}],
+                model=self.OPENAI_MODEL,
                 max_tokens=1500,
                 temperature=0.0,
                 response_format={"type": "json_object"}
             )
-            raw = response.choices[0].message.content.strip()
 
             try:
-                response_data = json.loads(raw)
-                negatives = response_data.get("negative_keywords", [])
+                raw = response.choices[0].message.content.strip()
+                response_data = NegativeKeywordResponse(**json.loads(raw))
+                negatives_raw = response_data.negative_keywords
             except Exception as e:
-                logger.error(f"Negative keyword JSON parsing failed: {e}")
-                negatives = get_fallback_negative_keywords()
+                logger.error(f"Negative keyword JSON parsing failed: {e}, using fallback")
+                negatives_raw = text_utils.get_fallback_negative_keywords()
 
-            cleaned_negatives = []
-            seen = set()
-            positive_tokens = set()
-            
-            for pos in positive_terms:
-                positive_tokens.update(re.findall(r"\w+", pos.lower()))
-
-            for item in negatives:
-                if not isinstance(item, dict):
-                    continue
-
-                kw = normalize_text(item.get("keyword", ""))
-                reason = item.get("reason", "Budget protection")
-
-                if not kw or len(kw) < 2 or len(kw) > 50 or kw in seen:
-                    continue
-
-                if any(pattern.search(kw) for pattern in self.safety_patterns):
-                    continue
-
-                if kw in [p.lower() for p in positive_terms]:
-                    logger.debug(f"Skipped negative '{kw}' - conflicts with positive keyword")
-                    continue
-
-                # Check for high token overlap with positive keywords
-                kw_tokens = set(re.findall(r"\w+", kw.lower()))
-                overlap_ratio = len(kw_tokens & positive_tokens) / max(len(kw_tokens), 1)
-
-                if overlap_ratio >= 0.8:  # Increased threshold for better precision
-                    logger.debug(f"Skipped negative '{kw}' - high overlap with positive keywords")
-                    continue
-
-                seen.add(kw)
-                cleaned_negatives.append({"keyword": kw, "reason": reason})
-
-                if len(cleaned_negatives) >= 40:
-                    break
+            cleaned_negatives = KeywordUtils.filter_and_validate_negatives(
+                negatives_raw,
+                optimized_positive_keywords,
+                self.safety_patterns
+            )
 
             logger.info(f"Generated {len(cleaned_negatives)} validated negative keywords")
+            logger.info(f"Final negative keywords: {cleaned_negatives}")
             return cleaned_negatives
 
         except Exception as e:
             logger.error(f"Negative keyword generation failed: {e}")
             return []
 
-    def extract_positive_strategy(
+    async def extract_positive_strategy(
         self,
+        keyword_request: KeywordResearchRequest,
         client_code: str,
-        session_id:str,
-        scraped_data: str,
-        customer_id: str,
-        location_ids: List[str],
-        url: str = None,
-        language_id: int = 1000,
-        seed_count: int = 40,
-        target_positive_count: int = 30
-    ) -> Dict[str, Any]:
+        session_id: str,
+        access_token: str,
+    ) -> KeywordResearchResult:
+        
+        location_ids = keyword_request.location_ids or self.DEFAULT_LOCATION_IDS
+        language_id = keyword_request.language_id or self.DEFAULT_LANGUAGE_ID
+        seed_count = keyword_request.seed_count or self.DEFAULT_SEED_COUNT
+        keyword_type = keyword_request.keyword_type or KeywordType.GENERIC
+        target_positive_count = keyword_request.target_positive_count or self.TARGET_POSITIVE_COUNT
 
         start_time = time.time()
         logger.info("Starting strategic keyword research pipeline")
 
-        try:
-            if session_id not in sessions:
-                raise HTTPException(status_code=404, detail="Invalid or expired session.")
-
-            session = sessions[session_id]
-            login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
-
-            if not login_customer_id:
-                raise HTTPException(status_code=400, detail="loginCustomerId not found in session.")
+        # validate the session
+        if session_id not in sessions:
+            raise HTTPException(status_code=404, detail="Invalid or expired session.")
         
-            # STEP 1: Extract business foundation
-            logger.info("STEP 1: Extracting business information and USPs")
-            brand_info = self.extract_business_metadata(scraped_data, url)
-            unique_features = self.extract_business_unique_features(scraped_data)
-            
-            # STEP 2: Generate strategic seeds (brand + services + locations)
-            logger.info("STEP 2: Generating strategic seed keywords")
-            seed_keywords = self.generate_seed_keywords(
-                scraped_data, url, brand_info, unique_features, seed_count
-            )
-            
-            if not seed_keywords:
-                logger.error("No seed keywords generated")
-                return {"positive_keywords": []}
+        session = sessions[session_id]
+        login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
 
-            # STEP 3: Get Google Ads suggestions
+        if not login_customer_id:
+            raise HTTPException(status_code=401, detail="loginCustomerId not found in session.")
+        
+        #get business details
+        scraped_data, url = self.business_extractor.get_business_details(
+            data_object_id=keyword_request.data_object_id, 
+            access_token=access_token,
+            client_code=client_code)
+
+        #validate we got data
+        if not scraped_data:
+            logger.error(f"No scraped data found for data_object_id: {keyword_request.data_object_id}")
+            return KeywordResearchResult(positive_keywords=[], brand_info=BusinessMetadata(), unique_features=[])
+        
+        brand_info = BusinessMetadata()
+        unique_features = []
+        seed_keywords = []
+        
+        try:
+            logger.info("STEP 1: Extracting business information and USPs")
+            brand_info, unique_features = await asyncio.gather(
+                self.business_extractor.extract_business_metadata(scraped_data, url),
+                self.business_extractor.extract_business_unique_features(scraped_data),
+                return_exceptions=True
+            )
+
+            # Handle exceptions from parallel execution
+            if isinstance(brand_info, Exception):
+                logger.warning(f"Brand extraction failed, using defaults: {brand_info}")
+                brand_info = BusinessMetadata()
+            if isinstance(unique_features, Exception):
+                logger.warning(f"USP extraction failed: {unique_features}")
+                unique_features = []
+
+            logger.info("STEP 2: Generating strategic seed keywords")
+            seed_keywords = await self.generate_seed_keywords(
+                scraped_data, url, brand_info, unique_features, seed_count, keyword_type
+            )
+
+            if not seed_keywords:
+                logger.error("No seed keywords generated - returning empty results")
+                return KeywordResearchResult(
+                    positive_keywords=[],
+                    brand_info=brand_info,
+                    unique_features=unique_features
+                )
+            logger.info(f"Generated {len(seed_keywords)} seed keywords for type '{keyword_type.value}")
+
             logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(seed_keywords))
-            all_suggestions = self.fetch_google_ads_suggestions(
-                customer_id=customer_id,
-                login_customer_id = login_customer_id,
+            all_suggestions = await self.fetch_google_ads_suggestions(
+                customer_id=keyword_request.customer_id,
+                login_customer_id=login_customer_id,
                 client_code=client_code,
                 seed_keywords=seed_keywords,
                 url=url,
@@ -542,47 +433,99 @@ class GoogleKeywordService:
                 language_id=language_id,
             )
 
-            # Inject seed keywords back to prevent loss
-            suggestion_texts = {s['keyword'] for s in all_suggestions}
-            for seed in seed_keywords:
-                if seed not in suggestion_texts:
-                    all_suggestions.append({
-                        "keyword": seed,
-                        "volume": 0,
-                        "competition": "UNKNOWN",
-                        "competitionIndex": 0.0,
-                    })
-
             if not all_suggestions:
-                logger.error("No suggestions from Google Ads API")
-                return {"positive_keywords": []}
+                logger.error("No suggestions from Google Ads API - creating from seed")
+                all_suggestions = [
+                    KeywordSuggestion(
+                        keyword=seed,
+                        volume=10, # added small but not zero 
+                        competition=CompetitionLevel.LOW, # low competition
+                        competitionIndex=0.1 # Low competition index
 
-            # STEP 4: Final optimization for intent and match types
-            logger.info("STEP 4: Final optimization for buying intent and match types")
-            optimized_positive = self.select_positive_keywords(
-                all_suggestions, brand_info, unique_features, scraped_data,url, target_positive_count
+                    )for seed in seed_keywords[:target_positive_count * 2]
+                ]
+            else:
+                # Inject seed keywords back to prevent loss
+                suggestion_texts = {s.keyword for s in all_suggestions}
+                for seed in seed_keywords:
+                    if seed not in suggestion_texts:
+                        all_suggestions.append(
+                            KeywordSuggestion(
+                                keyword=seed,
+                                volume=10, # added small but not zero
+                                competition=CompetitionLevel.LOW, # low competition
+                                competitionIndex=0.1 # low competition index
+                            )
+                        )
+
+            logger.info(
+                "STEP 4: Final optimization for buying intent and match types")
+            optimized_positive = await self.select_positive_keywords(
+                all_suggestions, brand_info, unique_features, scraped_data, keyword_type, url, target_positive_count
             )
 
-            if not optimized_positive:
-                logger.error("No keywords survived optimization - using all suggestions fallback")
-                optimized_positive = all_suggestions[:target_positive_count]
-                for kw in optimized_positive:
-                    kw["match_type"] = "phrase"
-                    kw["rationale"] = "Fallback selection"
-
-            result = {
-                "positive_keywords": optimized_positive,
-                "brand_info": brand_info,
-                "unique_features": unique_features
-            }
+            result = KeywordResearchResult(
+                positive_keywords=optimized_positive,
+                brand_info=brand_info,
+                unique_features=unique_features
+            )
 
             total_time = time.time() - start_time
             logger.info("Positive pipeline completed in %.2f seconds: %d positive keywords",
-                        total_time, len(optimized_positive))
+                        total_time, result.total_keywords)
+            logger.info(f"Match type percentages: {result.get_match_type_percentage()}")
+            logger.info(f"Cross-business terms: {result.cross_business_count}")
 
             return result
 
         except Exception as e:
             logger.exception("Pipeline failed: %s", e)
-            return {"positive_keywords": []}
+            return KeywordResearchResult(
+                positive_keywords=[],
+                brand_info=brand_info,
+                unique_features=unique_features
+            )
+    async def extract_negative_strategy(
+        self,
+        keyword_request: GoogleNegativeKwReq,
+        client_code: str,
+        access_token: str,
+    ) -> List[NegativeKeyword]:
+        
+        data_object_id = keyword_request.data_object_id
+        positive_keywords = keyword_request.positive_keywords
+        
+        try:
+            # Fetch business details
+            scraped_data, url = self.business_extractor.get_business_details(
+                data_object_id=data_object_id,
+                access_token=access_token,
+                client_code=client_code
+            )
+            
+            # Validate we got data
+            if not scraped_data:
+                logger.warning(f"No scraped data found for data_object_id: {data_object_id}")
+                return []
+            
+            logger.info("Started negative keyword generation")
+            
+            # Generate negative keywords
+            negatives = await self.generate_negative_keywords(
+                optimized_positive_keywords=positive_keywords,
+                scraped_data=scraped_data,
+                url=url
+            )
+            
+            logger.info(f"Generated {len(negatives)} negative keywords")
+            return negatives
+            
+        except Exception as e:
+            logger.exception(f"Negative keyword generation failed: {e}")
+            return []
+        
+    @staticmethod
+    def _get_prompt_file(prompt_map: dict, keyword_type: KeywordType) -> str:
+        return prompt_map.get(keyword_type, prompt_map[KeywordType.GENERIC])
 
+        

@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict
 import httpx
 
-from oserver.connection import fetch_google_api_token_simple
+from oserver.services.connection import fetch_google_api_token_simple
 
 
 class GoogleAdsClientError(Exception):
@@ -24,8 +24,8 @@ async def post_mutate_operations(
     """
     developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
     access_token =  fetch_google_api_token_simple(client_code)
-    access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
-    if not developer_token or access_token:
+    # access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+    if not developer_token or not access_token:
         raise GoogleAdsClientError("Missing Google Ads credentials or tokens.")
 
     

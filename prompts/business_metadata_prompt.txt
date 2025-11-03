@@ -1,46 +1,209 @@
-You are a precise business analyst extracting factual information. Adhere strictly to the following rules:
+<role>You are a business metadata extraction expert. Extract factual information from website content.</role>
 
-**CRITICAL CONSTRAINTS:**
-- Extract ONLY information explicitly stated in the content
-- DO NOT infer, assume, or guess any information
-- If information is not clearly stated, use the specified default values
-- Never add information not present in the text
-
-**BUSINESS CONTENT ANALYSIS:**
+<input>
 URL: {url}
-CONTENT: {content_summary}
+CONTENT: {scraped_data}
+</input>
 
-**EXTRACTION TASKS:**
-1. **Brand/Business Name**: Exact company, project, or brand name explicitly mentioned
-2. **Primary Location**: Main city/area explicitly stated as business base/headquarters
-3. **Service Areas**: Only geographic areas explicitly mentioned as service locations
-4. **Business Type**: Main industry/category explicitly described
+<task>
+Extract business metadata and return valid JSON. Be precise and factual.
+</task>
 
-**EXPLICIT INSTRUCTIONS:**
-- For brand names: Extract only names that are clearly identified as the main business entity
-- For locations: Only use locations that are explicitly stated, not implied
-- For service areas: List only areas that are specifically mentioned as served
-- For business type: Use the most specific category explicitly described
 
-**UNCERTAINTY HANDLING:**
-- If any field cannot be confidently extracted from explicit content, use:
-- "Unknown" for text fields
-- Empty list [] for service_areas
-- When uncertain, prefer "Unknown" over making assumptions
-- If content is insufficient or ambiguous, default to uncertainty values
+## 1. BRAND NAME
 
-**OUTPUT REQUIREMENTS:**
-- Return ONLY valid JSON, no additional text
-- Use exact phrasing from content when possible
-- For brand_keywords: generate 2-5 common search variations based ONLY on the extracted brand name
+<guidelines>
+**Look for:**
+- Company name in headers, titles, "About Us" sections
+- Repeated business name throughout content
+- Domain name pattern (e.g., "acmeplumbing.com" → "Acme Plumbing")
 
-**STRICT OUTPUT FORMAT:**
+**Rules:**
+- Return exact name as written
+- Return "Unknown" if not clearly identified
+</guidelines>
+
+
+## 2. BUSINESS TYPE
+
+<guidelines>
+**Look for:**
+- Direct statements: "We are a...", "...company", "...services"
+- Service/product descriptions that clearly indicate business category
+- Industry-specific terminology
+
+**Rules:**
+- Be specific: "Dental Clinic" not "Healthcare", "Real Estate Developer" not "Real Estate"
+- Return "Unknown" if unclear
+
+**Examples:**
+Real Estate Development, Digital Marketing Agency, Plumbing Services, Restaurant, E-commerce Store, Dental Clinic
+</guidelines>
+
+
+## 3. PRIMARY LOCATION
+
+<guidelines>
+**Look for:**
+- "Located in...", "Based in...", "Head office..."
+- Address in contact/footer sections
+- First/main location if multiple mentioned
+
+**Format:** "City, State" or "Area, City" (e.g., "Bangalore, Karnataka" or "Koramangala, Bangalore")
+
+**Rules:**
+- Return most specific location found
+- Return "Unknown" if not found
+</guidelines>
+
+
+## 4. SERVICE AREAS
+
+<critical>
+This field must capture ALL geographic locations where the business operates or serves customers.
+</critical>
+
+### EXTRACTION RULES (Priority Order):
+
+<rule priority="highest">
+**A. EXPLICIT SERVICE STATEMENTS**
+
+"We serve [X], [Y], [Z]"
+"Available in [X], [Y], [Z]"
+"Serving [X], [Y], and [Z]"
+"Coverage areas: [X], [Y], [Z]"
+"Operating in [X], [Y], [Z]"
+"Locations: [X], [Y], [Z]"
+
+→ Extract ALL locations X, Y, Z
+</rule>
+
+<rule priority="high">
+**B. MULTIPLE OFFICE/BRANCH LOCATIONS**
+
+"Offices in [X], [Y], [Z]"
+"Branches in [X] and [Y]"
+"Visit us at [X], [Y], or [Z]"
+
+→ Extract ALL locations
+</rule>
+
+<rule priority="medium">
+**C. PROXIMITY/CONNECTIVITY STATEMENTS**
+
+"Near [X], [Y], and [Z]"
+"Close to [X], [Y], [Z]"
+"Minutes from [X], [Y], [Z]"
+"Accessible from [X], [Y], [Z]"
+"Connecting [X], [Y], and [Z]"
+"Between [X] and [Y]"
+
+→ Extract ALL mentioned locations
+</rule>
+
+<rule priority="medium">
+**D. GEOGRAPHIC CONTEXT**
+
+Multiple city/area names in operational context
+"Customers in [X], [Y], [Z] can..."
+"Residents of [X] and [Y]..."
+
+→ Extract ALL locations
+</rule>
+
+<rule priority="low">
+**E. DELIVERY/SERVICE RADIUS**
+
+"Free delivery in [X], [Y], [Z]"
+"Shipping to [X], [Y], [Z]"
+
+→ Extract ALL locations
+</rule>
+
+### FORMATTING:
+- **Always include primary_location** in this array (if primary_location ≠ "Unknown")
+- Keep consistent format: "Area, City" or "City, State"
+- Remove generic terms: "metro", "surrounding", "nearby", "area"
+- Each entry should be a specific place name
+
+<examples>
+**Example 1 - Real Estate:**
+Content: "Located in Sarjapur, Bangalore. Close to Whitefield, Marathahalli, HSR Layout, and Electronic City."
+Output: ["Sarjapur, Bangalore", "Whitefield, Bangalore", "Marathahalli, Bangalore", "HSR Layout, Bangalore", "Electronic City, Bangalore"]
+
+**Example 2 - Restaurant:**
+Content: "Main outlet in Indiranagar. We deliver to Koramangala, HSR Layout, and BTM Layout."
+Output: ["Indiranagar, Bangalore", "Koramangala, Bangalore", "HSR Layout, Bangalore", "BTM Layout, Bangalore"]
+
+**Example 3 - Digital Agency:**
+Content: "Headquartered in Mumbai. Serving clients across Mumbai, Delhi, Bangalore, and Pune."
+Output: ["Mumbai", "Delhi", "Bangalore", "Pune"]
+
+**Example 4 - Single Location:**
+Content: "Located in Jayanagar, Bangalore. Visit us today!"
+Output: ["Jayanagar, Bangalore"]
+
+**Example 5 - No Specific Areas:**
+Content: "We serve the entire country."
+Output: [] (too generic - no specific locations)
+</examples>
+
+<default_behavior>
+- If **NO specific areas** found: Return `[primary_location]` (if primary_location ≠ "Unknown")
+- If **primary_location is "Unknown"**: Return `[]`
+- If **multiple areas found**: Return ALL of them (including primary_location)
+</default_behavior>
+
+
+## OUTPUT FORMAT
+
+<output>
+Return ONLY this JSON (no additional text):
+
 {{
-    "brand_name": "Exact name or 'Unknown'",
-    "primary_location": "Explicit location or 'Unknown'",
-    "service_areas": ["explicit", "locations", "only"],
-    "business_type": "Explicit category or 'Unknown'",
-    "brand_keywords": ["variation1", "variation2"]
+  "brand_name": "string or Unknown",
+  "business_type": "string or Unknown",
+  "primary_location": "string or Unknown",
+  "service_areas": ["area1", "area2", "area3"]
 }}
+</output>
 
-**REMINDER: Zero tolerance for hallucination. Extract only what is explicitly stated.**
+
+## QUALITY VALIDATION
+
+<validation>
+Before returning, verify:
+1. If primary_location ≠ "Unknown", it MUST be in service_areas array
+2. service_areas contains ALL mentioned locations (not just one)
+3. All strings are properly quoted, arrays have commas
+4. JSON is valid and parseable
+</validation>
+
+
+## EDGE CASES
+
+<edge_case type="insufficient_content">
+If content is too short (<50 words) or just navigation/SEO text:
+{{
+  "brand_name": "Unknown",
+  "business_type": "Unknown",
+  "primary_location": "Unknown",
+  "service_areas": []
+}}
+</edge_case>
+
+<edge_case type="generic_terms">
+Ignore: "nationwide", "pan-India", "metro areas", "surrounding areas", "nearby locations"
+→ Only extract specific city/area names
+</edge_case>
+
+<edge_case type="ambiguous">
+When uncertain, prefer "Unknown" over guessing
+</edge_case>
+
+
+## CRITICAL REMINDERS
+
+<critical>SERVICE AREAS: Extract ALL specific locations mentioned - not just the primary one</critical>
+<critical>ALWAYS VALID JSON: Ensure proper formatting, quotes, commas, brackets</critical>
+<critical>CRITICAL>FACTUAL ONLY: Never invent information not in the content</critical>
