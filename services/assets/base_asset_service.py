@@ -1,18 +1,17 @@
 from fastapi import HTTPException
 import json
 import re
-
 from services.openai_client import chat_completion
 from utils.prompt_loader import load_prompt
-from oserver.services.read_storage import read_storage
-from oserver.models.request_models import StorageReadRequest
+from oserver.services.storage_service import read_storage
+from oserver.models.storage_request_model import StorageRequest
 
 
 class BaseAssetService:
 
     @staticmethod
     async def fetch_product_details(data_object_id: str, access_token: str, client_code: str):
-        payload = StorageReadRequest(
+        payload = StorageRequest(
             storageName="AISuggestedData",
             appCode="marketingai",
             dataObjectId=data_object_id,

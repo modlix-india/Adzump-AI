@@ -1,21 +1,21 @@
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 from oserver.utils.helpers import generate_filename_from_url
-from oserver.services.storage_manager import StorageManager
+from oserver.services.file_service import upload_file
 
 async def scrape_website(url: str,access_token: str, client_code: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         await page.goto(url, wait_until="load", timeout=60000)
-        await page.wait_for_timeout(5000)  # wait for JS to load if needed
+        await page.wait_for_timeout(5000)
         screenshot_bytes = await page.screenshot(full_page=True)
         html = await page.content()
         await browser.close()
 
     folder_name = "screenshots"
     filename = generate_filename_from_url(url)
-    upload_resp = await StorageManager.upload_screenshot(
+    upload_resp = await upload_file(
         image_bytes=screenshot_bytes,
         filename=filename,
         folder_name=folder_name,

@@ -1,10 +1,10 @@
 import httpx
 from oserver.utils.helpers import get_base_url
-from oserver.models.request_models import StorageReadRequest
-from oserver.models.response_models import StorageReadResponse
+from oserver.models.storage_request_model import StorageRequest
+from oserver.models.storage_response_model import StorageResponse
 
 
-async def read_storage(request: StorageReadRequest, access_token: str, client_code: str):
+async def read_storage(request: StorageRequest, access_token: str, client_code: str):
     base = get_base_url()
     url = f"{base}/api/core/function/execute/CoreServices.Storage/Read"
 
@@ -19,14 +19,14 @@ async def read_storage(request: StorageReadRequest, access_token: str, client_co
             response = await client.post(url, headers=headers, json=request.model_dump())
             response.raise_for_status()
             response_json = response.json()
-            return StorageReadResponse(
+            return StorageResponse(
                 success=True,
                 result=response_json,
                 error=None
             )
 
     except httpx.RequestError as e:
-        return StorageReadResponse(
+        return StorageResponse(
             success=False,
             result=None,
             error=str(e)

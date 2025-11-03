@@ -18,7 +18,7 @@ class CallAssetsService(BaseAssetService):
 
     @staticmethod
     def clean_phone_numbers(numbers: List[str]) -> List[str]:
-        cleaned = []
+        cleaned_phone_numbers = []
         for num in numbers:
             digits = re.sub(r'\D', '', num)
             if 10 <= len(digits) <= 13:
@@ -27,9 +27,9 @@ class CallAssetsService(BaseAssetService):
                     digits = "+91" + digits
                 elif not digits.startswith("+"):
                     digits = "+" + digits
-                cleaned.append(digits)
+                cleaned_phone_numbers.append(digits)
         # Deduplicate
-        return list(set(cleaned))
+        return list(set(cleaned_phone_numbers))
 
     @staticmethod
     async def generate(data_object_id: str, access_token: str, client_code: str) -> List[str]:
@@ -64,6 +64,6 @@ class CallAssetsService(BaseAssetService):
             raise HTTPException(status_code=404, detail="No phone numbers found in site data")
 
         # Clean & deduplicate
-        cleaned = CallAssetsService.clean_phone_numbers(all_numbers)
+        cleaned_phone_numbers = CallAssetsService.clean_phone_numbers(all_numbers)
 
-        return cleaned
+        return cleaned_phone_numbers

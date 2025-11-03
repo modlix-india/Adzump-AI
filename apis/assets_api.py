@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException,Header
-from models.assets_models.request_models import AssetRequest
-from models.assets_models.response_models import AssetResponse
+from models.assets_models.assets_request_model import AssetRequest
+from models.assets_models.assets_response_model import AssetResponse
 from services.assets.call_assets_service import CallAssetsService
 from services.assets.call_out_service import CalloutsService
 from services.assets.site_link_service import SitelinksService
@@ -17,14 +17,14 @@ ASSET_SERVICE_MAP = {
 
 @router.post("/generate", response_model=AssetResponse)
 async def generate_asset(request: AssetRequest, access_token: str = Header(...),
-    clientcode: str = Header(...)):
+    clientCode: str = Header(...)):
     service = ASSET_SERVICE_MAP.get(request.asset_type.lower())
 
     if not service:
         raise HTTPException(status_code=400, detail=f"Invalid asset_type '{request.asset_type}'")
 
     try:
-        result = await service(request.data_object_id, access_token, clientcode)
+        result = await service(request.data_object_id, access_token, clientCode)
         return AssetResponse(success=True, result=result)
     except Exception as e:
         return AssetResponse(success=False, result=None, error=str(e))

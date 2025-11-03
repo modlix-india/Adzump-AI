@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from utils import prompt_loader
 from services.openai_client import chat_completion
-from oserver import connection
+from oserver.services import connection
 from models.keyword_model import BusinessMetadata
 
 logging.basicConfig(level=logging.INFO)
