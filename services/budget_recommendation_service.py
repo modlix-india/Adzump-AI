@@ -7,7 +7,6 @@ from services.openai_client import chat_completion
 from utils.prompt_loader import load_prompt
 from oserver.connection import fetch_google_api_token_simple
 from third_party.google.services.budget_service import (
-    get_access_token,
     fetch_audit_logs,
     fetch_campaign_metrics,
     fetch_old_budget
@@ -18,7 +17,7 @@ from third_party.google.services.budget_service import (
 async def generate_budget_recommendations(customer_id: str, login_customer_id: str,
                                                  campaign_id: str, client_code: str) -> Dict[str, Any]:
     try:
-        access_token = get_access_token(client_code)
+        access_token = fetch_google_api_token_simple(client_code=client_code)
         
         audit_logs = await fetch_audit_logs(customer_id, login_customer_id, access_token, campaign_id)
         metrics = await fetch_campaign_metrics(customer_id, login_customer_id, access_token, campaign_id)

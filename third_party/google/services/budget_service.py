@@ -2,10 +2,8 @@ from fastapi import HTTPException
 from datetime import date, timedelta
 import httpx
 import os
-from oserver.connection import fetch_google_api_token_simple
 
 DEVELOPER_TOKEN = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-
 
 # ---------------------- Fetch Audit Logs ----------------------
 async def fetch_audit_logs(customer_id: str, login_customer_id: str, access_token: str, campaign_id: str) -> list:
@@ -111,7 +109,3 @@ async def fetch_old_budget(customer_id: str, login_customer_id: str, access_toke
 
         data = response.json()
         return data.get("results", [{}])[0].get("campaignBudget", {}).get("amountMicros", 0)
-
-
-def get_access_token(client_code: str):
-    return fetch_google_api_token_simple(client_code=client_code)
