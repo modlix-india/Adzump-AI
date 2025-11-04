@@ -3,10 +3,11 @@ from typing import List
 import re
 import json
 
-from services.assets.base_asset_service import BaseAssetService
+from services.business_service import BusinessInfoService
 
 
-class CallAssetsService(BaseAssetService):
+
+class CallAssetsService(BusinessInfoService):
     
     @staticmethod
     def extract_phone_numbers(text: str) -> List[str]:
@@ -33,7 +34,7 @@ class CallAssetsService(BaseAssetService):
 
     @staticmethod
     async def generate(data_object_id: str, access_token: str, client_code: str) -> List[str]:
-        product_data = await BaseAssetService.fetch_product_details(
+        product_data = await BusinessInfoService.fetch_product_details(
             data_object_id, access_token, client_code
         )
 
@@ -60,10 +61,14 @@ class CallAssetsService(BaseAssetService):
         # Combine all sources
         all_numbers = tel_numbers + text_numbers + summary_numbers
 
-        if not all_numbers:
-            raise HTTPException(status_code=404, detail="No phone numbers found in site data")
-
         # Clean & deduplicate
         cleaned_phone_numbers = CallAssetsService.clean_phone_numbers(all_numbers)
 
-        return cleaned_phone_numbers
+        if not cleaned_phone_numbers:
+            return []
+
+        structured_numbers = [
+            {"phoneNumber": num, "countryCode": "IN"} for num in cleaned_phone_numbers
+        ]
+
+        return structured_numbers

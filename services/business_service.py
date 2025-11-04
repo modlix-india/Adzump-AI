@@ -2,11 +2,12 @@ import logging
 import json
 from typing import List, Tuple
 from pydantic import ValidationError
-
 from utils import prompt_loader
-from services.openai_client import chat_completion
-from services.assets.base_asset_service import BaseAssetService
 from models.business_model import BusinessMetadata
+from http.client import HTTPException
+from oserver.models.storage_request_model import StorageRequest
+from oserver.services.storage_service import read_storage
+from services.openai_client import chat_completion
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -74,22 +75,31 @@ class BusinessInfoService:
             logger.warning(f"USP extraction failed: {e}")
             return []
 
-    async def get_business_details(
-        self,
-        data_object_id: str,
-        access_token: str,
-        client_code: str
-    ) -> Tuple[str, str]:
+    @staticmethod
+    async def fetch_product_details(data_object_id: str, access_token: str, client_code: str):
+        payload = StorageRequest(
+            storageName="AISuggestedData",
+            appCode="marketingai",
+            dataObjectId=data_object_id,
+            eager=False,
+            eagerFields=[]
+        )
+
+        response = await read_storage(payload, access_token, client_code)
+
+        if not response.success or not response.result:
+            raise HTTPException(status_code=500, detail=response.error or "Failed to fetch product details")
+
+        data = response.result
+
         try:
-            business_data =await BaseAssetService.fetch_product_details(
-                data_object_id, access_token, client_code
-            )
-            scraped_data = business_data.get("summary", "")
-            url = business_data.get("businessUrl", "")
+            if isinstance(data, list) and len(data) > 0:
+                product_data = data[0]["result"]["result"]
+            elif isinstance(data, dict) and "result" in data:
+                product_data = data["result"]["result"]
+            else:
+                raise HTTPException(status_code=500, detail="Unexpected product data format")
+        except (KeyError, IndexError, TypeError):
+            raise HTTPException(status_code=500, detail="Invalid product data response structure")
 
-            logger.info(f"Fetched business details for data_object_id: {data_object_id}")
-            return scraped_data, url
-
-        except Exception as e:
-            logger.exception(f"Failed to fetch business details: {e}")
-            return "", ""  # Return empty strings on failure
+        return product_data
