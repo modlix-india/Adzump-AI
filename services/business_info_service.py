@@ -5,8 +5,8 @@ from pydantic import ValidationError
 
 from utils import prompt_loader
 from services.openai_client import chat_completion
-from oserver.services import connection
-from models.keyword_model import BusinessMetadata
+from services.assets.base_asset_service import BaseAssetService
+from models.business_model import BusinessMetadata
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -81,12 +81,11 @@ class BusinessInfoService:
         client_code: str
     ) -> Tuple[str, str]:
         try:
-            business_data = connection.fetch_product_details(
+            business_data = BaseAssetService.fetch_product_details(
                 data_object_id, access_token, client_code
             )
-            result = business_data[0].get("result", {}).get("result", {})
-            scraped_data = result.get("summary", "")
-            url = result.get("businessUrl", "")
+            scraped_data = business_data.get("summary", "")
+            url = business_data.get("businessUrl", "")
 
             logger.info(f"Fetched business details for data_object_id: {data_object_id}")
             return scraped_data, url

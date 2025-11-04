@@ -1,18 +1,17 @@
 import os,logging,time,asyncio,json
 import httpx
 from typing import List
-
-from oserver.services import connection
+from oserver.services.connection import fetch_google_api_token_simple
 from utils import text_utils,prompt_loader
 from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
 from services.business_info_service import BusinessInfoService
+from models.business_model import BusinessMetadata
 
 # Import Pydantic models
 from models.keyword_model import (
-    BusinessMetadata,
     KeywordSuggestion,
     OptimizedKeyword,
     NegativeKeyword,
@@ -109,7 +108,7 @@ class GoogleKeywordService:
             chunk_size: int = CHUNK_SIZE,
     ) -> List[KeywordSuggestion]:
 
-        access_token = connection.fetch_google_api_token_simple(client_code)
+        access_token = fetch_google_api_token_simple(client_code)
 
         location_ids = location_ids or self.DEFAULT_LOCATION_IDS  # India
         all_suggestions: List[KeywordSuggestion] = []
