@@ -1,3 +1,5 @@
+# GENERIC SEED KEYWORD GENERATION PROMPT
+
 <role>You are a keyword strategist generating seed keywords for Google Ads.</role>
 
 <business_data>
@@ -14,227 +16,176 @@ Generate exactly {max_kw} seed keywords
 
 ---
 
-# STEP 1: UNDERSTAND THE BUSINESS CATEGORY
+## THE CORE QUESTION
 
-First, identify what category this business belongs to:
+<fundamental_principle>
+When someone needs what this business offers, what do they type into Google?
 
-**A. PHYSICAL PRODUCTS** (E-commerce, Retail, Manufacturing)
-- Customers search for: product names, specifications, brands
-- Example businesses: online stores, electronics shops, furniture stores
-- Search patterns: "[product name]", "buy [product]", "[product] online"
+**Think from the customer's perspective:**
+- They have a need/want
+- They open Google
+- They type their search
 
-**B. LOCAL SERVICES** (Home services, Repair, Professional services)
-- Customers search for: service type + location + urgency
-- Example businesses: plumbers, electricians, cleaners, contractors
-- Search patterns: "[service] [location]", "[service] near me", "emergency [service]"
-
-**C. HEALTHCARE/PROFESSIONAL** (Doctors, Dentists, Lawyers, Consultants)
-- Customers search for: specific treatment/service + location
-- Example businesses: dental clinics, law firms, medical practices
-- Search patterns: "[treatment] [location]", "[specialist] near me", "[condition] doctor"
-
-**D. REAL ESTATE** (Property sales, Rentals, Developers)
-- Customers search for: property type + size + location
-- Example businesses: real estate developers, brokers, rental agencies
-- Search patterns: "[size] [property] [location]", "[property] for sale", "buy [property]"
-
-**E. FOOD & DINING** (Restaurants, Cafes, Food delivery, Catering)
-- Customers search for: cuisine/dish + location + occasion
-- Example businesses: restaurants, cloud kitchens, catering services
-- Search patterns: "[cuisine] restaurant [location]", "[dish] near me", "food delivery"
-
-**F. FITNESS & WELLNESS** (Gyms, Yoga, Spas, Salons)
-- Customers search for: activity/service + location + features
-- Example businesses: gyms, yoga studios, spas, beauty salons
-- Search patterns: "[activity] [location]", "[service] near me", "[type] gym"
-
-**G. EDUCATION & TRAINING** (Schools, Coaching, Online courses)
-- Customers search for: course/subject + location + level
-- Example businesses: coaching centers, online courses, tutoring
-- Search patterns: "[subject] coaching [location]", "[course] online", "[exam] classes"
-
-**H. B2B/SAAS** (Software, Business services, Consulting)
-- Customers search for: solution/tool + use case
-- Example businesses: software companies, consulting firms, agencies
-- Search patterns: "[solution] for [use case]", "[tool] software", "[service] agency"
-
-<action>Based on {business_type} and {unique_features}, determine which category this is.</action>
+Your job: Generate those EXACT searches as keywords.
+</fundamental_principle>
 
 ---
 
-# STEP 2: EXTRACT CORE OFFERINGS
+## STEP 1: IDENTIFY WHAT CUSTOMERS ACTUALLY WANT
 
-From {unique_features}, identify the SPECIFIC things customers want:
+<identify_customer_intent>
+Look at {business_type} and {unique_features}.
+
+Ask yourself: **What is the PRIMARY thing customers are looking for?**
+
+**Distinguish between:**
+
+**SEARCHABLE OFFERINGS** (Generate keywords for these):
+- The product they want to buy
+- The service they want to hire
+- The solution to their problem
+- The experience they want to have
+
+**DIFFERENTIATORS** (Do NOT generate keywords for these):
+- How you do it (methods, techniques, equipment)
+- What makes you special (quality descriptors, certifications)
+- What comes with it (amenities, add-ons, features)
+- Why you're better (awards, materials, technology)
+
+<test>
+**Simple Test:** 
+Would a customer search for THIS specific thing, or would they search for the broader category/offering and discover THIS as a feature later?
+
+If it's discovered AFTER the initial search → It's a differentiator, not a keyword.
+</test>
+</identify_customer_intent>
+
+---
+
+## STEP 2: EXTRACT SEARCH TERMS FROM FEATURES
 
 <extraction_rules>
-**If Physical Products:**
-- Extract: product names, product categories, brands (not the business's brand)
-- Example: "laptops, gaming accessories, wireless headphones" → use each
+From {unique_features}, extract ONLY the searchable offerings:
 
-**If Local Services:**
-- Extract: specific service types, problem solutions
-- Example: "leak repair, installation, emergency fixes" → use each
+**Filter Out:**
+- Adjectives without nouns ("premium", "luxury", "best")
+- Technical specifications ("energy-efficient", "high-quality")
+- Materials and components ("clay tiles", "harvesting system")
+- Amenities and add-ons ("pool", "gym", "parking")
+- Processes and methods ("sustainable building", "eco-friendly design")
 
-**If Healthcare:**
-- Extract: treatments, procedures, specializations
-- Example: "root canal, teeth whitening, dental implants" → use each
-
-**If Real Estate:**
-- Extract: property types, sizes, configurations
-- Example: "3 BHK apartments, villas, plots" → use each
-
-**If Food:**
-- Extract: cuisines, dishes, meal types
-- Example: "Italian, pizza, pasta, fine dining" → use each
-
-**If Fitness:**
-- Extract: activities, training types, services
-- Example: "personal training, yoga, cardio, spa treatments" → use each
-
-**If Education:**
-- Extract: subjects, courses, exam types
-- Example: "IELTS, spoken English, math tutoring" → use each
-
-**If B2B/SaaS:**
-- Extract: solutions, tools, services, use cases
-- Example: "CRM software, marketing automation, SEO services" → use each
-</extraction_rules>
-
-<avoid>
-ALWAYS IGNORE: marketing adjectives (premium, best, world-class), technical specs, vague features
-</avoid>
-
----
-
-# STEP 3: CHOOSE KEYWORD PATTERNS
-
-Based on the business category, use these patterns:
-
-## FOR LOCAL SERVICES, HEALTHCARE, FITNESS, FOOD:
-
-**Pattern 1 (60%):** [offering] [location]
-- "plumber bangalore", "dentist whitefield", "gym koramangala", "pizza sarjapur"
-
-**Pattern 2 (25%):** [offering] near me / [location]
-- "plumber near me", "dentist near whitefield", "gym near koramangala"
-
-**Pattern 3 (15%):** [quality] [offering] [location]
-- "best plumber bangalore", "top dentist whitefield", "affordable gym"
-
-## FOR REAL ESTATE, PHYSICAL PRODUCTS:
-
-**Pattern 1 (60%):** [product/property] [location/category]
-- "3 bhk apartments sarjapur", "laptops bangalore", "furniture online"
-
-**Pattern 2 (25%):** buy/[intent] [product] [location]
-- "buy villa whitefield", "buy laptop online", "apartments for sale"
-
-**Pattern 3 (15%):** [quality] [product] [location]
-- "luxury apartments", "best laptops", "affordable furniture"
-
-## FOR B2B/SAAS, EDUCATION:
-
-**Pattern 1 (60%):** [offering] [use-case/location]
-- "crm software", "ielts coaching bangalore", "seo services"
-
-**Pattern 2 (25%):** [offering] for [problem/audience]
-- "crm for small business", "coaching for ielts", "online courses"
-
-**Pattern 3 (15%):** best/top [offering]
-- "best crm software", "top coaching center", "online training platform"
-
----
-
-# STEP 4: LOCATION STRATEGY
-
-<location_strategy>
-**If business is LOCAL** (has physical service areas):
-- Use EVERY location from {service_areas}
-- Create variations: "[offering] [area]", "[offering] near [area]", "[offering] in [area]"
-
-**If business is ONLINE/NATIONWIDE**:
-- Use primary_location only
-- Focus on: "[offering] online", "[offering] india", "[offering] [primary_location]"
-
-**If business is HYBRID**:
-- Prioritize local areas (70%)
-- Add online/broader terms (30%)
-</location_strategy>
-
----
-
-# STEP 5: GENERATE KEYWORDS
-
-Now generate {max_kw} keywords following these rules:
-
-<universal_rules>
-1. **2-3 words maximum** (4 words only if absolutely necessary)
-2. **Natural language** - how real people search
-3. **Specific offerings** - not generic business type
-4. **All lowercase**
-5. **No brand name** "{brand_name}"
-6. **No duplicates**
-</universal_rules>
-
-## EXAMPLES ACROSS INDUSTRIES:
+**Keep:**
+- Concrete products/services that customers actively seek
+- Specific variations or types that define what they're looking for
+- Size/capacity/scale indicators that are part of the search intent
 
 <examples>
-**Plumbing Service (Local Service):**
-["plumber bangalore", "plumber near me", "emergency plumber", "leak repair bangalore", "plumber whitefield", "pipe repair", "water heater installation", "best plumber bangalore"]
+Input: "4BHK garden villas with infinity pool and rainwater harvesting"
+→ Extract: "4BHK villas", "villas" (ignore: garden, infinity pool, rainwater harvesting)
 
-**Dental Clinic (Healthcare):**
-["dentist bangalore", "root canal whitefield", "teeth whitening", "dentist near me", "dental implants bangalore", "tooth extraction", "cosmetic dentist", "emergency dentist"]
+Input: "Italian cuisine with wood-fired pizza and outdoor seating"
+→ Extract: "Italian", "pizza" (ignore: wood-fired, outdoor seating)
 
-**Restaurant (Food):**
-["italian restaurant bangalore", "pizza delivery", "pasta near me", "fine dining bangalore", "restaurant koramangala", "buffet restaurant", "romantic dinner", "food delivery"]
-
-**Gym (Fitness):**
-["gym bangalore", "gym near me", "personal training", "gym whitefield", "ladies gym", "24 hour gym", "yoga classes", "gym membership"]
-
-**Real Estate (Property):**
-["3 bhk apartment sarjapur", "villas whitefield", "buy villa bangalore", "apartments for sale", "2 bhk apartments", "luxury villas", "plots electronic city"]
-
-**E-commerce Electronics:**
-["laptop online", "buy laptop bangalore", "gaming laptop", "laptop store", "best laptops", "cheap laptops", "laptop price", "laptop deals"]
-
-**IELTS Coaching (Education):**
-["ielts coaching bangalore", "ielts classes", "ielts online", "ielts preparation", "ielts coaching whitefield", "best ielts institute", "ielts training"]
-
-**CRM Software (B2B SaaS):**
-["crm software", "crm for small business", "best crm", "sales crm", "crm india", "cloud crm", "affordable crm", "crm system"]
+Input: "Personal training with certified trainers and cardio equipment"
+→ Extract: "personal training" (ignore: certified, cardio equipment)
 </examples>
+</extraction_rules>
 
 ---
 
-# OUTPUT FORMAT
+## STEP 3: BUILD NATURAL SEARCH PHRASES
 
-<output_format>
-Return ONLY a JSON array with exactly {max_kw} keywords:
+<keyword_construction>
+Combine the extracted offerings with location and intent modifiers.
 
+**Pattern Priority:**
+
+**For businesses with physical locations (service_areas exist):**
+1. [offering] [location] — 50%
+2. [offering] near [location] — 20%
+3. [action] [offering] [location] — 20%
+4. [qualifier] [offering] [location] — 10%
+
+**For online/nationwide businesses:**
+1. [offering] online — 30%
+2. [offering] [location/country] — 30%
+3. [action] [offering] — 30%
+4. [offering] [use-case] — 10%
+
+**Modifiers to use sparingly:**
+- Actions: buy, hire, find, book, order
+- Qualifiers: best, top, affordable
+- Intent: near me, for sale, services
+
+**Location Strategy:**
+- If {service_areas} has multiple locations: Create variations for EACH
+- Use both specific areas AND city-level terms
+- Prioritize locations with higher population/demand
+</keyword_construction>
+
+---
+
+## KEYWORD QUALITY STANDARDS
+
+<standards>
+Each keyword must be:
+
+1. **Natural:** How real people actually talk and search
+2. **Specific:** Contains the core offering (not just modifiers)
+3. **Concise:** 2-3 words (4 max with location)
+4. **Searchable:** Something with actual search volume potential
+5. **Lowercase:** All lowercase letters
+6. **Unique:** No duplicates in the list
+
+**Avoid:**
+- Pure brand terms (already excluded: {brand_name})
+- Feature-only terms without the offering
+- Technical jargon customers don't use
+- Marketing language instead of search language
+- Overly generic terms without specificity
+</standards>
+
+---
+
+## VALIDATION CHECKLIST
+
+<validate_each_keyword>
+Before including any keyword, verify:
+
+✓ Would a customer searching for this want what {business_type} offers?
+✓ Does it contain the actual product/service (not just features)?
+✓ Is it natural language (not business jargon)?
+✓ Is it 2-3 words?
+✓ No brand name "{brand_name}"?
+
+**If you cannot confidently answer YES to all questions, revise or remove the keyword.**
+</validate_each_keyword>
+
+---
+
+## OUTPUT FORMAT
+
+Return ONLY a valid JSON array with exactly {max_kw} keywords:
+
+```json
 ["keyword 1", "keyword 2", "keyword 3"]
+```
 
-Requirements:
+**Requirements:**
+- Exactly {max_kw} keywords
+- Valid JSON format
 - All lowercase
-- 2-3 words each
-- No duplicates
-- No explanations
-- Valid JSON only
-</output_format>
+- No explanations or commentary
+- No duplicate keywords
 
 ---
 
-# CRITICAL REMINDERS
+## REMEMBER
 
-<critical_reminders>
-1. **Adapt to the business type** - use appropriate patterns for the category
-2. **Extract actual offerings** - not marketing descriptions
-3. **Think like a customer** - how would THEY search?
-4. **Keep it simple** - 2-3 words maximum
-5. **Use all locations** - if it's a local business
-6. **No brand name** - never include "{brand_name}"
-7. **Natural language** - real searches, not business jargon
-</critical_reminders>
+<final_reminder>
+You're generating search queries, not describing the business.
 
-<final_instruction>
-Generate keywords that real customers actually type into Google for this type of business.
-</final_instruction>
+Think: "What would I type into Google if I wanted what this business offers?"
+
+Generate those searches.
+</final_reminder>
