@@ -9,8 +9,9 @@ async def create_folder(folder_name: str, access_token: str, client_code: str) -
 
     headers = {
         "accept": "application/json",
-        "authorization": access_token,
-        "clientcode": client_code,
+        "Authorization": access_token,
+        "ClientCode": client_code,
+        "AppCode": "marketingai"
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -29,8 +30,9 @@ async def get_folder(folder_name: str, access_token: str, client_code: str) -> S
 
     headers = {
         "accept": "application/json",
-        "authorization": access_token,
-        "clientcode": client_code,
+        "Authorization": access_token,
+        "ClientCode": client_code,
+        "AppCode": "marketingai"
     }
 
     try:
@@ -56,8 +58,9 @@ async def upload_file(
     url = f"{base}/api/files/secured/{folder_name}?clientCode={client_code}"
     headers = {
         "accept": "application/json",
-        "authorization": access_token,
-        "clientcode": client_code,
+        "Authorization": access_token,
+        "ClientCode": client_code,
+        "AppCode": "marketingai"
     }
     files = {
         "file": (filename, image_bytes, "image/png"),
