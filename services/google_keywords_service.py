@@ -108,8 +108,7 @@ class GoogleKeywordService:
             chunk_size: int = CHUNK_SIZE,
     ) -> List[KeywordSuggestion]:
 
-        #access_token = fetch_google_api_token_simple(client_code)
-        access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+        access_token = fetch_google_api_token_simple(client_code)
 
         location_ids = location_ids or self.DEFAULT_LOCATION_IDS  # India
         all_suggestions: List[KeywordSuggestion] = []
