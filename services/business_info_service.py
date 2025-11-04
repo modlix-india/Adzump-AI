@@ -74,14 +74,14 @@ class BusinessInfoService:
             logger.warning(f"USP extraction failed: {e}")
             return []
 
-    def get_business_details(
+    async def get_business_details(
         self,
         data_object_id: str,
         access_token: str,
         client_code: str
     ) -> Tuple[str, str]:
         try:
-            business_data = BaseAssetService.fetch_product_details(
+            business_data =await BaseAssetService.fetch_product_details(
                 data_object_id, access_token, client_code
             )
             scraped_data = business_data.get("summary", "")
