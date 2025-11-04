@@ -2,14 +2,14 @@ from fastapi import HTTPException
 import json
 
 from services.assets.base_asset_service import BaseAssetService
-from services.business_service import BusinessInfoService
+from services.business_service import BusinessService
 
 
-class StructuredSnippetsService(BaseAssetService,BusinessInfoService):
+class StructuredSnippetsService(BaseAssetService):
 
     @staticmethod
     async def generate(data_object_id: str, access_token: str, client_code: str):
-        product_data = await BusinessInfoService.fetch_product_details(
+        product_data = await BusinessService.fetch_product_details(
             data_object_id, access_token, client_code
         )
 

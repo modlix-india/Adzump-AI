@@ -7,7 +7,7 @@ from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
-from services.business_service import BusinessInfoService
+from services.business_service import BusinessService
 from models.business_model import BusinessMetadata
 
 # Import Pydantic models
@@ -56,7 +56,7 @@ class GoogleKeywordService:
 
     def __init__(self):
         self.safety_patterns = text_utils.get_safety_patterns()
-        self.business_extractor = BusinessInfoService()
+        self.business_extractor = BusinessService()
     async def generate_seed_keywords(
         self,
         scraped_data: str,

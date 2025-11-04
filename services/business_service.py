@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class BusinessInfoService:
+class BusinessService:
 
     OPENAI_MODEL = "gpt-4o-mini"
 

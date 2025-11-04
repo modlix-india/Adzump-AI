@@ -2,12 +2,11 @@ from fastapi import HTTPException
 from typing import List
 import re
 import json
-
-from services.business_service import BusinessInfoService
-
+from services.business_service import BusinessService
 
 
-class CallAssetsService(BusinessInfoService):
+
+class CallAssetsService():
     
     @staticmethod
     def extract_phone_numbers(text: str) -> List[str]:
@@ -34,7 +33,7 @@ class CallAssetsService(BusinessInfoService):
 
     @staticmethod
     async def generate(data_object_id: str, access_token: str, client_code: str) -> List[str]:
-        product_data = await BusinessInfoService.fetch_product_details(
+        product_data = await BusinessService.fetch_product_details(
             data_object_id, access_token, client_code
         )
 

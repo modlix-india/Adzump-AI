@@ -4,14 +4,14 @@ from typing import List, Dict, Any
 import json
 from utils.text_utils import is_internal_link
 from services.assets.base_asset_service import BaseAssetService
-from services.business_service import BusinessInfoService
+from services.business_service import BusinessService
 
 
-class SitelinksService(BaseAssetService,BusinessInfoService):
+class SitelinksService(BaseAssetService):
     
     @staticmethod
     async def generate(data_object_id: str, access_token: str, client_code: str):
-        product_data = await BusinessInfoService.fetch_product_details(data_object_id, access_token, client_code)
+        product_data = await BusinessService.fetch_product_details(data_object_id, access_token, client_code)
 
         summary = product_data.get("summary", "")
         base_url = product_data.get("businessUrl", "")

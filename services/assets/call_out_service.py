@@ -1,13 +1,13 @@
 from fastapi import HTTPException
 from services.assets.base_asset_service import BaseAssetService
-from services.business_service import BusinessInfoService
+from services.business_service import BusinessService
 
 
-class CalloutsService(BaseAssetService,BusinessInfoService):
+class CalloutsService(BaseAssetService):
     
     @staticmethod
     async def generate(data_object_id: str, access_token: str, client_code: str):
-        product_data = await BusinessInfoService.fetch_product_details(data_object_id, access_token, client_code)
+        product_data = await BusinessService.fetch_product_details(data_object_id, access_token, client_code)
         summary = product_data.get("summary", "")
 
         if not summary:
