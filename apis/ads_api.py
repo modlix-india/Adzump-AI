@@ -2,7 +2,7 @@ import os
 import tempfile
 from typing import List,Dict,Any
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Request, Header
+from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
@@ -249,33 +249,27 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-class AnalyzeSearchTermRequest(BaseModel):
-    client_code: str
-    customer_id: str
-    login_customer_id: str
-    campaign_id: str
-    duration: str  # e.g., "LAST_30_DAYS" or "01/01/2025,31/01/2025"
-
-
-# New helper function to initialize the class
-def start_search_term_pipeline(request: AnalyzeSearchTermRequest):
-    return SearchTermPipeline(
-        client_code=request.client_code,
-        customer_id=request.customer_id,
-        login_customer_id=request.login_customer_id,
-        campaign_id=request.campaign_id,
-        duration=request.duration,
-    )
-
 @router.post("/search_term")
-async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
-    """Endpoint to analyze search terms and classify them as positive or negative."""
+async def analyze_search_terms_route(
+    access_token: str = Header(..., alias="accessToken"),
+    customer_id: str = Header(..., alias="customerId"),
+    login_customer_id: str = Header(..., alias="loginCustomerId"),
+    client_code: str = Header(..., alias="clientCode"),
+    campaign_id: str = Query(..., alias="campaignId"),
+    duration: str = Query(...),
+):
     try:
-        pipeline = start_search_term_pipeline(request)
+        pipeline = SearchTermPipeline(
+            client_code=client_code,
+            customer_id=customer_id,
+            login_customer_id=login_customer_id,
+            campaign_id=campaign_id,
+            duration=duration,
+            access_token=access_token,
+        )
         results = await pipeline.run_pipeline()
         return JSONResponse(
-            content={"status": "success", "data": results},
-            status_code=200
+            content={"status": "success", "data": results}, status_code=200
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -45,6 +45,7 @@ def fetch_product_details(data_object_id: str,access_token:str, client_code:str)
         "content-type": "application/json",
         "clientCode": client_code
     }
+    
 
     payload = {
         "storageName": "AISuggestedData",
@@ -52,7 +53,8 @@ def fetch_product_details(data_object_id: str,access_token:str, client_code:str)
         "dataObjectId": data_object_id,
         "eager": False,
         "eagerFields": []
-    }
+        }
+    
 
     try:
         response = requests.post(url, headers=headers, json=payload)
@@ -62,3 +64,42 @@ def fetch_product_details(data_object_id: str,access_token:str, client_code:str)
     except requests.exceptions.RequestException as e:
         print(f"Error fetching product details: {e}")
         return None
+
+   
+
+def fetch_product_summary(final_url: str,access_token:str, client_code:str):
+    
+    base = (os.getenv("NOCODE_PLATFORM_HOST") or "https://apps.dev.modlix.com").rstrip("/")
+    if not base:
+        raise RuntimeError("NOCODE_PLATFORM_HOST is not set")
+    url = f"{base}/api/core/function/execute/CoreServices.Storage/ReadPage"
+    
+    headers = {
+        "authorization": access_token,
+        "content-type": "application/json",
+        "clientCode": client_code
+    }
+    
+
+    payload = {
+        "storageName": "AISuggestedData",
+        "appCode": "marketingai",
+        "dataObjectId": final_url,
+        "eager": False,
+        "eagerFields": [],
+        "filter":{
+            "field":"businessUrl",
+            "value":final_url
+        }
+        }
+    
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching product details: {e}")
+        return None
+
