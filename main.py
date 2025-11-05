@@ -1,9 +1,10 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
+load_dotenv()
 from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from dotenv import load_dotenv
-load_dotenv()
-  # No-op in prod if no .env is present
+load_dotenv()  # No-op in prod if no .env is present
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze")
 

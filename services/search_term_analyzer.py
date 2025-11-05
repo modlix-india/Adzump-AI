@@ -1,71 +1,70 @@
-from services.search_term_metric_evaluators import evaluate_cost_per_conversion
+import os
+import json
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from dotenv import load_dotenv
+from openai import OpenAI
 
-def get_threshold_values():
-    """
-    Define acceptable threshold values for each metric.
-    You can later make this dynamic per client or campaign.
-    """
-    return {
-        "cost_per_conversion": 1000.0
-    }
+load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+THRESHOLD = 1000
 
 
-async def analyze_search_term_performance(search_terms: list):
-    """
-    Classify search terms using metric-based rules.
-    - Merge duplicate terms (same term + matchType)
-    - Sum metrics for duplicates
-    - Skip EXCLUDED, ADDED_EXCLUDED, ADDED terms
-    - Only evaluate NONE status terms
-    """
-    thresholds = get_threshold_values()
+def classify_search_terms(search_terms):
+    classified_results = []
 
-    # Step 1: Merge duplicates
-    merged_terms = {}
-    for term in search_terms:
-        term_text = (term.get("searchterm") or "").strip().lower()
-        match_type = (term.get("matchType") or "").strip().upper()
-        key = (term_text, match_type)
+    for item in search_terms:
+        searchterm = item.get("searchterm")
+        metrics = item.get("metrics", {})
+        raw_cpc = metrics.get("costPerConversion")
 
-        if key not in merged_terms:
-            merged_terms[key] = term
+        # Convert micros → human-readable
+        cost_per_conversion = (
+            raw_cpc / 1_000_000 if raw_cpc is not None else None
+        )
+
+        # Apply your rule
+        if cost_per_conversion is None:
+            recommendation = "negative"
+            reason = f"No conversion data for {searchterm}, marked negative."
+        elif cost_per_conversion < THRESHOLD:
+            recommendation = "positive"
+            reason = f"Cost per conversion is ₹{cost_per_conversion:.2f}, below threshold ₹{THRESHOLD} — positive."
         else:
-            existing = merged_terms[key]
-            existing_metrics = existing.get("metrics", {})
-            new_metrics = term.get("metrics", {})
+            recommendation = "negative"
+            reason = f"Cost per conversion is ₹{cost_per_conversion:.2f}, above threshold ₹{THRESHOLD} — negative."
 
-            # Aggregate numeric metrics
-            for metric_key in [
-                "impressions",
-                "clicks",
-                "conversions",
-                "costMicros",
-                "cost",
-            ]:
-                existing_metrics[metric_key] = (
-                    existing_metrics.get(metric_key, 0)
-                    + new_metrics.get(metric_key, 0)
-                )
+        # Keep metrics consistent
+        metrics["costPerConversion"] = cost_per_conversion
 
-            # Average CTR and CPC
-            existing_metrics["ctr"] = (
-                existing_metrics.get("ctr", 0) + new_metrics.get("ctr", 0)
-            ) / 2
-            existing_metrics["averageCpc"] = (
-                existing_metrics.get("averageCpc", 0)
-                + new_metrics.get("averageCpc", 0)
-            ) / 2
+        # Optional: Get LLM explanation
+        prompt = f"""
+You are a Google Ads expert. Here is a search term with metrics:
+{json.dumps({'searchterm': searchterm, 'metrics': metrics}, indent=2, ensure_ascii=False)}
 
-            existing["metrics"] = existing_metrics
-            
+Python has classified it as {recommendation}.
+Explain clearly in 1-2 sentences why this recommendation makes sense.
+Important: Do NOT add quotes around the search term in your explanation.
+Use INR currency symbol (₹). Return only the explanation.
+"""
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
+            )
+            llm_reason = response.choices[0].message.content.strip()
+            reason += " LLM: " + llm_reason
+        except Exception as e:
+            reason += " LLM: [failed to fetch explanation]"
 
+        classified_results.append({
+            "searchterm": searchterm,
+            "metrics": metrics,
+            "recommendation": recommendation,
+            "reason": reason
+        })
 
-    #Step 2: Evaluate merged terms
-    
-    results = []
-    for term in merged_terms.values():
-        result = evaluate_cost_per_conversion(term, thresholds["cost_per_conversion"])
-        if result:
-            results.append(result)
+    return classified_results
 
-    return results

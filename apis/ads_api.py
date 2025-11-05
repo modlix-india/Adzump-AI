@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 import requests
 from services.scraper_service import scrape_website
-from services.search_term_pipeline import SearchTermPipeline
+from services.search_term_analyzer import classify_search_terms
 from services.summarise_external_links import summarize_with_context
 from services.summary import make_readable
 from services.ads_service import generate_ad_assets
@@ -249,85 +249,15 @@ async def optimize_campaign(req: OptimizeCampaignRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@router.post("/search_term")
-async def analyze_search_terms_route(
-    access_token: str = Header(..., alias="accessToken"),
-    customer_id: str = Header(..., alias="customerId"),
-    login_customer_id: str = Header(..., alias="loginCustomerId"),
-    client_code: str = Header(..., alias="clientCode"),
-    campaign_id: str = Query(..., alias="campaignId"),
-    duration: str = Query(...),
-):
+
+@router.post("/search_term_analyzer")
+async def analyze_search_terms(request: Request):
     try:
-        pipeline = SearchTermPipeline(
-            client_code=client_code,
-            customer_id=customer_id,
-            login_customer_id=login_customer_id,
-            campaign_id=campaign_id,
-            duration=duration,
-            access_token=access_token,
-        )
-        results = await pipeline.run_pipeline()
+        payload = await request.json()
+        results = classify_search_terms(payload)
+        return JSONResponse(content=results, status_code=200)
+    except Exception as e:
         return JSONResponse(
-            content={"status": "success", "data": results}, status_code=200
+            content={"error": str(e)}, status_code=400
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-# ----- Router Endpoint For Generete Site Lins -----
-
-class SitelinkRequest(BaseModel):
-    data_object_id: str
-
-
-@router.post("/generate-sitelinks")
-async def create_sitelinks(
-    request: SitelinkRequest,
-    access_token: str = Header(..., alias="access-token"),
-    client_code: str = Header(..., alias="clientCode"),
-):
-    """
-    Generate high-quality, lead-focused Google Ads sitelinks.
-    Only 'data_object_id' is passed in payload; 
-    'access_token' and 'clientCode' come from headers.
-    """
-    try:
-        sitelinks = await generate_sitelinks_service(
-            data_object_id=request.data_object_id,
-            access_token=access_token,
-            client_code=client_code
-        )
-        return {"sitelinks": sitelinks}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    
-# -------------------- Budget Recommendation --------------------
-
-class BudgetRequest(BaseModel):
-    clientCode: str
-    loginCustomerId: str
-    customerId: str
-    campaignId: str
-    startDate: str
-    endDate: str
-
-@router.post("/generate_budget_recommendation")
-async def generate_budget_recommendation(request: BudgetRequest):
-    try:
-        result = await generate_budget_recommendation_service(
-            customer_id=request.customerId,
-            login_customer_id=request.loginCustomerId,
-            campaign_id=request.campaignId,
-            start_date=request.startDate,
-            end_date=request.endDate,
-            client_code=request.clientCode
-        )
-        return {"status": "success", "data": result}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
