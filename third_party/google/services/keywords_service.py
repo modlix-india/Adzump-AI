@@ -1,8 +1,8 @@
 import os
 import httpx
 import logging
+from oserver.services.connection import fetch_google_api_token_simple
 import utils.date_utils as date_utils
-from oserver.connection import fetch_google_api_token_simple
 from third_party.google.models.keyword_model import Keyword
 
 

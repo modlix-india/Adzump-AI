@@ -5,24 +5,6 @@ from openai import OpenAI
 from urllib.parse import urlparse
 
 
-def setup_apis():
-    try:
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if not openai_key:
-            raise ValueError("OPENAI_API_KEY is required")
-        openai_client = OpenAI(api_key=openai_key)
-
-        developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        if not developer_token:
-            raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
-        return openai_client
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Failed to setup APIs: %s", e)
-        raise
-
-
 def normalize_text(kw: str) -> str:
     if kw is None:
         return ""

@@ -2,11 +2,10 @@ import os
 import json
 import logging
 import requests
-import re
-from services.openai_client import chat_completion
 import utils.date_utils as date_utils
 from third_party.google.services import keywords_service, ads_service
 from services.search_term_analyzer import analyze_search_term_performance
+from third_party.google.services.keywords_service import fetch_keywords_service  # import new service
 from oserver.connection import fetch_google_api_token_simple
 
 logger = logging.getLogger(__name__)
