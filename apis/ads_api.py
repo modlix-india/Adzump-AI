@@ -19,6 +19,7 @@ from services.optimize_ad import optimize_with_llm
 from services.sitelink_service import generate_sitelinks_service
 from services.budget_recommendation_service import generate_budget_recommendations
 from services.age_optimization_service import generate_age_optimizations
+from services.gender_optimization_service import generate_gender_optimizations
 
 from models.keyword_model import (
     KeywordResearchRequest,
@@ -338,6 +339,29 @@ async def generate_age_optimization(
 ):
     try:
         result = await generate_age_optimizations(
+            customer_id=customerId,
+            login_customer_id=loginCustomerId,
+            campaign_id=campaignId,
+            client_code=clientCode,
+            duration=duration
+        )
+        return {"status": "success", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+@router.post("/optimize/gender")
+async def generate_gender_optimization(
+    clientCode: str = Header(...),
+    loginCustomerId: str = Header(...),
+    customerId: str = Header(...),
+    campaignId: str = Query(...),
+    duration: str = Query(...)
+):
+    try:
+        result = await generate_gender_optimizations(
             customer_id=customerId,
             login_customer_id=loginCustomerId,
             campaign_id=campaignId,

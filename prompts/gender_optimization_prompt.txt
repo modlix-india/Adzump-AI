@@ -1,0 +1,82 @@
+You are an expert in Google Ads audience targeting and optimization.
+
+Your task is to analyze the following campaign dataset and recommend which GENDERS should be optimized, excluded, or prioritized for each ad group within each campaign, based on the provided performance metrics.
+
+---
+
+Input Data:
+
+Metrics Data (includes impressions, clicks, conversions, cost_micros, costPerConversion, ctr, and averageCpc — all in micros where applicable):
+{metrics}
+
+---
+
+Important Notes:
+- The field `metrics.ctr` is already a ratio (clicks/impressions), so multiply it by 100 to interpret as percentage.
+- All cost values are provided in micros (1,000,000 micros = 1 standard currency unit). Do NOT convert; analyze in micros only.
+
+---
+
+Decision-Making Rules:
+
+| CTR | CPA | CPC | Recommendation | Reason |
+|------|------|------|----------------|---------|
+| High | Low | Low/Medium | **Prioritize** | Strong engagement and cost-effective conversions. |
+| High | Medium | Medium | **Continue** | Performing well; maintain performance. |
+| Medium | High | High | **Optimize** | Needs improvement; review targeting or creatives. |
+| Low | High | High | **Pause/Exclude** | Poor engagement and inefficient spend. |
+| No data | — | — | **Insufficient data** | Not enough performance to decide. |
+
+---
+
+Instructions:
+- Use provided metrics directly (`ctr`, `averageCpc`, `costPerConversion`) — do NOT recalculate.
+- For CTR, multiply by 100 in your reasoning (e.g., 0.1363 → 13.63%).
+- Analyze performance for each gender (MALE, FEMALE, UNDETERMINED).
+- For each gender, classify into:
+  **Prioritize**, **Continue**, **Optimize**, **Pause**, or **Insufficient data**.
+- Add `"is_optimized": true` for **Prioritize**, **Continue**, or **Optimize**.
+- Add `"is_optimized": false` for **Pause**, **Exclude**, or **Insufficient data**.
+- Include metric values (`ctr`, `averageCpc`, `costPerConversion`) for each `optimized_genders` entry.
+- Provide concise `"reason"` and `"rationale_summary"`.
+- Output must be **strictly valid JSON** — no markdown or text outside JSON.
+
+---
+
+### Output Format (strictly JSON):
+
+{{
+  "campaigns": [
+    {{
+      "campaign_id": "123456789",
+      "campaign_name": "Example Campaign",
+      "ad_groups": [
+        {{
+          "ad_group_id": "987654321",
+          "ad_group_name": "Ad Group 1",
+          "optimized_genders": [
+            {{
+              "gender": "MALE",
+              "ctr": 0.1363,
+              "averageCpc": 117886686.53,
+              "costPerConversion": 3536600596,
+              "recommendation": "Prioritize - high CTR and low cost per conversion",
+              "reason": "This gender delivers strong engagement and cost efficiency.",
+              "is_optimized": true
+            }},
+            {{
+              "gender": "UNDETERMINED",
+              "ctr": 0.1053,
+              "averageCpc": 128473669.76,
+              "costPerConversion": 5524367800,
+              "recommendation": "Pause - low engagement and high cost per conversion",
+              "reason": "This segment shows poor efficiency compared to others.",
+              "is_optimized": false
+            }}
+          ],
+          "rationale_summary": "Focus on MALE audiences for better ROI; reduce spend on underperforming UNDETERMINED segments."
+        }}
+      ]
+    }}
+  ]
+}}
