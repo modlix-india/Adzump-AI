@@ -7,6 +7,7 @@ from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
 from services.google_ads_builder import build_google_ads_payloads
 from services.budget_recommendation_service import generate_budget_recommendations
+from services.age_optimization_service import generate_age_optimizations
 
 from models.keyword_model import (
     KeywordResearchRequest,
@@ -132,6 +133,29 @@ async def generate_budget_recommendation(
             login_customer_id=loginCustomerId,
             campaign_id=campaignId,
             client_code=clientCode
+        )
+        return {"status": "success", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
+@router.post("/optimize/age")
+async def generate_age_optimization(
+    clientCode: str = Header(...),
+    loginCustomerId: str = Header(...),
+    customerId: str = Header(...),
+    campaignId: str = Query(...),
+    duration: str = Query(...)
+):
+    try:
+        result = await generate_age_optimizations(
+            customer_id=customerId,
+            login_customer_id=loginCustomerId,
+            campaign_id=campaignId,
+            client_code=clientCode,
+            duration=duration
         )
         return {"status": "success", "data": result}
     except HTTPException:
