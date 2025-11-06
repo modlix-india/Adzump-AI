@@ -9,7 +9,6 @@ from third_party.google.models.keyword_model import Keyword
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-
 async def fetch_keywords(
     client_code: str,
     customer_id: str,

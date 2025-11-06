@@ -1,8 +1,10 @@
 import os
 import httpx
 import logging
-from oserver.connection import fetch_google_api_token_simple
-from oserver.connection import fetch_product_summary
+
+from oserver.models.storage_request_model import StorageReadPageRequest
+from oserver.services.connection import fetch_google_api_token_simple
+from oserver.services.storage_service import read_Page_Storage
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -79,9 +81,31 @@ async def fetch_ads(
 
             for url in final_urls:
                 final_url = url.rstrip('/') 
-                product_summary = fetch_product_summary(final_url, access_token ,client_code)
-                product_result = product_summary[0].get("result", {}).get("result", {}).get("content",{})[0]
-                summary = product_result.get("summary", "")
+                payload = StorageReadPageRequest(
+                storageName="AISuggestedData",
+                appCode="marketingai",
+                dataObjectId=final_url,
+                eager=False,
+                eagerFields=[],
+                filter={
+                     "field":"businessUrl",
+                    "value":final_url
+                }
+                )
+                product_summary = await read_Page_Storage(payload, access_token ,client_code)
+                if product_summary.success and product_summary.result:
+                    product_list = product_summary.result
+                    if product_list:
+                        product_result = product_list[0].get("result", {}).get("result", {}).get("content", [])
+                        if product_result:
+                            summary = product_result[0].get("summary", "")
+                        else:
+                            summary = ""
+                    else:
+                        summary = ""
+                else:
+                    summary = ""
+
                 if not summary:
                     raise Exception(status_code=400, detail="Missing 'summary' or 'businessUrl' in product data")
                 if summary:
