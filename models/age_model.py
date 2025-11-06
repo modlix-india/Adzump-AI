@@ -3,23 +3,23 @@ from typing import List, Optional
 
 class OptimizedAgeGroup(BaseModel):
     age_range: str
-    CPA: Optional[float] = None
-    CTR: Optional[float] = None
-    CPC: Optional[float] = None
+    ctr: Optional[float] = None
+    averageCpc: Optional[float] = None
+    costPerConversion: Optional[float] = None
     recommendation: str
     reason: str
     is_optimized: bool
 
-class AdGroupOptimization(BaseModel):
+class AdGroupAgeOptimization(BaseModel):
     ad_group_id: str
     ad_group_name: str
     optimized_age_groups: List[OptimizedAgeGroup]
     rationale_summary: str
 
-class CampaignOptimization(BaseModel):
+class CampaignAgeOptimization(BaseModel):
     campaign_id: str
     campaign_name: str
-    ad_groups: List[AdGroupOptimization]
+    ad_groups: List[AdGroupAgeOptimization]
 
 class AgeOptimizationResponse(BaseModel):
-    campaigns: List[CampaignOptimization]
+    campaigns: List[CampaignAgeOptimization]

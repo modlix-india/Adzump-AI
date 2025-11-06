@@ -7,9 +7,8 @@ from utils.date_utils import format_duration_clause
 DEVELOPER_TOKEN = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
 
-# ---------------------- Fetch Campaign Metrics ----------------------
-async def fetch_age_metrics(customer_id: str, login_customer_id: str, access_token: str,
-                            campaign_id: str, duration: str) -> list:
+# ---------------------- Fetch Age Metrics ----------------------
+async def fetch_age_metrics(customer_id: str, login_customer_id: str, access_token: str, campaign_id: str, duration: str) -> list:
     url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:searchStream"
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -17,20 +16,24 @@ async def fetch_age_metrics(customer_id: str, login_customer_id: str, access_tok
         "login-customer-id": login_customer_id,
         "Content-Type": "application/json"
     }
-    
+
     duration_clause = format_duration_clause(duration)
 
     query = f"""
-    SELECT campaign.id,
-           campaign.name,
-           ad_group.id,
-           ad_group.name,
-           age_range_view.resource_name,
-           ad_group_criterion.age_range.type,
-           metrics.impressions,
-           metrics.clicks,
-           metrics.conversions,
-           metrics.cost_micros
+    SELECT 
+        campaign.id,
+        campaign.name,
+        ad_group.id,
+        ad_group.name,
+        age_range_view.resource_name,
+        ad_group_criterion.age_range.type,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.conversions,
+        metrics.cost_micros,
+        metrics.ctr,
+        metrics.average_cpc,
+        metrics.cost_per_conversion
     FROM age_range_view
     WHERE segments.date {duration_clause}
       AND campaign.id = {campaign_id}
@@ -53,6 +56,6 @@ async def fetch_age_metrics(customer_id: str, login_customer_id: str, access_tok
             for chunk in response.json():
                 metrics_data.extend(chunk.get("results", []))
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to parse metrics response: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to parse age metrics: {str(e)}")
 
         return metrics_data

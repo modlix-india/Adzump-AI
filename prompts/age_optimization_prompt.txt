@@ -6,15 +6,21 @@ Your task is to analyze the following campaign dataset and recommend which AGE R
 
 Input Data:
 
-Metrics Data (includes impressions, clicks, conversions, cost_micros, CPA, CTR, and CPC):
+Metrics Data (includes impressions, clicks, conversions, cost_micros, costPerConversion, ctr, and averageCpc — all in micros where applicable):
 {metrics}
+
+---
+
+Important Notes:
+- The field `metrics.ctr` is already a ratio (clicks/impressions), so multiply it by 100 to interpret as percentage.
+- All cost values are provided in micros (1,000,000 micros = 1 standard currency unit). Do NOT convert; analyze in micros only.
 
 ---
 
 Decision-Making Rules:
 
-| CTR | CPA | CPC | Recommendation | Reason |
-|------|------|------|----------------|---------|
+| CTR (%) | costPerConversion (micros) | averageCpc (micros) | Recommendation | Reason |
+|----------|-----------------------------|----------------------|----------------|---------|
 | High | Low | Low/Medium | **Prioritize** | Strong engagement and cost-effective conversions. |
 | High | Medium | Medium | **Continue** | Performing well; maintain performance. |
 | Medium | High | High | **Optimize** | Needs improvement; review targeting or creatives. |
@@ -24,17 +30,16 @@ Decision-Making Rules:
 ---
 
 Instructions:
-
-- Use the provided metrics (`CPA`, `CTR`, and `CPC`) directly — do **not** recalculate them.
-- Analyze performance per age range for each ad group within each campaign.
-- For each age range, classify the performance into one of:
+- Use provided metrics directly (`ctr`, `averageCpc`, `costPerConversion`) — do NOT recalculate.
+- For CTR, multiply by 100 in your reasoning (e.g., 0.1363 → 13.63%).
+- Analyze performance for each age range (AGE_RANGE_18_24, AGE_RANGE_25_34, etc.).
+- For each age range, classify into:
   **Prioritize**, **Continue**, **Optimize**, **Pause**, or **Insufficient data**.
 - Add `"is_optimized": true` for **Prioritize**, **Continue**, or **Optimize**.
 - Add `"is_optimized": false` for **Pause**, **Exclude**, or **Insufficient data**.
-- Include metric values (`CPA`, `CTR`, `CPC`) under each `optimized_age_groups` entry.
-- Provide a concise `"reason"` for each recommendation.
-- Include a `"rationale_summary"` per ad group summarizing optimization logic.
-- Output must be **strictly valid JSON** — no markdown or explanations outside JSON.
+- Include metric values (`ctr`, `averageCpc`, `costPerConversion`) for each `optimized_age_groups` entry.
+- Provide concise `"reason"` and `"rationale_summary"`.
+- Output must be **strictly valid JSON** — no markdown or text outside JSON.
 
 ---
 
@@ -52,24 +57,24 @@ Instructions:
           "optimized_age_groups": [
             {{
               "age_range": "AGE_RANGE_25_34",
-              "CPA": 120.50,
-              "CTR": 5.4,
-              "CPC": 2.3,
-              "recommendation": "Prioritize - high engagement and low CPA",
-              "reason": "This age range delivers strong conversions at an efficient cost.",
+              "ctr": 0.1363,
+              "averageCpc": 117886686.53,
+              "costPerConversion": 3536600596,
+              "recommendation": "Prioritize - high CTR and low cost per conversion",
+              "reason": "This age range delivers strong engagement and cost efficiency.",
               "is_optimized": true
             }},
             {{
               "age_range": "AGE_RANGE_55_64",
-              "CPA": 480.75,
-              "CTR": 0.9,
-              "CPC": 6.1,
-              "recommendation": "Pause - low engagement and high CPA",
-              "reason": "This group consumes budget inefficiently with poor conversions.",
+              "ctr": 0.1053,
+              "averageCpc": 128473669.76,
+              "costPerConversion": 5524367800,
+              "recommendation": "Pause - low engagement and high cost per conversion",
+              "reason": "This group shows poor efficiency compared to others.",
               "is_optimized": false
             }}
           ],
-          "rationale_summary": "Focus on younger audiences (25–44) for best ROI, reduce spend on low-performing older segments."
+          "rationale_summary": "Focus on younger audiences for better ROI; reduce spend on underperforming older segments."
         }}
       ]
     }}
