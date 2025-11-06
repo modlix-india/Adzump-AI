@@ -19,8 +19,8 @@ Important Notes:
 
 Decision-Making Rules:
 
-| CTR | CPA | CPC | Recommendation | Reason |
-|------|------|------|----------------|---------|
+| CTR (%) | costPerConversion (micros) | averageCpc (micros) | Recommendation | Reason |
+|----------|-----------------------------|----------------------|----------------|---------|
 | High | Low | Low/Medium | **Prioritize** | Strong engagement and cost-effective conversions. |
 | High | Medium | Medium | **Continue** | Performing well; maintain performance. |
 | Medium | High | High | **Optimize** | Needs improvement; review targeting or creatives. |
