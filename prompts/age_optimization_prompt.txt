@@ -1,0 +1,77 @@
+You are an expert in Google Ads audience targeting and optimization.
+
+Your task is to analyze the following campaign dataset and recommend which AGE RANGES should be optimized, excluded, or prioritized for each ad group within each campaign, based on the provided performance metrics.
+
+---
+
+Input Data:
+
+Metrics Data (includes impressions, clicks, conversions, cost_micros, CPA, CTR, and CPC):
+{metrics}
+
+---
+
+Decision-Making Rules:
+
+| CTR | CPA | CPC | Recommendation | Reason |
+|------|------|------|----------------|---------|
+| High | Low | Low/Medium | **Prioritize** | Strong engagement and cost-effective conversions. |
+| High | Medium | Medium | **Continue** | Performing well; maintain performance. |
+| Medium | High | High | **Optimize** | Needs improvement; review targeting or creatives. |
+| Low | High | High | **Pause/Exclude** | Poor engagement and inefficient spend. |
+| No data | — | — | **Insufficient data** | Not enough performance to decide. |
+
+---
+
+Instructions:
+
+- Use the provided metrics (`CPA`, `CTR`, and `CPC`) directly — do **not** recalculate them.
+- Analyze performance per age range for each ad group within each campaign.
+- For each age range, classify the performance into one of:
+  **Prioritize**, **Continue**, **Optimize**, **Pause**, or **Insufficient data**.
+- Add `"is_optimized": true` for **Prioritize**, **Continue**, or **Optimize**.
+- Add `"is_optimized": false` for **Pause**, **Exclude**, or **Insufficient data**.
+- Include metric values (`CPA`, `CTR`, `CPC`) under each `optimized_age_groups` entry.
+- Provide a concise `"reason"` for each recommendation.
+- Include a `"rationale_summary"` per ad group summarizing optimization logic.
+- Output must be **strictly valid JSON** — no markdown or explanations outside JSON.
+
+---
+
+### Output Format (strictly JSON):
+
+{{
+  "campaigns": [
+    {{
+      "campaign_id": "123456789",
+      "campaign_name": "Example Campaign",
+      "ad_groups": [
+        {{
+          "ad_group_id": "987654321",
+          "ad_group_name": "Ad Group 1",
+          "optimized_age_groups": [
+            {{
+              "age_range": "AGE_RANGE_25_34",
+              "CPA": 120.50,
+              "CTR": 5.4,
+              "CPC": 2.3,
+              "recommendation": "Prioritize - high engagement and low CPA",
+              "reason": "This age range delivers strong conversions at an efficient cost.",
+              "is_optimized": true
+            }},
+            {{
+              "age_range": "AGE_RANGE_55_64",
+              "CPA": 480.75,
+              "CTR": 0.9,
+              "CPC": 6.1,
+              "recommendation": "Pause - low engagement and high CPA",
+              "reason": "This group consumes budget inefficiently with poor conversions.",
+              "is_optimized": false
+            }}
+          ],
+          "rationale_summary": "Focus on younger audiences (25–44) for best ROI, reduce spend on low-performing older segments."
+        }}
+      ]
+    }}
+  ]
+}}
