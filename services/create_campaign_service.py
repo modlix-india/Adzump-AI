@@ -1,7 +1,7 @@
 # services/campaign_service.py
 from typing import Any, Dict
 from third_party.google.services.google_ads_client import post_mutate_operations, GoogleAdsClientError
-from services.build_ads_payload import generate_google_ads_mutate_operations
+from third_party.google.services import google_ads_client , build_google_search_ad_payload
 
 
 class CampaignServiceError(Exception):
@@ -30,11 +30,11 @@ async def create_and_post_campaign(
         )
 
     # Build mutate payload using your existing generator
-    mutate_payload = generate_google_ads_mutate_operations(customer_id=customer_id, ads=request_body)
+    mutate_payload = build_google_search_ad_payload.generate_google_ads_mutate_operations(customer_id=customer_id, ads=request_body)
     
     # Post to Google Ads
     try:
-        response = await post_mutate_operations(
+        response = await google_ads_client.post_mutate_operations(
             customer_id=customer_id,
             login_customer_id=str(login_customer_id),
             mutate_payload=mutate_payload,

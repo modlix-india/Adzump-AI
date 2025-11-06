@@ -1,18 +1,17 @@
 import os,logging,time,asyncio,json
 import httpx
 from typing import List
-
-from oserver.services import connection
+from oserver.services.connection import fetch_google_api_token_simple
 from utils import text_utils,prompt_loader
 from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
 from services.business_info_service import BusinessInfoService
+from models.business_model import BusinessMetadata
 
 # Import Pydantic models
 from models.keyword_model import (
-    BusinessMetadata,
     KeywordSuggestion,
     OptimizedKeyword,
     NegativeKeyword,
@@ -109,7 +108,7 @@ class GoogleKeywordService:
             chunk_size: int = CHUNK_SIZE,
     ) -> List[KeywordSuggestion]:
 
-        access_token = connection.fetch_google_api_token_simple(client_code)
+        access_token = fetch_google_api_token_simple(client_code)
 
         location_ids = location_ids or self.DEFAULT_LOCATION_IDS  # India
         all_suggestions: List[KeywordSuggestion] = []
@@ -230,7 +229,7 @@ class GoogleKeywordService:
 
             all_suggestions.sort(key=lambda x: x.volume, reverse=True)
             logger.info("TOTAL: %d suggestions from Google Ads API for %d locations", len(all_suggestions), len(location_ids))
-            logger.info("all suggestion from google ads api :", all_suggestions)
+            logger.info("all suggestion from google ads api : %s", all_suggestions)
             return all_suggestions
 
         except Exception as e:
@@ -378,10 +377,11 @@ class GoogleKeywordService:
             raise HTTPException(status_code=401, detail="loginCustomerId not found in session.")
         
         #get business details
-        scraped_data, url = self.business_extractor.get_business_details(
+        scraped_data, url = await self.business_extractor.get_business_details(
             data_object_id=keyword_request.data_object_id, 
             access_token=access_token,
             client_code=client_code)
+        print(f"scraped data: {scraped_data}, url: {url}")
 
         #validate we got data
         if not scraped_data:

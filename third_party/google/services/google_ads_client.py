@@ -3,12 +3,7 @@ import os
 from typing import Any, Dict
 import httpx
 
-from oserver.services.connection import fetch_google_api_token_simple
-
-
-class GoogleAdsClientError(Exception):
-    pass
-
+from oserver.services import connection
 
 
 async def post_mutate_operations(
@@ -23,10 +18,10 @@ async def post_mutate_operations(
     Post the provided mutate payload to Google Ads API and return JSON response.
     """
     developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-    access_token =  fetch_google_api_token_simple(client_code)
+    access_token =  connection.fetch_google_api_token_simple(client_code)
     # access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
     if not developer_token or not access_token:
-        raise GoogleAdsClientError("Missing Google Ads credentials or tokens.")
+        raise Exception("Missing Google Ads credentials or tokens.")
 
     
 
@@ -50,6 +45,6 @@ async def post_mutate_operations(
 
     if resp.status_code != 200:
         # bubble up response and status for the caller to handle/log
-        raise GoogleAdsClientError(f"Google Ads API error: {resp.status_code} - {data}")
+        raise Exception(f"Google Ads API error: {resp.status_code} - {data}")
 
     return data

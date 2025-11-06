@@ -5,14 +5,16 @@ from fastapi.responses import JSONResponse
 from services.search_term_pipeline import SearchTermPipeline
 from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
-# from services.google_ads_builder import build_google_ads_payloads
 from services.budget_recommendation_service import generate_budget_recommendations
-from services.create_campaign_service import create_and_post_campaign, CampaignServiceError
+from services.create_campaign_service import CampaignServiceError
 from models.keyword_model import (
     KeywordResearchRequest,
     GoogleNegativeKwReq
 )
 from utils.response_helpers import error_response, success_response
+from models.search_campaign_data_model import GenerateCampaignRequest
+from services import create_campaign_service
+
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -131,21 +133,7 @@ async def generate_budget_recommendation(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-# ---------------- Pydantic Model ----------------
-class GenerateCampaignRequest(BaseModel):
-    customer_id: str
-    loginCustomerId: str
-    businessName: str
-    budget: float
-    startDate: str
-    endDate: str
-    goal: str
-    websiteURL: str
-    geoTargetTypeSetting: Dict[str, Any]
-    locations: List[Dict[str, str]]
-    targeting: List[Dict[str, Any]]
-    # Assets optional, we will handle inside service if provided
-    assets: Dict[str, Any] = None
+
 
 # ------------------ Router ------------------
 @router.post("/generate-campaign")
@@ -160,11 +148,9 @@ async def generate_campaign(
     - Delegates work to campaign service
     """
     try:
-        # Convert Pydantic model to dict (preserves original keys)
-        request_body = request.model_dump()
 
         # Call service to create payload and post to Google Ads
-        result = await create_and_post_campaign(request_body=request_body, client_code=clientCode)
+        result = await create_campaign_service.create_and_post_campaign(request_body=request, client_code=clientCode)
 
         return {"status": "success", "data": result}
 
