@@ -170,6 +170,15 @@ def build_google_ads_payloads(customer_id, ads):
         ad_obj["responsiveSearchAd"]["descriptions"] = [{"text": d} for d in descriptions]
     if final_urls:
         ad_obj["finalUrls"] = final_urls
+    
+    ad_obj["finalUrlSuffix"] = (
+    "utm_source=google&utm_medium=cpc"
+    "&utm_campaign={campaignid}"
+    "&utm_adgroup={adgroupid}"
+    "&utm_ad={creative}"
+    "&utm_term={keyword}"
+    "&utm_device={device}"
+)
 
     if not ad_obj["responsiveSearchAd"]:
         del ad_obj["responsiveSearchAd"]

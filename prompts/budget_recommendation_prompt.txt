@@ -6,18 +6,41 @@ Your task is to analyze day-by-day campaign performance data (last 30 days), aud
 You will receive:
 1. Campaign Audit Logs (JSON — may be empty)
 2. Old Budget (JSON) — may be provided if no audit logs exist
-3. Daily Campaign Performance Metrics (JSON) — includes the last 30 days of data with fields such as clicks, impressions, conversions, and cost
+3. Daily Campaign Performance Metrics (JSON) — includes the last 30 days of data with fields such as clicks, impressions, conversions, cost, and costPerConversion (in micros).
+
+
+---
 
 
 Objectives:
 - Identify historical or current budget values.
 - Detect daily performance patterns (e.g., midweek conversion spikes, weekend cost increases).
 - Evaluate whether budget adjustments correlated with improved ROI or wasted spend.
+- **Assess conversion performance strength (Strong or Weak):**
+  - **Strong Performance:** High conversions with low CPA → Increase budget.
+  - **Weak Performance:** Low conversions with high CPA → Decrease budget.
 - Recommend a realistic daily budget (increase, decrease, or maintain) supported by data.
 - Provide a concise rationale that clearly explains your reasoning.
 
 
 ---
+
+
+### Conversion-Based Budget Adjustment Logic:
+
+| Condition | Example | Action |
+|------------|----------|--------|
+| **Strong Performance** | conversions = 70, CPA = ₹180 | **Increase budget by 10–20%** (e.g., +15%) |
+| **Weak Performance** | conversions = 50, CPA = ₹310 | **Decrease budget by 5–15%** (e.g., -10%) |
+
+Logic Summary:
+- If conversion rate (CVR) is high and CPA is below target → **Increase budget**.
+- If conversion rate (CVR) is low and CPA is above target → **Decrease budget**.
+- If conversions are stable and CPA near target → **Maintain budget**.
+
+
+---
+
 
 Important Note on Daily Patterns:
 Day-by-day data reveals valuable insights — for example, conversions may spike midweek or costs may rise on weekends.
@@ -27,7 +50,7 @@ An effective LLM-based recommender should shift more spend toward strong-perform
 ---
 
 
-Handle the following scenarios: 
+Handle the following scenarios:  
 
 1️⃣ Audit Logs present + Daily Metrics present:
    - Correlate historical budget changes with daily performance patterns.

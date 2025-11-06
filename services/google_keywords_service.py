@@ -1,18 +1,17 @@
 import os,logging,time,asyncio,json
 import httpx
 from typing import List
-
+from oserver.services.connection import fetch_google_api_token_simple
 from utils import text_utils,prompt_loader
 from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
-from oserver import connection
-from services.business_info_service import BusinessInfoService
+from services.business_service import BusinessService
+from models.business_model import BusinessMetadata
 
 # Import Pydantic models
 from models.keyword_model import (
-    BusinessMetadata,
     KeywordSuggestion,
     OptimizedKeyword,
     NegativeKeyword,
@@ -57,7 +56,7 @@ class GoogleKeywordService:
 
     def __init__(self):
         self.safety_patterns = text_utils.get_safety_patterns()
-        self.business_extractor = BusinessInfoService()
+        self.business_extractor = BusinessService()
     async def generate_seed_keywords(
         self,
         scraped_data: str,
@@ -109,7 +108,7 @@ class GoogleKeywordService:
             chunk_size: int = CHUNK_SIZE,
     ) -> List[KeywordSuggestion]:
 
-        access_token = connection.fetch_google_api_token_simple(client_code)
+        access_token = fetch_google_api_token_simple(client_code)
 
         location_ids = location_ids or self.DEFAULT_LOCATION_IDS  # India
         all_suggestions: List[KeywordSuggestion] = []
@@ -230,7 +229,7 @@ class GoogleKeywordService:
 
             all_suggestions.sort(key=lambda x: x.volume, reverse=True)
             logger.info("TOTAL: %d suggestions from Google Ads API for %d locations", len(all_suggestions), len(location_ids))
-            logger.info("all suggestion from google ads api :", all_suggestions)
+            logger.info("all suggestion from google ads api : %s", all_suggestions)
             return all_suggestions
 
         except Exception as e:
@@ -378,10 +377,12 @@ class GoogleKeywordService:
             raise HTTPException(status_code=401, detail="loginCustomerId not found in session.")
         
         #get business details
-        scraped_data, url = self.business_extractor.get_business_details(
+        business_data= await self.business_extractor.fetch_product_details(
             data_object_id=keyword_request.data_object_id, 
             access_token=access_token,
             client_code=client_code)
+        scraped_data = business_data.get("summary", "")
+        url = business_data.get("businessUrl", "")
 
         #validate we got data
         if not scraped_data:
@@ -497,11 +498,13 @@ class GoogleKeywordService:
         
         try:
             # Fetch business details
-            scraped_data, url = self.business_extractor.get_business_details(
+            business_data = await self.business_extractor.fetch_product_details(
                 data_object_id=data_object_id,
                 access_token=access_token,
                 client_code=client_code
             )
+            scraped_data = business_data.get("summary", "")
+            url = business_data.get("businessUrl", "")
             
             # Validate we got data
             if not scraped_data:
