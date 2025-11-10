@@ -1,6 +1,6 @@
 # services/campaign_service.py
 from typing import Any, Dict
-from third_party.google.services.google_ads_client import post_mutate_operations, GoogleAdsClientError
+
 from third_party.google.services import google_ads_client , build_google_search_ad_payload
 
 
@@ -18,8 +18,11 @@ async def create_and_post_campaign(
     2. Post payload to Google Ads via google_ads_client
     """
     # Validate presence of required fields from request_body
-    customer_id = request_body.get("customer_id") or request_body.get("customerId")
-    login_customer_id = request_body.get("login_customer_id") or request_body.get("loginCustomerId") or request_body.get("login-customer-id")
+    customer_id = request_body.customer_id or request_body.customerId
+    login_customer_id = (
+        request_body.loginCustomerId
+        or request_body.login_customer_id
+    )
 
     if not customer_id:
         raise CampaignServiceError("customer_id is required in the request payload")
@@ -30,7 +33,7 @@ async def create_and_post_campaign(
         )
 
     # Build mutate payload using your existing generator
-    mutate_payload = build_google_search_ad_payload.generate_google_ads_mutate_operations(customer_id=customer_id, ads=request_body)
+    mutate_payload = build_google_search_ad_payload.generate_google_ads_mutate_operations(customer_id=customer_id, campaign_data_payload=request_body)
     
     # Post to Google Ads
     try:
@@ -41,7 +44,7 @@ async def create_and_post_campaign(
             client_code=client_code,
             api_version=api_version,
         )
-    except GoogleAdsClientError as e:
+    except Exception as e:
         raise CampaignServiceError(str(e))
 
     return response
