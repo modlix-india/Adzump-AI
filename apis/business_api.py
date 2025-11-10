@@ -3,19 +3,24 @@ import os
 import tempfile
 import requests
 from fastapi import APIRouter, HTTPException, Header, Body
+from services.business_service import process_website_data
 from services.pdf_service import process_pdf_from_path
 from services.scraper_service import scrape_website
-from services.summary import make_readable
+from services.summary_service import generate_summary
 from utils.response_helpers import error_response, success_response
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
 
 @router.post("/scrape")
-async def analyze_website(websiteUrl: str = Body(..., embed=True),access_token: str = Header(..., alias="access-token"),
-    client_code: str = Header(..., alias="clientCode"),):
+async def analyze_website(websiteUrl: str = Body(..., embed=True),
+                        access_token: str = Header(..., alias="access-token"),
+                        client_code: str = Header(..., alias="clientCode"),
+                        x_forwarded_host: str = Header(alias="x-forwarded-host", default=None),
+                        x_forwarded_port: str = Header(alias="x-forwarded-port", default=None)
+):
     try:
         scraped_data = await scrape_website(websiteUrl,access_token=access_token,
-            client_code=client_code)
+            client_code=client_code, x_forwarded_host=x_forwarded_host, x_forwarded_port=x_forwarded_port)
         response = {
             "status": "success",
             "data": {
@@ -29,14 +34,9 @@ async def analyze_website(websiteUrl: str = Body(..., embed=True),access_token: 
     
 
 @router.post("/generate/summary")
-async def make_readable_endpoint(scrapedData: dict = Body(..., embed=True)):
-    try:
-        result = await make_readable(scrapedData)
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-        return success_response(result)
-    except Exception as e:
-        return error_response(str(e))
+async def generate_summary_endpoint(scrapedData: dict = Body(..., embed=True)):
+    result = await generate_summary(scrapedData)
+    return success_response(result)
 
 
 @router.post("/generate/pdf-summary")
@@ -58,3 +58,25 @@ async def summarize_pdf(pdf_url: str = Body(..., embed=True)):
         return success_response(result)
     except Exception as e:
         return error_response(str(e))
+    
+@router.post("/analyze")
+async def analyze_website(websiteUrl: str = Body(..., embed=True),
+    access_token: str = Header(..., alias="access-token"),
+    client_code: str = Header(..., alias="clientCode"),
+    x_forwarded_host: str = Header(alias="x-forwarded-host", default=None),
+    x_forwarded_port: str = Header(alias="x-forwarded-port", default=None)
+):
+    result = await process_website_data(
+        website_url=websiteUrl,
+        access_token=access_token,
+        client_code=client_code,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port
+    )
+    final_data = {
+        "websiteUrl": result.get("websiteUrl"),
+        "summary": result.get("summary"),
+        "screenshotUrl": result.get("screenshotUrl"),
+        "storageId": result.get("storageId")
+    }
+    return success_response(final_data)

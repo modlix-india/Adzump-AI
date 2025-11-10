@@ -3,7 +3,7 @@ from playwright.async_api import async_playwright
 from oserver.utils.helpers import generate_filename_from_url
 from oserver.services.file_service import upload_file
 
-async def scrape_website(url: str,access_token: str, client_code: str):
+async def scrape_website(url: str,access_token: str, client_code: str, x_forwarded_host: str, x_forwarded_port: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
@@ -20,7 +20,9 @@ async def scrape_website(url: str,access_token: str, client_code: str):
         filename=filename,
         folder_name=folder_name,
         client_code=client_code,
-        access_token=access_token
+        access_token=access_token,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port
     )
     uploaded_file_info = upload_resp.result if upload_resp.success else {}
 
