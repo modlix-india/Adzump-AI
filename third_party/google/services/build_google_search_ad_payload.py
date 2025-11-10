@@ -4,24 +4,26 @@ from typing import List, Dict, Any
 def get_unique_suffix() -> str:
     return datetime.now().strftime("%d/%m/%Y_%H:%M:%S")
 
-def generate_google_ads_mutate_operations(customer_id: str, ads: Dict[str, Any]) -> Dict[str, Any]:
+def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     - Campaign-level assets are created via assetOperation.create (with negative resourceNames)
     - Each created asset is linked to the campaign via campaignAssetOperation.create
     - Ad groups, ad group criteria, and responsive search ads are created
     """
-    safe_name = ads.get("businessName") or ads.get("business_name") or "DefaultBusiness"
-    budget_number = float(ads.get("budget", 0) or 0)
+    campaign_data_payload = campaign_data_payload.model_dump()
+
+    safe_name = campaign_data_payload.get("businessName") or campaign_data_payload.get("business_name") or "DefaultBusiness"
+    budget_number = float(campaign_data_payload.get("budget", 0) or 0)
     amount_micros = int(budget_number * 1_000_000) if budget_number > 0 else None
 
     
-    start_date = datetime.strptime(ads.get("startDate"), "%d/%m/%Y").strftime("%Y-%m-%d")
-    end_date = datetime.strptime(ads.get("endDate"), "%d/%m/%Y").strftime("%Y-%m-%d")
-    goal = ads.get("goal", "leads")
-    geo_target_type_setting = ads.get("geoTargetTypeSetting")
-    locations = ads.get("locations", [])
-    targetings = ads.get("targeting", [])
-    assets = ads.get("assets", {}) or {}
+    start_date = datetime.strptime(campaign_data_payload.get("startDate"), "%d/%m/%Y").strftime("%Y-%m-%d")
+    end_date = datetime.strptime(campaign_data_payload.get("endDate"), "%d/%m/%Y").strftime("%Y-%m-%d")
+    goal = campaign_data_payload.get("goal", "leads")
+    geo_target_type_setting = campaign_data_payload.get("geoTargetTypeSetting")
+    locations = campaign_data_payload.get("locations", [])
+    targetings = campaign_data_payload.get("targeting", [])
+    assets = campaign_data_payload.get("assets", {}) or {}
 
     suffix = get_unique_suffix()
     mutate_ops: List[Dict[str, Any]] = []
@@ -323,7 +325,7 @@ def generate_google_ads_mutate_operations(customer_id: str, ads: Dict[str, Any])
         # Ads (Responsive Search Ad)
         headlines = targeting.get("headlines", [])
         descriptions = targeting.get("descriptions", [])
-        final_urls = targeting.get("finalUrls", []) or [ads.get("websiteURL")]
+        final_urls = targeting.get("finalUrls", []) or [campaign_data_payload.get("websiteURL")]
 
         ad_obj = {"status": "ENABLED", "ad": {}}
         if headlines or descriptions:
@@ -345,4 +347,5 @@ def generate_google_ads_mutate_operations(customer_id: str, ads: Dict[str, Any])
         })
     
     # Return final payload
+    
     return {"mutateOperations": mutate_ops}
