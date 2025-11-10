@@ -7,7 +7,7 @@ from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
 from fastapi import HTTPException
-from services.business_info_service import BusinessInfoService
+from services.business_service import BusinessService
 from models.business_model import BusinessMetadata
 
 # Import Pydantic models
@@ -56,7 +56,7 @@ class GoogleKeywordService:
 
     def __init__(self):
         self.safety_patterns = text_utils.get_safety_patterns()
-        self.business_extractor = BusinessInfoService()
+        self.business_extractor = BusinessService()
     async def generate_seed_keywords(
         self,
         scraped_data: str,
@@ -377,11 +377,12 @@ class GoogleKeywordService:
             raise HTTPException(status_code=401, detail="loginCustomerId not found in session.")
         
         #get business details
-        scraped_data, url = await self.business_extractor.get_business_details(
+        business_data= await self.business_extractor.fetch_product_details(
             data_object_id=keyword_request.data_object_id, 
             access_token=access_token,
             client_code=client_code)
-        print(f"scraped data: {scraped_data}, url: {url}")
+        scraped_data = business_data.get("summary", "")
+        url = business_data.get("businessUrl", "")
 
         #validate we got data
         if not scraped_data:
@@ -497,11 +498,13 @@ class GoogleKeywordService:
         
         try:
             # Fetch business details
-            scraped_data, url = self.business_extractor.get_business_details(
+            business_data = await self.business_extractor.fetch_product_details(
                 data_object_id=data_object_id,
                 access_token=access_token,
                 client_code=client_code
             )
+            scraped_data = business_data.get("summary", "")
+            url = business_data.get("businessUrl", "")
             
             # Validate we got data
             if not scraped_data:

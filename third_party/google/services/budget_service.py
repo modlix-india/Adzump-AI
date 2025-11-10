@@ -61,7 +61,8 @@ async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, acces
       metrics.clicks,
       metrics.impressions,
       metrics.conversions,
-      metrics.cost_micros
+      metrics.cost_micros,
+      metrics.cost_per_conversion
     FROM campaign
     WHERE campaign.id = {campaign_id}
       AND segments.date DURING LAST_30_DAYS

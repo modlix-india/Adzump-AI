@@ -1,18 +1,20 @@
-from typing import List,Dict,Any
+from typing import List,Dict,Any,Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Header, Body, Query
+from fastapi import APIRouter, HTTPException, Header,status, Body, Query
 from fastapi.responses import JSONResponse
 from services.search_term_pipeline import SearchTermPipeline
 from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
-from services.google_ads_builder import build_google_ads_payloads
 from services.budget_recommendation_service import generate_budget_recommendations
-
+from services.create_campaign_service import CampaignServiceError
 from models.keyword_model import (
     KeywordResearchRequest,
     GoogleNegativeKwReq
 )
 from utils.response_helpers import error_response, success_response
+from models.search_campaign_data_model import GenerateCampaignRequest
+from services import create_campaign_service
+
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -36,15 +38,6 @@ async def create_ad_assets(summary: str = Body(...),positive_keywords: List[Dict
         return error_response(str(e))
 
 
-@router.post("/generate/payloads")
-async def build_payloads(body: dict):
-    try:
-        ads = body.get("ads", {})
-        customer_id = body.get("customerId", "")
-        payloads = build_google_ads_payloads(customer_id, ads)
-        return success_response(payloads)
-    except Exception as e:
-        return error_response(str(e))
 
 gks = GoogleKeywordService()
 
@@ -134,7 +127,35 @@ async def generate_budget_recommendation(
             client_code=clientCode
         )
         return {"status": "success", "data": result}
-    except HTTPException:
-        raise
+
+    except CampaignServiceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+# ------------------ Router ------------------
+@router.post("/generate-campaign")
+async def generate_campaign(
+    request: GenerateCampaignRequest,
+    clientCode: str = Header(..., alias="clientCode"),
+):
+    """
+    Router endpoint:
+    - Accepts GenerateCampaignRequest body
+    - Requires clientCode header
+    - Delegates work to campaign service
+    """
+    try:
+
+        # Call service to create payload and post to Google Ads
+        result = await create_campaign_service.create_and_post_campaign(request_body=request, client_code=clientCode)
+
+        return {"status": "success", "data": result}
+
+    except CampaignServiceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        # unexpected errors
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
