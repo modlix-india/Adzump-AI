@@ -1,0 +1,19 @@
+You are given scraped website data in JSON:
+{scraped_data}
+
+Task:
+Write a clear, detailed, and informative business summary of 400–500 words in one continuous paragraph that includes:
+The business’s purpose or mission and overall industry focus
+The main products or services offered and their applications
+Key details about the company’s location(s), service area, or regions served
+Any founding or background information available (such as years in business, experience, or history)
+The target audience or customer base
+The unique features, strengths, or differentiators that set the business apart from competitors
+
+Guidelines:
+Maintain a professional, factual, and descriptive tone (more informative than promotional).
+Avoid bullet points or section headings; write in a single, cohesive paragraph.
+Ensure the summary is suitable for use in business listings, SEO descriptions, or knowledge panels.
+Include all relevant business information present in the scraped data (like address, contact, branches, or certifications) naturally within the paragraph.
+Do NOT include any code, markdown, or meta commentary.
+Return ONLY the paragraph text.

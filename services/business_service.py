@@ -2,11 +2,13 @@ import logging
 import json
 from typing import List, Tuple
 from pydantic import ValidationError
+from services.scraper_service import scrape_website
+from services.summary_service import generate_summary
 from utils import prompt_loader
 from models.business_model import BusinessMetadata
 from http.client import HTTPException
-from oserver.models.storage_request_model import StorageRequest
-from oserver.services.storage_service import read_storage
+from oserver.models.storage_request_model import StorageFilter, StorageReadRequest, StorageRequest, StorageRequestWithPayload
+from oserver.services.storage_service import read_storage, read_storage_page, write_storage
 from services.openai_client import chat_completion
 
 logging.basicConfig(level=logging.INFO)
@@ -84,14 +86,10 @@ class BusinessService:
             eager=False,
             eagerFields=[]
         )
-
         response = await read_storage(payload, access_token, client_code)
-
         if not response.success or not response.result:
             raise HTTPException(status_code=500, detail=response.error or "Failed to fetch product details")
-
         data = response.result
-
         try:
             if isinstance(data, list) and len(data) > 0:
                 product_data = data[0]["result"]["result"]
@@ -101,5 +99,119 @@ class BusinessService:
                 raise HTTPException(status_code=500, detail="Unexpected product data format")
         except (KeyError, IndexError, TypeError):
             raise HTTPException(status_code=500, detail="Invalid product data response structure")
-
         return product_data
+
+
+async def process_website_data(website_url: str, access_token: str, client_code: str,x_forwarded_host: str, x_forwarded_port: str):
+    try:
+        # --- Step 1: Check if the data already exists in storage ---
+        logger.info(f"Checking if {website_url} already exists in storage")
+
+        read_request = StorageReadRequest(
+            storageName="AISuggestedData",
+            appCode="marketingai",
+            clientCode=client_code,
+            filter=StorageFilter(
+                field="businessUrl",
+                value=website_url
+            )
+        )
+
+        existing_data_response = await read_storage_page(
+            request=read_request,
+            access_token=access_token,
+            client_code=client_code,
+        )
+
+        if existing_data_response.success:
+            try:
+                # Extract from response
+                existing_records = (
+            existing_data_response.result[0]
+            .get("result", {})
+            .get("result", {})
+            .get("content", [])
+        )
+                if existing_records:
+                    existing_record = existing_records[-1]
+                    existing_id = existing_record.get("_id")
+                    existing_summary = existing_record.get("summary", "")
+                    existing_screenshot = existing_record.get("screenshot")
+
+                    logger.info(f"Found existing record for {website_url}, returning from storage")
+
+                    return {
+                        "websiteUrl": website_url,
+                        "summary": existing_summary,
+                        "screenshotUrl": existing_screenshot,
+                        "storageId": existing_id,
+                    }
+            except Exception as e:
+                logger.warning(f"Error parsing existing storage data: {e}")
+
+        # --- Step 2: If not found, proceed with scraping ---
+        logger.info(f"Scraping website: {website_url}")
+        scraped_data = await scrape_website(
+            website_url,
+            access_token=access_token,
+            client_code=client_code,
+            x_forwarded_host=x_forwarded_host,
+            x_forwarded_port=x_forwarded_port
+        )
+        if not scraped_data:
+            raise HTTPException(status_code=500, detail="Failed to scrape website")
+        logger.info(f"Generating summary for {website_url}")
+        summary_result = await generate_summary(scraped_data)
+        summary_text = summary_result.get("summary", "")
+        payload = {
+            "storageName": "AISuggestedData",
+            "dataObject": {
+                "summary": summary_text,
+                "businessUrl": website_url,
+                "siteLinks": scraped_data.get("links", []),
+                "screenshot": scraped_data.get("screenshot"),
+            },
+            "eagerFields": [],
+            "eager": False,
+            "appCode": "",
+            "clientCode": client_code
+        }
+        storage_request = StorageRequestWithPayload(**payload)
+        logger.info(f"Creating document in storage for {website_url}")
+        storage_response = await write_storage(
+            storage_request,
+            access_token=access_token,
+            client_code=client_code
+        )
+        if not storage_response.success:
+            raise HTTPException(status_code=500, detail=f"Storage failed: {storage_response.error}")
+        storage_id = None
+        try:
+            storage_records = storage_response.result
+            if isinstance(storage_records, list) and len(storage_records) > 0:
+                storage_id = (
+                    storage_records[0]
+                    .get("result", {})
+                    .get("result", {})
+                    .get("_id", None)
+                )
+            else:
+                storage_id = None
+        except (KeyError, TypeError, IndexError) as e:
+            logger.error(f"Error extracting storageId: {e}")
+            storage_id = None
+
+        logger.info(f"Extracted Storage ID: {storage_id}")
+
+        return {
+            "websiteUrl": website_url,
+            "summary": summary_text,
+            "screenshotUrl": scraped_data.get("screenshot"),
+            "storageId": storage_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Unexpected error in analyze_and_store_website: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during analysis")
