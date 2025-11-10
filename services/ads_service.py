@@ -3,10 +3,8 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
-from dotenv import load_dotenv
 from services.json_utils import safe_json_parse
 
-load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 executor = ThreadPoolExecutor()
 
