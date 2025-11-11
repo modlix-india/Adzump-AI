@@ -80,37 +80,37 @@ async def gks_negative(google_keyword_request: GoogleNegativeKwReq,
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-
-class AnalyzeSearchTermRequest(BaseModel):
-    client_code: str
-    customer_id: str
-    login_customer_id: str
-    campaign_id: str
-    duration: str
-
-
-def start_search_term_pipeline(request: AnalyzeSearchTermRequest):
-    return SearchTermPipeline(
-        client_code=request.client_code,
-        customer_id=request.customer_id,
-        login_customer_id=request.login_customer_id,
-        campaign_id=request.campaign_id,
-        duration=request.duration,
-    )
-
 @router.post("/search_term")
-async def analyze_search_terms_route(request: AnalyzeSearchTermRequest):
-    """Endpoint to analyze search terms and classify them as positive or negative."""
+async def analyze_search_terms_route(
+    access_token: str = Header(..., alias="accessToken"),
+    customer_id: str = Header(..., alias="customerId"),
+    login_customer_id: str = Header(..., alias="loginCustomerId"),
+    client_code: str = Header(..., alias="clientCode"),
+    campaign_id: str = Query(..., alias="campaignId"),
+    duration: str = Query(...),
+):
     try:
-        pipeline = start_search_term_pipeline(request)
-        results = await pipeline.run_pipeline()
-        return JSONResponse(
-            content={"status": "success", "data": results},
-            status_code=200
+        pipeline = SearchTermPipeline(
+            client_code=client_code,
+            customer_id=customer_id,
+            login_customer_id=login_customer_id,
+            campaign_id=campaign_id,
+            duration=duration,
+            access_token=access_token,
         )
+
+        results = await pipeline.run_pipeline()
+
+        return {"status": "success", "data": results}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+        
 
+    except CampaignServiceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
 @router.post("/optimize/budget")
 async def generate_budget_recommendation(
