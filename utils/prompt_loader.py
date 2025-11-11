@@ -21,7 +21,7 @@ def get_relevancy_prompt(section_name: str) -> str:
     then extracts the specified section (like brand_relevancy).
     """
     # Load the whole file (using the already merged function)
-    content = load_prompt("search_term_relevancy.txt")
+    content = load_prompt("search_term_relevancy_prompt.txt")
 
     # Extract only the section you need
     pattern = rf"# === {section_name} ===\n(.*?)(?=\n# ===|\Z)"

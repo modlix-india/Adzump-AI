@@ -55,16 +55,6 @@ class SearchTermPipeline:
             logger.error(f"[LLM] {label} relevance check failed: {e}")
             return {"error": str(e)}
 
-
-    # Brand Relevance
-    async def check_brand_relevance(self, summary: str, search_term: str) -> dict:
-        """Check if search term refers to brand, competitor, or generic."""
-        system_msg = get_relevancy_prompt("brand_relevancy")
-        user_msg = (
-            f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
-        )
-        return await self._call_llm(system_msg, user_msg, "brand")
-
     # Configuration Relevance
     async def check_configuration_relevance(self, summary: str, search_term: str) -> dict:
         """Check if search term refers to configurations (1BHK, villa, etc.)."""
@@ -75,6 +65,70 @@ class SearchTermPipeline:
         )
         return await self._call_llm(system_msg, user_msg, "configuration")
 
+    # Brand Relevance
+    async def check_brand_relevance(self, summary: str, search_term: str) -> dict:
+        """Check if search term refers to brand, competitor, or generic."""
+        system_msg = get_relevancy_prompt("brand_relevancy")
+        user_msg = (
+            f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
+        )
+        return await self._call_llm(system_msg, user_msg, "brand")
+
+    #Location Relevance
+    async def check_location_relevance(self, summary: str, search_term: str, brand_type: dict):
+        """
+        Evaluates the location relevancy for a search term based on brand type.
+
+        - If brand.type == 'competitor': skips LLM call and returns 'skipped_due_to_competitor'.
+        - If brand.type in ['own_brand', 'generic']: calls LLM to evaluate location relevancy.
+        - If brand.type missing or invalid: returns 'no_brand_context'.
+        """
+
+        # Competitor case — skip LLM
+        if brand_type == "competitor":
+            return {
+                "location": {
+                    "match": False,
+                    "type": "skipped_due_to_competitor",
+                    "score": 0.0,
+                    "match_level": "No Match",
+                    "reason": "Search term contains a competitor brand, so location relevancy check was skipped."
+                }
+            }
+
+        # Own brand or generic — perform LLM call
+        if brand_type in ("own_brand", "generic"):
+            system_msg = get_relevancy_prompt("location_relevancy")
+            user_msg = f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
+
+            try:
+                llm_response = await self._call_llm(system_msg, user_msg, "location")
+                return llm_response
+            except Exception as e:
+                return {
+                    "location": {
+                        "match": False,
+                        "type": "llm_error",
+                        "score": 0.0,
+                        "match_level": "No Match",
+                        "reason": f"Error during LLM evaluation: {str(e)}"
+                    }
+                }
+
+        # Unknown brand context — skip
+        return {
+            "location": {
+                "match": False,
+                "type": "no_brand_context",
+                "score": 0.0,
+                "match_level": "No Match",
+                "reason": (
+                    "Brand type was not identified (missing or invalid), "
+                    "so location relevance check was skipped."
+                )
+            }
+        }
+
     # Overall Relevance
     async def check_overall_relevance(
         self,
@@ -82,14 +136,18 @@ class SearchTermPipeline:
         search_term: str,
         brand_result: dict,
         config_result: dict,
+        location_result: dict
     ) -> dict:
-        """Combine brand/config results and summarize overall intent."""
+        """Combine brand, configuration, and location results and summarize overall intent.
+    Ensures consistent output structure: overallPerformance -> overall"""
         system_msg = get_relevancy_prompt("overall_relevancy")
         user_msg = (
             f"PROJECT SUMMARY:\n{summary}\n\n"
             f"SEARCH TERM:\n{search_term}\n\n"
             f"BRAND RELEVANCE RESULT:\n{json.dumps(brand_result, indent=2)}\n\n"
             f"CONFIGURATION RELEVANCE RESULT:\n{json.dumps(config_result, indent=2)}"
+            f"LOCATION RELEVANCE RESULT:\n{json.dumps(location_result, indent=2)}"
+
         )
         return await self._call_llm(system_msg, user_msg, "overall")
 
@@ -233,25 +291,32 @@ class SearchTermPipeline:
                     "classification": term_data.pop("classification", None),
                     "recommendation": term_data.pop("recommendation", None),
                 }
-
+            
             # Brand & configuration relevance checks
-            brand_eval = await self.check_brand_relevance(summary, search_term)
+            
             config_eval = await self.check_configuration_relevance(summary, search_term)
-
+            brand_eval = await self.check_brand_relevance(summary, search_term)
+            brand_type = brand_eval.get("brand", {}).get("type", None)
+            location_eval = await self.check_location_relevance(summary, search_term, brand_type)
             brand_match = brand_eval.get("brand", {}).get("match", False)
             config_match = config_eval.get("configuration", {}).get("match", False)
 
             # Overall classification
             if not brand_match and not config_match:
                 summary_eval = {
-                    "intent_stage": "Irrelevant",
-                    "overall_classification": "Negative",
-                    "insight": "No brand or configuration match found — unrelated to project.",
-                    "recommendation": "Exclude / Add as Negative Keyword",
-                }
+                    
+                        "overall": {
+                            "match": False,
+                            "match_level": "No Match",
+                            "intent_stage": "Irrelevant",
+                            "suggestion_type": "negative",
+                            "reason": "No brand, configuration, or location match found — search term is unrelated to the project."
+                        }
+                    
+}
             else:
                 summary_eval = await self.check_overall_relevance(
-                    summary, search_term, brand_eval, config_eval
+                    summary, search_term, brand_eval, config_eval, location_eval
                 )
 
             # Merge all evaluations neatly
@@ -260,6 +325,7 @@ class SearchTermPipeline:
                 "relevancyCheck": {
                     "brandRelevancy": brand_eval,
                     "configurationRelevancy": config_eval,
+                    "locationRelevancy":location_eval
                 },
                 "overallPerformance": summary_eval,
             }

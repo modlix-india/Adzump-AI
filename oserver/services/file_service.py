@@ -1,9 +1,11 @@
+from typing import Optional
 import httpx
 from oserver.models.storage_response_model import StorageResponse
 from oserver.utils.helpers import get_base_url
 
 
-async def create_folder(folder_name: str, access_token: str, client_code: str) -> StorageResponse:
+async def create_folder(folder_name: str, access_token: str, client_code: str, x_forwarded_host:Optional[str] = None,
+    x_forwarded_port:Optional[str] = None) -> StorageResponse:
     base = get_base_url()
     url = f"{base}/api/files/secured/directory/{folder_name}"
 
@@ -11,7 +13,9 @@ async def create_folder(folder_name: str, access_token: str, client_code: str) -
         "accept": "application/json",
         "Authorization": access_token,
         "ClientCode": client_code,
-        "AppCode": "marketingai"
+        "AppCode": "marketingai",
+        "X-Forwarded-Host": x_forwarded_host,
+        "X-Forwarded-Port": x_forwarded_port
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -24,7 +28,8 @@ async def create_folder(folder_name: str, access_token: str, client_code: str) -
         return StorageResponse(success=False, error=f"HTTP error: {str(e)}")
     
 
-async def get_folder(folder_name: str, access_token: str, client_code: str) -> StorageResponse:
+async def get_folder(folder_name: str, access_token: str, client_code: str,x_forwarded_host:Optional[str] = None,
+    x_forwarded_port:Optional[str] = None) -> StorageResponse:
     base = get_base_url()
     url = f"{base}/api/files/secured/{folder_name}"
 
@@ -32,7 +37,9 @@ async def get_folder(folder_name: str, access_token: str, client_code: str) -> S
         "accept": "application/json",
         "Authorization": access_token,
         "ClientCode": client_code,
-        "AppCode": "marketingai"
+        "AppCode": "marketingai",
+        "X-Forwarded-Host": x_forwarded_host,
+        "X-Forwarded-Port": x_forwarded_port
     }
 
     try:
@@ -51,22 +58,26 @@ async def upload_file(
     filename: str,
     folder_name: str,
     client_code: str,
-    access_token: str
+    access_token: str,
+    x_forwarded_host:Optional[str] = None,
+    x_forwarded_port:Optional[str] = None
 ) -> StorageResponse:
-    
+        
     base = get_base_url()
     url = f"{base}/api/files/secured/{folder_name}?clientCode={client_code}"
     headers = {
         "accept": "application/json",
         "Authorization": access_token,
         "ClientCode": client_code,
-        "AppCode": "marketingai"
+        "AppCode": "marketingai",
+        "X-Forwarded-Host": x_forwarded_host,
+        "X-Forwarded-Port": x_forwarded_port
     }
     files = {
         "file": (filename, image_bytes, "image/png"),
-    }    
-    folder_ok = await ensure_folder(folder_name, access_token, client_code)
-    print("Folder check/create status:", folder_ok)
+    }
+    folder_ok = await ensure_folder(folder_name, access_token, client_code,x_forwarded_host=x_forwarded_host,
+    x_forwarded_port=x_forwarded_port)
     if not folder_ok:
         raise Exception(f"Folder '{folder_name}' does not exist and could not be created")
 
@@ -84,10 +95,28 @@ async def upload_file(
         return StorageResponse(success=False, error=f"HTTP error: {str(e)}")
 
 
-async def ensure_folder(folder_name: str, access_token: str, client_code: str) -> bool:
-        folder_resp = await get_folder(folder_name, access_token, client_code)
-        if folder_resp.success and folder_resp.result:
-            return True
+async def ensure_folder(
+    folder_name: str,
+    access_token: str,
+    client_code: str,
+    x_forwarded_host: Optional[str] = None,
+    x_forwarded_port: Optional[str] = None
+) -> bool:
+    folder_resp = await get_folder(
+        folder_name,
+        access_token,
+        client_code,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port
+    )
+    if folder_resp.success and folder_resp.result:
+        return True
 
-        create_resp = await create_folder(folder_name, access_token, client_code)
-        return create_resp.success
+    create_resp = await create_folder(
+        folder_name,
+        access_token,
+        client_code,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port
+    )
+    return create_resp.success
