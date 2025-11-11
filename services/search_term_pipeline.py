@@ -332,7 +332,3 @@ class SearchTermPipeline:
 
         logger.info("Search term pipeline completed successfully.")
         return {"classified_search_terms": classified_terms}
-
-
-
-

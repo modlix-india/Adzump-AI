@@ -4,6 +4,7 @@ import logging
 from typing import Any,Optional,List,Dict
 import re
 
+
 logger = logging.getLogger(__name__)
 
 def load_prompt(prompt_name: str) -> str:
@@ -12,6 +13,26 @@ def load_prompt(prompt_name: str) -> str:
     prompt_path = os.path.join(root_dir, 'prompts', prompt_name)
     with open(prompt_path, 'r', encoding='utf-8') as f:
         return f.read()
+
+
+def get_relevancy_prompt(section_name: str) -> str:
+    """
+    Uses the existing load_prompt() to load the file,
+    then extracts the specified section (like brand_relevancy).
+    """
+    # Load the whole file (using the already merged function)
+    content = load_prompt("search_term_relevancy_prompt.txt")
+
+    # Extract only the section you need
+    pattern = rf"# === {section_name} ===\n(.*?)(?=\n# ===|\Z)"
+    match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
+
+    if not match:
+        available = re.findall(r"# === (.*?) ===", content)
+        raise ValueError(f"Section '{section_name}' not found in search_term_relevancy.txt. Available: {available}")
+
+    return match.group(1).strip()
+
     
 
 def format_prompt(

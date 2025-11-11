@@ -9,7 +9,6 @@ def get_threshold_values():
         "cost_per_conversion": 1000.0
     }
 
-
 async def analyze_search_term_performance(search_terms: list):
     """
     Classify search terms using metric-based rules.
@@ -57,9 +56,6 @@ async def analyze_search_term_performance(search_terms: list):
             ) / 2
 
             existing["metrics"] = existing_metrics
-            
-
-
     #Step 2: Evaluate merged terms
     
     results = []

@@ -1,4 +1,11 @@
-from typing import List,Dict,Any,Optional
+from typing import List,Dict,Any
+from fastapi import APIRouter, HTTPException, Query, Header,Body
+from services.ads_service import generate_ad_assets
+from services.google_keywords_service import GoogleKeywordService
+from services.ads_service import generate_ad_assets
+
+
+from typing import List,Dict,Any
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Header,status, Body, Query
 from fastapi.responses import JSONResponse
@@ -11,6 +18,7 @@ from models.keyword_model import (
     KeywordResearchRequest,
     GoogleNegativeKwReq
 )
+from services.search_term_pipeline import SearchTermPipeline
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service
@@ -120,13 +128,22 @@ async def generate_budget_recommendation(
     campaignId: str = Query(...)
 ):
     try:
-        result = await generate_budget_recommendations(
-            customer_id=customerId,
-            login_customer_id=loginCustomerId,
-            campaign_id=campaignId,
-            client_code=clientCode
+        pipeline = SearchTermPipeline(
+            client_code=client_code,
+            customer_id=customer_id,
+            login_customer_id=login_customer_id,
+            campaign_id=campaign_id,
+            duration=duration,
+            access_token=access_token,
         )
-        return {"status": "success", "data": result}
+
+        results = await pipeline.run_pipeline()
+
+        return {"status": "success", "data": results}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+        
 
     except CampaignServiceError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

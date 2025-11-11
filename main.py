@@ -1,3 +1,6 @@
+from fastapi import FastAPI
+from dotenv import load_dotenv
+load_dotenv()
 from dotenv import load_dotenv
 from fastapi.exceptions import RequestValidationError
 load_dotenv()
@@ -8,6 +11,8 @@ from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
 from apis.business_api import router as business_router
+from dotenv import load_dotenv
+load_dotenv()  # No-op in prod if no .env is present
 from utils.response_helpers import error_response
 
 

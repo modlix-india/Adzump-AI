@@ -23,14 +23,15 @@ async def fetch_keywords(
     try:
         # Step 1: Auth setup
         developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        access_token = fetch_google_api_token_simple(client_code=client_code)
+        google_ads_access_token = fetch_google_api_token_simple(client_code=client_code)
+
         
-        if not developer_token or not access_token:
+        if not developer_token or not google_ads_access_token:
             raise ValueError("Missing Google Ads credentials or tokens.")
 
         endpoint = f"https://googleads.googleapis.com/v20/customers/{customer_id}/googleAds:search"
         headers = {
-            "Authorization": f"Bearer {access_token}",
+            "Authorization": f"Bearer {google_ads_access_token}",
             "developer-token": developer_token,
             "login-customer-id": login_customer_id,
             "Content-Type": "application/json",

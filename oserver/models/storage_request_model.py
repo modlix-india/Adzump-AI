@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Any, List
 from typing import Any, List, Optional
 
 class StorageRequest(BaseModel):
@@ -8,6 +9,13 @@ class StorageRequest(BaseModel):
     eager: bool = False
     eagerFields: List[str] = []
 
+class StorageReadPageRequest(BaseModel):
+    storageName: str = Field(..., description="Name of the storage to read from")
+    appCode: str = Field(default="marketingai", description="App code in NCLC")
+    dataObjectId: str
+    eager: bool = False
+    eagerFields: List[str] = [],
+    filter: Any
 class StorageRequestWithPayload(BaseModel):
     storageName: str = Field(..., description="Name of the storage to create in")
     appCode: str = Field(default="marketingai", description="App code in NCLC")

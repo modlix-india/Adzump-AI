@@ -25,6 +25,8 @@ async def fetch_ads(
         developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
         google_ads_access_token = fetch_google_api_token_simple(client_code=client_code)
         
+
+
         if not developer_token or not google_ads_access_token:
             raise ValueError("Missing Google Ads credentials or tokens.")
 
@@ -83,8 +85,8 @@ async def fetch_ads(
                 final_url = url.rstrip('/') 
                 payload = StorageReadRequest(
                 storageName="AISuggestedData",
-                clientCode=client_code,
                 appCode="marketingai",
+                clientCode=client_code,
                 dataObjectId=final_url,
                 eager=False,
                 eagerFields=[],

@@ -36,13 +36,11 @@ def evaluate_cost_per_conversion(term_data, threshold):
         return {
             **base_result,
             "classification": "Positive",
-            "reason": f"Cost per conversion is {value} (below threshold {threshold}).",
             "recommendation": f"Good performance — cost per conversion is affordable at {value}.",
         }
 
     return {
         **base_result,
         "classification": "Negative",
-        "reason": f"Cost per conversion is {value} (above threshold {threshold}).",
         "recommendation": f"High cost ({value}) — consider pausing or optimizing this term.",
     }
