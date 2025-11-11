@@ -2,24 +2,7 @@ import os
 import re
 import textwrap
 from openai import OpenAI
-
-
-def setup_apis():
-    try:
-        openai_key = os.getenv("OPENAI_API_KEY")
-        if not openai_key:
-            raise ValueError("OPENAI_API_KEY is required")
-        openai_client = OpenAI(api_key=openai_key)
-
-        developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        if not developer_token:
-            raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
-        return openai_client
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Failed to setup APIs: %s", e)
-        raise
+from urllib.parse import urlparse
 
 
 def normalize_text(kw: str) -> str:
@@ -74,3 +57,16 @@ def get_fallback_negative_keywords():
         {"keyword": "broken", "reason": "Universal condition filter"},
         {"keyword": "repair", "reason": "Universal service type filter"},
     ]
+
+# ---------------- Helper: Check if link is internal ---------------- #
+def is_internal_link(href: str, base_domain: str) -> bool:
+    """Return True if href belongs to the same domain, subdomain, or is relative."""
+    if not href or href.startswith(("javascript:void(0)", "tel:")):
+        return False
+
+    parsed = urlparse(href)
+    if not parsed.netloc:  # relative or hash (#gallery, /about)
+        return True
+
+    href_domain = parsed.netloc.replace("www.", "").lower()
+    return base_domain in href_domain

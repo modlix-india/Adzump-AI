@@ -1,14 +1,30 @@
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
+from oserver.utils.helpers import generate_filename_from_url
+from oserver.services.file_service import upload_file
 
-async def scrape_website(url: str):
+async def scrape_website(url: str,access_token: str, client_code: str, x_forwarded_host: str, x_forwarded_port: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
-        await page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        await page.wait_for_timeout(5000)  # wait for JS to load if needed
+        await page.goto(url, wait_until="load", timeout=60000)
+        await page.wait_for_timeout(5000)
+        screenshot_bytes = await page.screenshot(full_page=True)
         html = await page.content()
         await browser.close()
+
+    folder_name = "screenshots"
+    filename = generate_filename_from_url(url)
+    upload_resp = await upload_file(
+        image_bytes=screenshot_bytes,
+        filename=filename,
+        folder_name=folder_name,
+        client_code=client_code,
+        access_token=access_token,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port
+    )
+    uploaded_file_info = upload_resp.result if upload_resp.success else {}
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -58,7 +74,8 @@ async def scrape_website(url: str):
         "images": [
             {"alt": img.get("alt", ""), "src": img["src"]}
             for img in soup.find_all("img", src=True)
-        ]
+        ],
+        "screenshot": uploaded_file_info.get("url", "") if upload_resp.success else None
     }
 
     return data

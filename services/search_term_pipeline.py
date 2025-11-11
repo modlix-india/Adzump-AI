@@ -1,0 +1,152 @@
+import os
+import json
+import logging
+import requests
+from oserver.services.connection import fetch_google_api_token_simple
+import utils.date_utils as date_utils
+from third_party.google.services import keywords_service
+from services.search_term_analyzer import analyze_search_term_performance
+from third_party.google.services.keywords_service import fetch_keywords_service  # import new service
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+
+class SearchTermPipeline:
+    def __init__(
+        self,
+        client_code: str,
+        customer_id: str,
+        login_customer_id: str,
+        campaign_id: str,
+        duration: str,
+    ):
+        """
+        duration can be either:
+          - 'LAST_30_DAYS', 'LAST_7_DAYS', etc.
+          - '01/01/2025,31/12/2025' (custom range in DD/MM/YYYY format)
+        """
+        self.client_code = client_code
+        self.customer_id = customer_id
+        self.login_customer_id = login_customer_id
+        self.campaign_id = campaign_id
+        self.duration = duration.strip()
+        self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
+        self.access_token = fetch_google_api_token_simple(client_code=client_code)
+
+    def fetch_search_terms(self, keywords: list) -> list:
+        """Fetch all search terms for multiple keywords in one API call."""
+        logger.info("Fetching search terms...")
+        if not keywords:
+            logger.warning("No keywords provided.")
+            return []
+
+        if isinstance(keywords[0], dict):
+            keywords = [kw.get("keyword", "") for kw in keywords if kw.get("keyword")]
+
+        endpoint = f"https://googleads.googleapis.com/v20/customers/{self.customer_id}/googleAds:search"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "developer-token": self.developer_token,
+            "login-customer-id": self.login_customer_id,
+            "Content-Type": "application/json",
+        }
+
+        try:
+            duration_clause = date_utils.format_duration_clause(self.duration)
+            sanitized_keywords = [kw.keyword.replace("'", "\\'") for kw in keywords if kw.keyword]
+            keyword_list = "', '".join(sanitized_keywords)
+            in_clause = f"('{keyword_list}')"
+
+            query = f"""
+            SELECT
+                ad_group.id,
+                search_term_view.search_term,
+                search_term_view.status,
+                segments.keyword.info.text,
+                segments.search_term_match_type,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.ctr,
+                metrics.average_cpc,
+                metrics.cost_micros,
+                metrics.conversions,
+                metrics.cost_per_conversion
+            FROM search_term_view
+            WHERE
+                campaign.id = {self.campaign_id}
+                AND segments.date {duration_clause}
+                AND segments.keyword.info.text IN {in_clause}
+                AND ad_group.status = 'ENABLED'
+                AND campaign.status = 'ENABLED'
+                ORDER BY ad_group.id
+            """
+            response = requests.post(endpoint, headers=headers, json={"query": query})
+            data = response.json()
+
+            if "error" in data:
+                err_msg = data["error"].get("message", "Unknown GAQL error")
+                logger.error(f"Google Ads API error: {err_msg}")
+                return []
+
+            search_terms = []
+            for row in data.get("results", []):
+                metrics = row.get("metrics", {})
+                search_view = row.get("searchTermView", {})
+                segments = row.get("segments", {})
+                ad_group = row.get("adGroup", {})
+                ad_group_id = ad_group.get("resourceName")
+                term = search_view.get("searchTerm")
+                keyword_text = segments.get("keyword", {}).get("info", {}).get("text")
+                match_type = segments.get("searchTermMatchType")
+                if not term or not keyword_text:
+                    continue
+
+                search_terms.append({
+                    "searchterm": term,
+                    "status": search_view.get("status"), 
+                    "keyword": keyword_text,
+                    "matchType": match_type,
+                    "adGroupId":ad_group_id,
+                    "metrics": {
+                        "impressions": metrics.get("impressions"),
+                        "clicks": metrics.get("clicks"),
+                        "ctr": metrics.get("ctr"),
+                        "conversions": metrics.get("conversions"),
+                        "costMicros": metrics.get("costMicros"),
+                        "averageCpc": metrics.get("averageCpc"),
+                        "cost": (metrics.get("costMicros", 0) or 0) / 1_000_000,
+                        "costPerConversion": metrics.get("costPerConversion"),
+                    },
+                })
+
+            return search_terms
+
+        except Exception as e:
+            logger.exception(f"Error fetching search terms: {e}")
+            return []
+
+    async def run_pipeline(self) -> list:
+        """Full flow: fetch keywords (via new service) → fetch search terms → classify."""
+        logger.info("Running full search term analysis pipeline...")
+
+        keywords = await keywords_service.fetch_keywords_service(
+            client_code=self.client_code,
+            customer_id=self.customer_id,
+            login_customer_id=self.login_customer_id,
+            campaign_id=self.campaign_id,
+            duration=self.duration,
+        )
+
+        if not keywords:
+            logger.warning("No keywords found — skipping search term fetch.")
+            return []
+
+        search_terms = self.fetch_search_terms(keywords)
+        if not search_terms:
+            logger.warning("No search terms found — skipping classification.")
+            return []
+
+        classified_terms = await analyze_search_term_performance(search_terms)
+        return classified_terms

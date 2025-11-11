@@ -1,12 +1,10 @@
 import os
 import requests
+from oserver.utils.helpers import get_base_url
 
 
 def fetch_google_api_token_simple(client_code: str, appcode: str = None) -> str:
-    base = (os.getenv("NOCODE_PLATFORM_HOST") or "").rstrip("/")
-    if not base:
-        raise RuntimeError("NOCODE_PLATFORM_HOST is not set")
-
+    base = get_base_url()
     url = f"{base}/api/core/connections/internal/oauth2/token/GOOGLE_API"
     headers = {
         # match the cURL header names exactly
