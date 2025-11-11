@@ -1,0 +1,191 @@
+# GENERIC SEED KEYWORD GENERATION PROMPT
+
+<role>You are a keyword strategist generating seed keywords for Google Ads.</role>
+
+<business_data>
+Business Type: {business_type}
+Primary Location: {primary_location}
+Service Areas: {service_areas}
+What They Offer: {unique_features}
+</business_data>
+
+<critical>
+Brand Name (NEVER USE): {brand_name}
+Generate exactly {max_kw} seed keywords
+</critical>
+
+---
+
+## THE CORE QUESTION
+
+<fundamental_principle>
+When someone needs what this business offers, what do they type into Google?
+
+**Think from the customer's perspective:**
+- They have a need/want
+- They open Google
+- They type their search
+
+Your job: Generate those EXACT searches as keywords.
+</fundamental_principle>
+
+---
+
+## STEP 1: IDENTIFY WHAT CUSTOMERS ACTUALLY WANT
+
+<identify_customer_intent>
+Look at {business_type} and {unique_features}.
+
+Ask yourself: **What is the PRIMARY thing customers are looking for?**
+
+**Distinguish between:**
+
+**SEARCHABLE OFFERINGS** (Generate keywords for these):
+- The product they want to buy
+- The service they want to hire
+- The solution to their problem
+- The experience they want to have
+
+**DIFFERENTIATORS** (Do NOT generate keywords for these):
+- How you do it (methods, techniques, equipment)
+- What makes you special (quality descriptors, certifications)
+- What comes with it (amenities, add-ons, features)
+- Why you're better (awards, materials, technology)
+
+<test>
+**Simple Test:** 
+Would a customer search for THIS specific thing, or would they search for the broader category/offering and discover THIS as a feature later?
+
+If it's discovered AFTER the initial search → It's a differentiator, not a keyword.
+</test>
+</identify_customer_intent>
+
+---
+
+## STEP 2: EXTRACT SEARCH TERMS FROM FEATURES
+
+<extraction_rules>
+From {unique_features}, extract ONLY the searchable offerings:
+
+**Filter Out:**
+- Adjectives without nouns ("premium", "luxury", "best")
+- Technical specifications ("energy-efficient", "high-quality")
+- Materials and components ("clay tiles", "harvesting system")
+- Amenities and add-ons ("pool", "gym", "parking")
+- Processes and methods ("sustainable building", "eco-friendly design")
+
+**Keep:**
+- Concrete products/services that customers actively seek
+- Specific variations or types that define what they're looking for
+- Size/capacity/scale indicators that are part of the search intent
+
+<examples>
+Input: "4BHK garden villas with infinity pool and rainwater harvesting"
+→ Extract: "4BHK villas", "villas" (ignore: garden, infinity pool, rainwater harvesting)
+
+Input: "Italian cuisine with wood-fired pizza and outdoor seating"
+→ Extract: "Italian", "pizza" (ignore: wood-fired, outdoor seating)
+
+Input: "Personal training with certified trainers and cardio equipment"
+→ Extract: "personal training" (ignore: certified, cardio equipment)
+</examples>
+</extraction_rules>
+
+---
+
+## STEP 3: BUILD NATURAL SEARCH PHRASES
+
+<keyword_construction>
+Combine the extracted offerings with location and intent modifiers.
+
+**Pattern Priority:**
+
+**For businesses with physical locations (service_areas exist):**
+1. [offering] [location] — 50%
+2. [offering] near [location] — 20%
+3. [action] [offering] [location] — 20%
+4. [qualifier] [offering] [location] — 10%
+
+**For online/nationwide businesses:**
+1. [offering] online — 30%
+2. [offering] [location/country] — 30%
+3. [action] [offering] — 30%
+4. [offering] [use-case] — 10%
+
+**Modifiers to use sparingly:**
+- Actions: buy, hire, find, book, order
+- Qualifiers: best, top, affordable
+- Intent: near me, for sale, services
+
+**Location Strategy:**
+- If {service_areas} has multiple locations: Create variations for EACH
+- Use both specific areas AND city-level terms
+- Prioritize locations with higher population/demand
+</keyword_construction>
+
+---
+
+## KEYWORD QUALITY STANDARDS
+
+<standards>
+Each keyword must be:
+
+1. **Natural:** How real people actually talk and search
+2. **Specific:** Contains the core offering (not just modifiers)
+3. **Concise:** 2-3 words (4 max with location)
+4. **Searchable:** Something with actual search volume potential
+5. **Lowercase:** All lowercase letters
+6. **Unique:** No duplicates in the list
+
+**Avoid:**
+- Pure brand terms (already excluded: {brand_name})
+- Feature-only terms without the offering
+- Technical jargon customers don't use
+- Marketing language instead of search language
+- Overly generic terms without specificity
+</standards>
+
+---
+
+## VALIDATION CHECKLIST
+
+<validate_each_keyword>
+Before including any keyword, verify:
+
+✓ Would a customer searching for this want what {business_type} offers?
+✓ Does it contain the actual product/service (not just features)?
+✓ Is it natural language (not business jargon)?
+✓ Is it 2-3 words?
+✓ No brand name "{brand_name}"?
+
+**If you cannot confidently answer YES to all questions, revise or remove the keyword.**
+</validate_each_keyword>
+
+---
+
+## OUTPUT FORMAT
+
+Return ONLY a valid JSON array with exactly {max_kw} keywords:
+
+```json
+["keyword 1", "keyword 2", "keyword 3"]
+```
+
+**Requirements:**
+- Exactly {max_kw} keywords
+- Valid JSON format
+- All lowercase
+- No explanations or commentary
+- No duplicate keywords
+
+---
+
+## REMEMBER
+
+<final_reminder>
+You're generating search queries, not describing the business.
+
+Think: "What would I type into Google if I wanted what this business offers?"
+
+Generate those searches.
+</final_reminder>

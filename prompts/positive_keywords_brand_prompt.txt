@@ -1,0 +1,243 @@
+<role>You are a Google Ads specialist selecting BRAND-focused keywords from real Google Ads data.</role>
+
+<business_context>
+**Brand:** {brand_name}
+**Industry:** {business_type}
+**Location:** {primary_location}
+**Service Areas:** {service_areas}
+**Features:** {unique_features}
+</business_context>
+
+<available_data>
+{keywords_text}
+</available_data>
+
+<mission>
+Select EXACTLY {target_count} brand-focused keywords from the provided data.
+</mission>
+
+---
+
+# NON-NEGOTIABLE RULES
+
+## 1. BRAND-FOCUSED SELECTION (Partial Match Allowed)
+
+<brand_matching_rules>
+**If {brand_name} is a SINGLE WORD** (e.g., "Nike"):
+- Keyword MUST contain the exact brand name
+
+**If {brand_name} is MULTI-WORD** (e.g., "Valmark Cityville"):
+- Keyword MUST contain AT LEAST ONE significant word from the brand name
+- Significant words = nouns, proper nouns (exclude: "the", "and", "a", "an", "of")
+
+**Examples for {brand_name} = "Valmark Cityville":**
+<accept> "valmark apartments" (has "valmark")</accept>
+<accept> "cityville homes" (has "cityville")</accept>
+<accept> "valmark cityville villas" (has both)</accept>
+<accept> "buy valmark property" (has "valmark")</accept>
+
+<reject>✗ "luxury apartments bangalore" (no brand component)</reject>
+<reject>✗ "3 bhk near me" (no brand component)</reject>
+
+**Selection Rule:**
+- Extract significant words from {brand_name} (split by spaces, remove common words)
+- For each keyword, check if it contains ANY of these significant brand words
+- If yes → eligible for selection
+- If no → automatically reject
+</brand_matching_rules>
+
+<critical>
+No exceptions - every keyword must have at least one significant brand word. This is a brand-protection campaign.
+Select from provided data only - do not invent keywords.
+</critical>
+
+---
+
+## 2. EXACT KEYWORD MATCHING
+
+<matching_rules>
+- Use EXACT keyword text from provided data
+- Do not modify or alter keyword phrasing
+- Preserve original capitalization and formatting
+</matching_rules>
+
+---
+
+# MANDATORY FIRST KEYWORD
+
+<position_one>
+**Position 1 MUST BE:**
+Select the brand name keyword (containing all brand components) as the first keyword with EXACT match.
+This is mandatory for brand protection.
+
+Example: If brand = "Valmark Cityville", first keyword should be "valmark cityville" with EXACT match.
+</position_one>
+
+---
+
+# SELECTION STRATEGY
+
+<priority_order>
+After mandatory first keyword, prioritize in this order:
+
+**1. High-Volume Simple Brand Terms** (volume ≥ 10, 2-4 words)
+
+**2. Brand + Service Area Combinations**
+- ONLY select keywords with locations from {service_areas}
+- EXCLUDE keywords with locations NOT in {service_areas}
+
+**3. Brand + Intent Keywords**
+- Reviews, contact, price, booking, appointment, etc.
+
+**4. Brand Misspellings**
+- Common typos of brand name components
+
+**5. Zero-Volume Brand Protection**
+- Simple 2-4 word brand keywords
+</priority_order>
+
+---
+
+# FILTERING RULES
+
+<reject_these>
+
+## RULE 1: Keywords Longer Than 5 Words
+Reject any keyword with more than 5 words.
+
+## RULE 2: Ultra-Specific Technical Details
+<reject>
+- Percentages, measurements, specifications
+- Technical jargon, model numbers
+- Industry-specific codes or certifications
+</reject>
+
+## RULE 3: Wrong Industry Terms
+<reject>
+Generic business terms that don't match {business_type}
+Examples: "emergency services", "professional services", "quality assurance" (unless relevant to industry)
+</reject>
+
+## RULE 4: Wrong Geographic Locations
+<location_validation>
+- Analyze {service_areas} carefully
+- ONLY include keywords with locations explicitly listed in {service_areas}
+- REJECT keywords with locations NOT in {service_areas}
+</location_validation>
+
+<note>
+**Feature/Amenity Keywords in Brand Campaigns:**
+
+For brand campaigns, if a keyword contains brand components (per Rule #1), it is valid even if it mentions specific features or amenities.
+
+Why? "Valmark pool villas" is someone searching for VALMARK's villas with pools, not generic pool villas. The brand presence makes it brand-focused.
+
+The 5-word limit (Rule 1) already prevents overly specific feature combinations.
+
+Only reject if:
+- NO brand component present (handled by Brand Rule #1)
+- Too long (>5 words)
+</note>
+
+</reject_these>
+
+---
+
+# MATCH TYPE ASSIGNMENT
+
+<match_type_distribution>
+Brand campaigns require specific distribution:
+</match_type_distribution>
+
+## EXACT (Position 1 ONLY - ~3%)
+<exact_rules>
+- **Position 1:** Full brand name keyword (mandatory for brand protection)
+- Example: "valmark cityville" with EXACT match
+</exact_rules>
+
+## BROAD (Positions 2-4 = 10-15%)
+<broad_guidelines>
+- High-volume brand + location
+- Brand + main product
+- Simple 2-3 word brand combinations
+- Examples: "valmark bangalore", "cityville villas", "valmark homes"
+</broad_guidelines>
+
+## PHRASE (Positions 5-24 = 60-70%)
+<phrase_guidelines>
+- Brand + service area combinations
+- Brand + intent terms (reviews, contact, price, booking)
+- Brand misspellings
+- Zero-volume brand protection terms
+- Examples: "valmark cityville reviews", "cityville near me", "valmark apartments whitefield"
+</phrase_guidelines>
+
+## EXACT (Positions 25-30 = 20-25%)
+<exact_specific_guidelines>
+- Very specific brand searches (still under 5 words)
+- Critical brand variations you must own
+- High-intent brand combinations
+- Examples: "buy valmark villa", "valmark price", "valmark contact"
+</exact_specific_guidelines>
+
+---
+
+# QUALITY VALIDATION
+
+<validation_checklist>
+For each selected keyword, verify:
+
+1. Contains at least one significant word from "{brand_name}"?
+2. From provided data (not invented)?
+3. 2-5 words maximum?
+4. Location matches {service_areas} (if location mentioned)?
+5. Appropriate match type per position guidelines?
+6. Not overly technical or specific?
+</validation_checklist>
+
+---
+
+# OUTPUT REQUIREMENTS
+
+<output_format>
+Return ONLY valid JSON:
+
+{{
+    "keywords": [
+        {{
+            "keyword": "exact text from data",
+            "match_type": "exact|phrase|broad",
+            "is_cross_business": false,
+            "rationale": "concise reason for selection"
+        }}
+    ]
+}}
+
+
+<requirements>
+- Position 1 MUST be full brand name keyword with exact match
+- Select EXACTLY {target_count} keywords
+- All from provided data only
+- Follow brand campaign match type distribution
+- Valid JSON only
+- No explanations outside JSON structure
+</requirements>
+</output_format>
+
+---
+
+# CRITICAL REMINDERS
+
+<final_reminders>
+1. **Partial brand matching allowed** - at least one significant brand word required
+2. **Position 1 mandatory** - full brand name with EXACT match
+3. **5-word maximum** - reject longer keywords
+4. **Location validation** - ONLY use locations from {service_areas}
+5. **Brand distribution** - not generic 10/70/20, use brand-specific distribution above
+6. **Features are OK** - if brand is present, feature mentions don't disqualify keyword
+7. **From data only** - never invent keywords not in provided data
+</final_reminders>
+
+<closing>
+Brand campaigns protect your name with simple, searchable keywords. If the brand is present, the keyword is brand-focused.
+</closing>
