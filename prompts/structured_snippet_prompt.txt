@@ -1,40 +1,56 @@
 You are generating Google Ads Structured Snippet assets.
 
-### Rules:
-- Output only valid JSON. No explanations, comments, or markdown.
-- Return an array of objects.
-- Each object must follow this format exactly:
-  {{
-    "header": "<Header Name>",
-    "values": ["<Value 1>", "<Value 2>", "<Value 3>"]
-  }}
+### Output Rules:
+- Output ONLY valid JSON.
+- The output must be an array of objects.
+- No explanations, no comments, no markdown.
+
+### Object Format:
+Each object must follow this exact structure:
+{{
+  "header": "<Header Name>",
+  "values": ["<Value 1>", "<Value 2>", "<Value 3>"]
+}}
 
 ### Header Rules:
-- Header must be chosen only from Google-approved list:
-  ["Amenities", "Brands", "Courses", "Degree programs", "Destinations", 
-   "Featured hotels", "Insurance coverage", "Models", "Neighborhoods", 
-   "Service catalog", "Shows", "Styles", "Types", "Programs"]
-- Use only 1–3 headers that are relevant to the business.
-- Do not invent new headers.
-- Each "values" list must have 3–10 items.
+- Header must be chosen ONLY from this approved Google list:
+  ["Amenities",
+ "Brands",
+ "Courses",
+ "Degree programs",
+ "Destinations",
+ "Featured hotels",
+ "Insurance coverage",
+ "Models",
+ "Neighborhoods",
+ "Services",
+ "Shows",
+ "Styles",
+ "Types"]
+- Use 1 to 3 headers ONLY.
+- **Choose headers ONLY if they clearly match the Business Summary.**
+  - Example: Real estate → "Amenities", "Neighborhoods", "Types"
+  - Example: Education → "Courses", "Degree programs", "Programs"
+  - Example: Automotive → "Models", "Brands", "Types"
+  - If a header does not logically fit the business, DO NOT use it.
+- Do NOT invent or modify headers.
 
 ### Value Rules:
-- Each value must be <= 25 characters.
-- Must be relevant to the business.
-- Do not include prices, contact details, or promotional text.
-- Keep them short, natural, and human-readable.
+- Each "values" list must contain between 3 and 7 items (NEVER fewer than 3).
+- Values must be relevant to the Business Summary AND the selected header.
+- Each value must be 25 characters or fewer.
+- No prices, promotional language, punctuation marks, emojis, URLs, or contact details.
+- Values must be meaningful, distinct, and human-readable.
 
-### Example Output:
-[
-  {{
-    "header": "Amenities",
-    "values": ["Clubhouse", "Gym", "Pool", "Jogging Track"]
-  }},
-  {{
-    "header": "Neighborhoods",
-    "values": ["Bannerghatta", "JP Nagar", "Electronic City"]
-  }}
-]
+### Hard Rules (Do Not Break):
+- NEVER output fewer than 3 values for ANY header.
+- If you cannot generate at least 3 valid values for a header, DO NOT include that header.
+- The output must be valid JSON on the first attempt.
+- Headers and values MUST be directly relevant to the Business Summary.
+- Only include headers that logically represent the business category.
 
 ### Business Summary:
 {summary}
+
+### Output:
+Return ONLY the JSON array.
