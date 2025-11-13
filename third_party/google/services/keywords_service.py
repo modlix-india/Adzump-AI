@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 
-async def fetch_keywords_service(
+async def fetch_keywords(
     client_code: str,
     customer_id: str,
     login_customer_id: str,

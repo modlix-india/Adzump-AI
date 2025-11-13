@@ -159,3 +159,29 @@ async def generate_campaign(
     except Exception as e:
         # unexpected errors
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    
+@router.post("/search_term")
+async def analyze_search_terms_route(
+    access_token: str = Header(..., alias="accessToken"),
+    customer_id: str = Header(..., alias="customerId"),
+    login_customer_id: str = Header(..., alias="loginCustomerId"),
+    client_code: str = Header(..., alias="clientCode"),
+    campaign_id: str = Query(..., alias="campaignId"),
+    duration: str = Query(...),
+):
+    try:
+        pipeline = SearchTermPipeline(
+            client_code=client_code,
+            customer_id=customer_id,
+            login_customer_id=login_customer_id,
+            campaign_id=campaign_id,
+            duration=duration,
+            access_token=access_token,
+        )
+
+        results = await pipeline.run_pipeline()
+
+        return {"status": "success", "data": results}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
