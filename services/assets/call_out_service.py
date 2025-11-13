@@ -17,4 +17,10 @@ class CalloutsService(BaseAssetService):
             "callouts_prompt.txt", {"summary": summary}
         )
 
-        return [{"callout_text": c[:25]} for c in callouts if isinstance(c, str) and c.strip()]
+        valid_callouts = [
+            {"callout_text": c}
+            for c in callouts
+            if isinstance(c, str) and len(c) <= 25
+        ]
+
+        return valid_callouts
