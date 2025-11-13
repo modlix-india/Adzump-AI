@@ -2,6 +2,7 @@ import os
 from utils.text_utils import safe_truncate_to_sentence
 import logging
 from typing import Any,Optional,List,Dict
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -101,3 +102,16 @@ def build_template_variables(template:str,context:Dict[str,Any])->Dict[str,Any]:
         format_dict['url'] = 'Not provided'
     return format_dict
 
+def get_relevancy_prompt(section_name: str) -> str:
+    """
+    Uses the existing load_prompt() to load the file,
+    then extracts the specified section (like brand_relevancy).
+    """
+    content = load_prompt("search_term_relevancy_prompt.txt")
+    pattern = rf"# === {section_name} ===\n(.*?)(?=\n# ===|\Z)"
+    match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
+    if not match:
+        available = re.findall(r"# === (.*?) ===", content)
+        raise ValueError(f"Section '{section_name}' not found in search_term_relevancy.txt. Available: {available}")
+
+    return match.group(1).strip()
