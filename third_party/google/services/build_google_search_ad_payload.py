@@ -24,6 +24,7 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
     locations = campaign_data_payload.get("locations", [])
     targetings = campaign_data_payload.get("targeting", [])
     assets = campaign_data_payload.get("assets", {}) or {}
+    network_settings = campaign_data_payload.get("networkSettings") 
 
     suffix = get_unique_suffix()
     mutate_ops: List[Dict[str, Any]] = []
@@ -62,7 +63,15 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
         "maximizeConversions": {} if goal == "leads" else {},
         **({"startDate": start_date} if start_date else {}),
         **({"endDate": end_date} if end_date else {}),
-        **({"geoTargetTypeSetting": geo_target_type_setting} if geo_target_type_setting else {})
+        **({"geoTargetTypeSetting": geo_target_type_setting} if geo_target_type_setting else {}),
+        "networkSettings": (
+            network_settings if network_settings else {
+            "targetGoogleSearch": True,             # Show ads ONLY on the main Google Search engine (google.com)
+            "targetSearchNetwork": False,           # Show ads on Google Search Network partners
+            "targetPartnerSearchNetwork": False,    # Show ads ONLY on partner search sites (not on Google.com itself)
+            "targetContentNetwork": False           # Show text ads on the Google Display Network (GDN)
+            }
+        )
     }
     mutate_ops.append({"campaignOperation": {"create": campaign_create}})
 
@@ -347,5 +356,5 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
         })
     
     # Return final payload
-    
+
     return {"mutateOperations": mutate_ops}

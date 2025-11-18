@@ -34,7 +34,7 @@ async def create_and_post_campaign(
 
     # Build mutate payload using your existing generator
     mutate_payload = build_google_search_ad_payload.generate_google_ads_mutate_operations(customer_id=customer_id, campaign_data_payload=request_body)
-    
+
     # Post to Google Ads
     try:
         response = await google_ads_client.post_mutate_operations(
