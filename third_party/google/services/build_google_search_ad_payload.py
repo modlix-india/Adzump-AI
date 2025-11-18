@@ -356,5 +356,5 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
         })
     
     # Return final payload
-    print(mutate_ops)
+
     return {"mutateOperations": mutate_ops}
