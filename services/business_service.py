@@ -215,3 +215,84 @@ async def process_website_data(website_url: str, access_token: str, client_code:
     except Exception as e:
         logger.exception(f"Unexpected error in analyze_and_store_website: {e}")
         raise HTTPException(status_code=500, detail="Internal server error during analysis")
+
+async def fetch_products_summary(
+    website_url: str,
+    access_token: str,
+    client_code: str
+):
+    try:
+        logger.info(f"Fetching product summary for {website_url}")
+
+        read_request = StorageReadRequest(
+            storageName="AISuggestedData",
+            appCode="marketingai",
+            clientCode=client_code,
+            filter=StorageFilter(
+                field="businessUrl",
+                value=website_url
+            )
+        )
+
+        existing_data_response = await read_storage_page(
+            request=read_request,
+            access_token=access_token,
+            client_code=client_code,
+        )
+
+        if existing_data_response.success:
+            try:
+                records = (
+                    existing_data_response.result[0]
+                    .get("result", {})
+                    .get("result", {})
+                    .get("content", [])
+                )
+
+                if records:
+                    record = records[-1]
+                    id = record.get("_id")
+
+                    summary = record.get("summary", "")
+                    external_links = record.get("externalLinks", [])
+                    assets = record.get("assets", [])
+
+                    external_links_summary = [
+                        {
+                            "url": link.get("url"),
+                            "urlSummary": link.get("urlSummary") or link.get("summary")
+                        }
+                        for link in external_links
+                    ]
+
+                    assets_summary = [
+                        {
+                            "fileName": asset.get("fileName"),
+                            "fileSummary": asset.get("fileSummary") or asset.get("summary")
+                        }
+                        for asset in assets
+                    ]
+
+                    return {
+                        "websiteUrl": website_url,
+                        "summary": summary,
+                        "externalLinksSummary": external_links_summary,
+                        "assetsSummary": assets_summary,
+                        "storageId": id,
+                        "storageObject": record
+                    }
+
+            except Exception as e:
+                logger.warning(f"Error parsing storage data: {e}")
+
+        return {
+            "websiteUrl": website_url,
+            "summary": "",
+            "externalLinksSummary": [],
+            "assetsSummary": [],
+            "storageObject": {}
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching product summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
