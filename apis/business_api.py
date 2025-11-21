@@ -8,6 +8,8 @@ from services.pdf_service import process_pdf_from_path
 from services.scraper_service import scrape_website
 from services.summary_service import generate_summary
 from utils.response_helpers import error_response, success_response
+from services.final_summary_service import generate_final_summary
+
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
 
@@ -80,3 +82,33 @@ async def analyze_website(websiteUrl: str = Body(..., embed=True),
         "storageId": result.get("storageId")
     }
     return success_response(final_data)
+
+@router.post("/generate-final-summary")
+async def final_summary(
+    websiteUrl: str = Body(..., embed=True),
+    access_token: str = Header(..., alias="access-token"),
+    client_code: str = Header(..., alias="client-code"),
+):
+    try:
+        final_summary = await generate_final_summary(
+            websiteUrl=websiteUrl,
+            access_token=access_token,
+            client_code=client_code
+        )
+
+        return success_response({
+            "websiteUrl": websiteUrl,
+            "finalSummary": final_summary
+        })
+
+    except HTTPException as e:
+        return error_response(
+            message=e.detail,
+            status_code=e.status_code
+        )
+
+    except Exception as e:
+        return error_response(
+            message=str(e),
+            status_code=500
+        )
