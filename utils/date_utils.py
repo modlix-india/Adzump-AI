@@ -19,7 +19,7 @@ def format_duration_clause(duration: str) -> str:
 
         # Swap if reversed
         if start_date > end_date:
-            start_date, end_date = end_date, start_date
+            raise ValueError("Start date cannot be after end date.")
 
         # Format as SQL-friendly date strings
         start_str = start_date.strftime("%Y-%m-%d")

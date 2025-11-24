@@ -2,7 +2,6 @@ import os
 import json
 import logging
 import requests
-from utils.prompt_loader import get_relevancy_prompt
 from third_party.google.services import ads_service, keywords_service
 from services.search_term_analyzer import analyze_search_term_performance
 from services.openai_client import chat_completion
@@ -12,8 +11,21 @@ from oserver.services.connection import fetch_google_api_token_simple
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+def load_search_term_prompt(file_name: str) -> str:
+    """
+    Loads search-term-specific prompts from:
+    prompts/search_term_prompts/{file_name}
+    """
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    prompt_path = os.path.join(root_dir, "prompts", "search_term_prompts", file_name)
+
+    with open(prompt_path, "r", encoding="utf-8") as f:
+        return f.read()
+
 class SearchTermPipeline:
     """Pipeline to evaluate brand, configuration, and overall search term relevancy."""
+    OPENAI_MODEL = "gpt-4o-mini"
+
     def __init__(
         self,
         client_code: str,
@@ -41,7 +53,7 @@ class SearchTermPipeline:
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": user_msg},
             ]
-            response = await chat_completion(messages, model="gpt-4o-mini")
+            response = await chat_completion(messages, model=self.OPENAI_MODEL)
             content = response.choices[0].message.content.strip() if response.choices else ""
 
             logger.info(f"[LLM] {label} relevance check completed.")
@@ -58,7 +70,7 @@ class SearchTermPipeline:
     # Configuration Relevance
     async def check_configuration_relevance(self, summary: str, search_term: str) -> dict:
         """Check if search term refers to configurations (1BHK, villa, etc.)."""
-        system_msg = get_relevancy_prompt("configuration_relevancy")
+        system_msg = load_search_term_prompt("configuration_relevancy_prompt.txt")
 
         user_msg = (
             f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
@@ -68,7 +80,7 @@ class SearchTermPipeline:
     # Brand Relevance
     async def check_brand_relevance(self, summary: str, search_term: str) -> dict:
         """Check if search term refers to brand, competitor, or generic."""
-        system_msg = get_relevancy_prompt("brand_relevancy")
+        system_msg = load_search_term_prompt("brand_relevancy_prompt.txt")
         user_msg = (
             f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
         )
@@ -98,7 +110,7 @@ class SearchTermPipeline:
 
         # Own brand or generic — perform LLM call
         if brand_type in ("own_brand", "generic"):
-            system_msg = get_relevancy_prompt("location_relevancy")
+            system_msg = load_search_term_prompt("location_relevancy_prompt.txt")
             user_msg = f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
 
             try:
@@ -140,7 +152,7 @@ class SearchTermPipeline:
     ) -> dict:
         """Combine brand, configuration, and location results and summarize overall intent.
     Ensures consistent output structure: overallPerformance -> overall"""
-        system_msg = get_relevancy_prompt("overall_relevancy")
+        system_msg = load_search_term_prompt("overall_relevancy_prompt.txt")
         user_msg = (
             f"PROJECT SUMMARY:\n{summary}\n\n"
             f"SEARCH TERM:\n{search_term}\n\n"
