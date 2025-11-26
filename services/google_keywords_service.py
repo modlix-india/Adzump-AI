@@ -24,7 +24,6 @@ from models.keyword_model import (
     KeywordType,
     CompetitionLevel,
 )
-from pydantic import ValidationError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,11 +31,12 @@ logger = logging.getLogger(__name__)
 class GoogleKeywordService:
 
     OPENAI_MODEL = "gpt-4o-mini"
-    DEFAULT_LOCATION_IDS = ["geoTargetConstants/2840"]
+    DEFAULT_LOCATION_IDS = ["geoTargetConstants/2356"]  # India
     MIN_KEYWORD_LENGTH = 2
     MAX_KEYWORD_WORDS = 6
-    DEFAULT_SEED_COUNT = 40  
+    DEFAULT_SEED_COUNT = 80
     TARGET_POSITIVE_COUNT = 30
+    FINAL_KEYWORD_LIMIT = 15
     DEFAULT_LANGUAGE_ID = 1000
     HTTP_TIMEOUT = 30.0
     CHUNK_SIZE = 15
@@ -298,10 +298,14 @@ class GoogleKeywordService:
                 final_optimized.append(optimized)
                 seen.add(kw_text)
                 
+        # Filter out zero volume keywords and sort by volume descending
+        filtered_optimized = [kw for kw in final_optimized if kw.volume > 0]
+        filtered_optimized.sort(key=lambda x: x.volume, reverse=True)
 
-        logger.info(f"Final optimization: {len(final_optimized)} keywords selected")
-        logger.info(f"Final optimized keywords: {final_optimized}")
-        return final_optimized[:target_count]
+        logger.info(f"Final optimization: {len(filtered_optimized)} keywords selected (non-zero volume)")
+        logger.info(f"Final optimized keywords: {filtered_optimized}")
+        
+        return filtered_optimized[:self.FINAL_KEYWORD_LIMIT]
 
     async def generate_negative_keywords(
         self,
