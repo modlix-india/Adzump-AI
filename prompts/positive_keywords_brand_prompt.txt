@@ -145,34 +145,162 @@ Only reject if:
 
 # MATCH TYPE ASSIGNMENT
 
-<match_type_distribution>
-Brand campaigns require specific distribution:
-</match_type_distribution>
+<match_type_philosophy>
+Assign match types based on keyword characteristics and brand intent, NOT fixed positions.
 
-## PHRASE (Position 1 - Mandatory)
-<phrase_rules>
-- **Position 1:** Full brand name keyword (mandatory for brand protection)
-- Example: "valmark cityville" with PHRASE match
-</phrase_rules>
+Analyze each keyword (except Position 1) and assign the appropriate match type based on its:
+- Specificity level (word count, detail)
+- Search intent (discovery vs conversion)
+- Brand protection priority
+- Query expansion potential
+</match_type_philosophy>
 
-## PHRASE (Positions 2-24 = 80-90%)
-<phrase_guidelines>
-- High-volume brand + location
-- Brand + main product
-- Brand + service area combinations
-- Brand + intent terms (reviews, contact, price, booking)
-- Brand misspellings
-- Zero-volume brand protection terms
-- Examples: "valmark bangalore", "cityville villas", "valmark cityville reviews", "cityville near me"
-</phrase_guidelines>
+<target_distribution>
+**Aim for approximately:**
+- Position 1: PHRASE match (mandatory - full brand name)
+- Remaining keywords: ~80-90% PHRASE, ~10-20% EXACT
 
-## EXACT (Positions 25-30 = 10-20%)
-<exact_specific_guidelines>
-- Very specific brand searches (still under 5 words)
-- Critical brand variations you must own
-- High-intent brand combinations
-- Examples: "buy valmark villa", "valmark price", "valmark contact"
-</exact_specific_guidelines>
+But prioritize correct match type assignment over hitting exact percentages.
+Quality of assignment matters more than rigid distribution.
+</target_distribution>
+
+---
+
+<assignment_criteria>
+Analyze each keyword and assign match type based on these criteria:
+
+## POSITION 1 - MANDATORY PHRASE MATCH
+<position_one_rule>
+**Position 1 MUST BE:**
+Full brand name keyword with PHRASE match (non-negotiable for brand protection)
+
+Example: "valmark cityville" → PHRASE match
+</position_one_rule>
+
+---
+
+## PHRASE MATCH [~80-90% of remaining keywords]
+
+<when_to_use_phrase>
+**Assign PHRASE match when:**
+
+1. **Brand Discovery:** High-volume brand + location/product searches
+2. **Brand Protection:** Misspellings, variations, zero-volume brand terms
+3. **Moderate Specificity:** 2-3 words with some context
+4. **Intent Keywords:** Brand + reviews, contact, price, booking, etc.
+5. **Service Areas:** Brand + location combinations from {service_areas}
+6. **Default Choice:** When uncertain, prefer Phrase for brand keywords
+
+**Keyword Characteristics:**
+- 2-3 words with moderate detail
+- Brand + location/intent/product combinations
+- Common brand searches
+- Brand protection terms
+- Most brand keywords should land here
+
+**Examples:**
+- "valmark bangalore", "cityville villas"
+- "valmark cityville reviews", "cityville near me"
+- "valmark apartments", "cityville price"
+- "valmark contact", "cityville location"
+
+**This is your default match type** for brand keywords. When in doubt, use Phrase.
+</when_to_use_phrase>
+
+---
+
+## EXACT MATCH [~10-20% of remaining keywords]
+
+<when_to_use_exact>
+**Assign EXACT match when:**
+
+1. **High Precision Needed:** Very specific, conversion-focused brand searches
+2. **Complete Intent:** 4-5 words capturing full search intent
+3. **Critical Variations:** Brand variations you must own with zero expansion
+4. **High-Value Terms:** Critical conversion keywords worth exact targeting
+5. **Maximum Control:** Need to prevent any query expansion
+
+**Keyword Characteristics:**
+- Very specific (4-5 words)
+- Complete search intent captured
+- High conversion potential
+- Critical brand variations
+- No query expansion desired
+
+**Examples:**
+- "buy valmark villa whitefield"
+- "valmark cityville 3 bhk price"
+- "valmark apartments sarjapur price"
+- "cityville villas for sale bangalore"
+
+**Use for precision targeting** where you want zero query expansion.
+</when_to_use_exact>
+
+</assignment_criteria>
+
+---
+
+<decision_process>
+## MATCH TYPE DECISION PROCESS
+
+**For Position 1:**
+- ALWAYS assign PHRASE match (mandatory brand protection rule)
+
+**For Each Remaining Keyword, Ask These Questions:**
+
+**1. How specific is it?**
+- 2-3 words, moderate detail → PHRASE
+- 4-5 words, very specific → EXACT
+
+**2. What's the search intent?**
+- Discovery/awareness/consideration → PHRASE
+- Ready to convert (with price, buy, sale terms) → EXACT
+
+**3. How critical is brand protection?**
+- Standard brand search → PHRASE
+- Critical exact variation you must own → EXACT
+
+**4. How much query expansion is beneficial?**
+- Some expansion helpful (more reach) → PHRASE
+- No expansion wanted (precision only) → EXACT
+
+**5. Is it high-value/conversion-focused?**
+- General brand search → PHRASE
+- High-intent conversion term → EXACT
+</decision_process>
+
+---
+
+<strategic_guidelines>
+## STRATEGIC MATCH TYPE GUIDELINES
+
+**POSITION 1 = Brand Protection (Mandatory PHRASE)**
+- Full brand name keyword
+- Non-negotiable rule
+- Ensures brand visibility
+
+**PHRASE = Workhorse**
+- Your default choice (~80-90% of remaining keywords)
+- Balances reach and control for brand terms
+- Most brand keywords should land here
+- Safe choice when uncertain
+
+**EXACT = Sniper Rifle**
+- Use for precision (~10-20% of remaining keywords)
+- High-intent, specific brand searches
+- Maximum control, minimum waste
+- Worth it for critical brand variations
+
+<critical>
+**Key Principles:**
+
+- Position 1 is ALWAYS PHRASE (mandatory)
+- Think strategically - match type should serve the keyword's purpose
+- PHRASE = Default workhorse for brand keywords
+- EXACT = Precision targeting for specific, high-value brand searches
+- Aim for ~80-90% PHRASE and ~10-20% EXACT distribution (excluding Position 1)
+</critical>
+</strategic_guidelines>
 
 ---
 
@@ -185,8 +313,9 @@ For each selected keyword, verify:
 2. From provided data (not invented)?
 3. 2-5 words maximum?
 4. Location matches {service_areas} (if location mentioned)?
-5. Appropriate match type per position guidelines?
-6. Not overly technical or specific?
+5. Match type assigned intelligently based on keyword characteristics?
+6. Position 1 uses PHRASE match for full brand name?
+7. Not overly technical or specific?
 </validation_checklist>
 
 ---
@@ -202,7 +331,7 @@ Return ONLY valid JSON:
             "keyword": "exact text from data",
             "match_type": "exact|phrase",
             "is_cross_business": false,
-            "rationale": "concise reason for selection"
+            "rationale": "concise reason for selection AND match type choice"
         }}
     ]
 }}
@@ -212,9 +341,11 @@ Return ONLY valid JSON:
 - Position 1 MUST be full brand name keyword with PHRASE match
 - Select EXACTLY {target_count} keywords
 - All from provided data only
-- Follow brand campaign match type distribution
+- Match types assigned intelligently based on keyword characteristics (NOT positions)
+- Aim for ~80-90% PHRASE and ~10-20% EXACT distribution
 - Valid JSON only
 - No explanations outside JSON structure
+- Rationale should explain BOTH selection reason AND match type reasoning
 </requirements>
 </output_format>
 
@@ -227,9 +358,10 @@ Return ONLY valid JSON:
 2. **Position 1 mandatory** - full brand name with PHRASE match
 3. **5-word maximum** - reject longer keywords
 4. **Location validation** - ONLY use locations from {service_areas}
-5. **Brand distribution** - use brand-specific distribution (Phrase/Exact only) defined above
-6. **Features are OK** - if brand is present, feature mentions don't disqualify keyword
-7. **From data only** - never invent keywords not in provided data
+5. **Intelligent match type assignment** - analyze each keyword's characteristics, NOT position
+6. **Match type rationale** - explain WHY you chose Phrase or Exact for each keyword
+7. **Features are OK** - if brand is present, feature mentions don't disqualify keyword
+8. **From data only** - never invent keywords not in provided data
 </final_reminders>
 
 <closing>
