@@ -13,5 +13,6 @@ class GenerateCampaignRequest(BaseModel):
     geoTargetTypeSetting: Dict[str, Any]
     locations: List[Dict[str, str]]
     targeting: List[Dict[str, Any]]
+    networkSettings: Optional[Dict[str, Any]] = None
     # Assets optional, we will handle inside service if provided
     assets: Dict[str, Any] = None
