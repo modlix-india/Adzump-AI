@@ -7,6 +7,7 @@ from services.search_term_analyzer import analyze_search_term_performance
 from services.openai_client import chat_completion
 import utils.date_utils as date_utils
 from oserver.services.connection import fetch_google_api_token_simple
+import asyncio
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -14,7 +15,7 @@ logger.setLevel(logging.INFO)
 def load_search_term_prompt(file_name: str) -> str:
     """
     Loads search-term-specific prompts from:
-    prompts/search_term_prompts/{file_name}
+    prompts/search_term/{file_name}
     """
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prompt_path = os.path.join(root_dir, "prompts", "search_term", file_name)
@@ -257,9 +258,10 @@ class SearchTermPipeline:
             return []
 
     # Full Pipeline
-    
+    import asyncio  # <--- needed for concurrency
+
     async def run_pipeline(self) -> dict:
-        """Full flow: fetch ads, keywords, search terms → analyze + LLM relevance."""
+        """Full flow: fetch ads, keywords, search terms → analyze + LLM relevance with concurrency."""
         logger.info("Running full search term analysis pipeline...")
 
         # Fetch ads summary
@@ -293,8 +295,7 @@ class SearchTermPipeline:
         # Analyze metrics
         classified_terms = await analyze_search_term_performance(search_terms)
 
-        # LLM relevancy evaluations
-        for term_data in classified_terms:
+        async def process_term(term_data):
             search_term = term_data["term"]
             performances = term_data.pop("performances", {})
 
@@ -303,44 +304,51 @@ class SearchTermPipeline:
                     "classification": term_data.pop("classification", None),
                     "recommendation": term_data.pop("recommendation", None),
                 }
-            
-            # Brand & configuration relevance checks
-            
-            config_eval = await self.check_configuration_relevance(summary, search_term)
-            brand_eval = await self.check_brand_relevance(summary, search_term)
+
+            # Run LLM calls concurrently
+            config_task = self.check_configuration_relevance(summary, search_term)
+            brand_task = self.check_brand_relevance(summary, search_term)
+            # We need brand type for location, so wait for brand first
+            brand_eval = await brand_task
             brand_type = brand_eval.get("brand", {}).get("type", None)
-            location_eval = await self.check_location_relevance(summary, search_term, brand_type)
+
+            location_task = self.check_location_relevance(summary, search_term, brand_type)
+
+            # Wait for configuration + location concurrently
+            config_eval, location_eval = await asyncio.gather(config_task, location_task)
+
             brand_match = brand_eval.get("brand", {}).get("match", False)
             config_match = config_eval.get("configuration", {}).get("match", False)
 
             # Overall classification
             if not brand_match and not config_match:
                 summary_eval = {
-                    
-                        "overall": {
-                            "match": False,
-                            "match_level": "No Match",
-                            "intent_stage": "Irrelevant",
-                            "suggestion_type": "negative",
-                            "reason": "No brand, configuration, or location match found — search term is unrelated to the project."
-                        }
-                    
-}
+                    "overall": {
+                        "match": False,
+                        "match_level": "No Match",
+                        "intent_stage": "Irrelevant",
+                        "suggestion_type": "negative",
+                        "reason": "No brand, configuration, or location match found — search term is unrelated to the project."
+                    }
+                }
             else:
                 summary_eval = await self.check_overall_relevance(
                     summary, search_term, brand_eval, config_eval, location_eval
                 )
 
-            # Merge all evaluations neatly
+            # Merge all evaluations
             term_data["evaluations"] = {
                 "performances": performances,
                 "relevancyCheck": {
                     "brandRelevancy": brand_eval,
                     "configurationRelevancy": config_eval,
-                    "locationRelevancy":location_eval
+                    "locationRelevancy": location_eval
                 },
                 "overallPerformance": summary_eval,
             }
 
+            return term_data
+        # Process all terms concurrently
+        classified_terms = await asyncio.gather(*(process_term(td) for td in classified_terms))
         logger.info("Search term pipeline completed successfully.")
         return {"classified_search_terms": classified_terms}
