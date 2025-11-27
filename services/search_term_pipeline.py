@@ -17,7 +17,7 @@ def load_search_term_prompt(file_name: str) -> str:
     prompts/search_term_prompts/{file_name}
     """
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    prompt_path = os.path.join(root_dir, "prompts", "search_term_prompts", file_name)
+    prompt_path = os.path.join(root_dir, "prompts", "search_term", file_name)
 
     with open(prompt_path, "r", encoding="utf-8") as f:
         return f.read()
