@@ -241,12 +241,12 @@ class SearchTermPipeline:
                     "metrics": {
                         "impressions": metrics.get("impressions", 0) or 0,
                         "clicks": metrics.get("clicks", 0) or 0,
-                        "ctr": float(metrics.get("ctr", 0) or 0),
-                        "conversions": float(metrics.get("conversions", 0) or 0),
+                        "ctr": metrics.get("ctr", 0) or 0,
+                        "conversions": metrics.get("conversions", 0) or 0,
                         "costMicros": int(metrics.get("costMicros", 0) or 0),
-                        "averageCpc": float(metrics.get("averageCpc", 0) or 0),
+                        "averageCpc": metrics.get("averageCpc", 0) or 0,
                         "cost": (int(metrics.get("costMicros", 0) or 0)) / 1_000_000,
-                        "costPerConversion": float(metrics.get("costPerConversion", 0) or 0),
+                        "costPerConversion": metrics.get("costPerConversion", 0) or 0,
                     },
                 })
 

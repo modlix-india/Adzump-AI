@@ -1,8 +1,7 @@
 import os
 from utils.text_utils import safe_truncate_to_sentence
 import logging
-from typing import Any,Optional,List,Dict
-import re
+from typing import Any,Dict
 
 logger = logging.getLogger(__name__)
 
