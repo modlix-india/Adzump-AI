@@ -1,19 +1,40 @@
-You are given scraped website data in JSON:
+You are given scraped website data in JSON format:
 {scraped_data}
 
-Task:
-Write a clear, detailed, and informative business summary of 400–500 words in one continuous paragraph that includes:
-The business’s purpose or mission and overall industry focus
-The main products or services offered and their applications
-Key details about the company’s location(s), service area, or regions served
-Any founding or background information available (such as years in business, experience, or history)
-The target audience or customer base
-The unique features, strengths, or differentiators that set the business apart from competitors
+Your tasks:
 
-Guidelines:
-Maintain a professional, factual, and descriptive tone (more informative than promotional).
-Avoid bullet points or section headings; write in a single, cohesive paragraph.
-Ensure the summary is suitable for use in business listings, SEO descriptions, or knowledge panels.
-Include all relevant business information present in the scraped data (like address, contact, branches, or certifications) naturally within the paragraph.
-Do NOT include any code, markdown, or meta commentary.
-Return ONLY the paragraph text.
+1. DETERMINE THE BUSINESS TYPE
+Analyze the scraped data and identify the accurate business type.
+Examples: "Real Estate Developer", "Restaurant", "Tech Company",
+"Hospital", "E-Commerce Store", "Interior Designer", etc.
+Return only the single best matching business type.
+
+2. WRITE A DETAILED BUSINESS SUMMARY (400–500 words)
+Write a professional, detailed, cohesive SINGLE PARAGRAPH of 400–500 words.
+Based ONLY on the scraped data, include:
+• Business purpose, mission, industry
+• Products / services
+• Locations, addresses, operating areas
+• History, background
+• Contact details
+• Target audience
+• Strengths, special features
+• Certifications / trust indicators
+
+STRICT RULES:
+• Only one paragraph
+• DO NOT invent details
+• DO NOT include URLs
+• DO NOT reference the prompt
+• DO NOT output bullet points
+• DO NOT use unescaped double quotes inside the summary
+  Instead, replace any internal double quotes with single quotes
+• Ensure the output is valid JSON that can be parsed by json.loads
+
+3. OUTPUT FORMAT (MANDATORY)
+Return ONLY this exact JSON format:
+
+{{
+  "businessType": "<business_type>",
+  "summary": "<summary_text>"
+}}
