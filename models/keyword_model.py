@@ -11,7 +11,6 @@ from enum import Enum
 class MatchType(str, Enum):
     EXACT = "exact"
     PHRASE = "phrase"
-    BROAD = "broad"
 
 class CompetitionLevel(str, Enum):
     LOW = "LOW"
@@ -143,7 +142,7 @@ class KeywordResearchRequest(BaseModel):
     keyword_type: KeywordType = Field(default=KeywordType.GENERIC, description="Type of keywords to generate")
     location_ids: List[str] = Field(default_factory=lambda: ["geoTargetConstants/2840"], description="Target location IDs")
     language_id: int = Field(default=1000, description="Target language ID")
-    seed_count: int = Field(default=40, ge=10, le=100, description="Number of seed keywords")
+    seed_count: int = Field(default=80, ge=10, le=100, description="Number of seed keywords")
     target_positive_count: int = Field(default=30, ge=10, le=100, description="Target positive keywords count")
     
     model_config = {
@@ -154,7 +153,7 @@ class KeywordResearchRequest(BaseModel):
                 "keyword_type": "brand",
                 "location_ids": ["geoTargetConstants/2356"],
                 "language_id": 1000,
-                "seed_count": 40,
+                "seed_count": 80,
                 "target_positive_count": 30
             }
         }
@@ -171,7 +170,7 @@ class KeywordResearchResult(BaseModel):
     
     @property
     def match_type_distribution(self) -> Dict[str, int]:
-        distribution = {"exact": 0, "phrase": 0, "broad": 0}
+        distribution = {"exact": 0, "phrase": 0}
         for kw in self.positive_keywords:
             distribution[kw.match_type.value] += 1
         return distribution
@@ -182,7 +181,7 @@ class KeywordResearchResult(BaseModel):
     
     def get_match_type_percentage(self) -> Dict[str, float]:
         if not self.positive_keywords:
-            return {"exact": 0.0, "phrase": 0.0, "broad": 0.0}
+            return {"exact": 0.0, "phrase": 0.0}
         
         total = len(self.positive_keywords)
         dist = self.match_type_distribution
@@ -198,7 +197,7 @@ class KeywordResearchResult(BaseModel):
                     {
                         "keyword": "acme plumbing bangalore",
                         "volume": 890,
-                        "competition": "LOW", 
+                        "competition": "LOW",
                         "competitionIndex": 0.32,
                         "match_type": "phrase",
                         "rationale": "Brand + location high-intent search",
@@ -207,7 +206,7 @@ class KeywordResearchResult(BaseModel):
                 ],
                 "brand_info": {
                     "brand_name": "Acme Plumbing",
-                    "business_type": "Plumbing Services", 
+                    "business_type": "Plumbing Services",
                     "primary_location": "Bangalore",
                     "service_areas": ["Koramangala", "Indiranagar"],
                     "brand_keywords": ["acme plumbing"]

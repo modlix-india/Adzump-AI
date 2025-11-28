@@ -1,7 +1,7 @@
 import os
 from utils.text_utils import safe_truncate_to_sentence
 import logging
-from typing import Any,Optional,List,Dict
+from typing import Any,Dict
 
 logger = logging.getLogger(__name__)
 
@@ -100,4 +100,3 @@ def build_template_variables(template:str,context:Dict[str,Any])->Dict[str,Any]:
     if 'url' not in format_dict:
         format_dict['url'] = 'Not provided'
     return format_dict
-
