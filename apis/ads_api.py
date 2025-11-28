@@ -1,7 +1,5 @@
 from typing import List, Dict, Any
-from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Header, status, Body, Query
-from fastapi.responses import JSONResponse
 from services.search_term_pipeline import SearchTermPipeline
 from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
