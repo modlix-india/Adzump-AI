@@ -1,15 +1,16 @@
 import httpx
 import asyncio
 import os
+from typing import Dict ,List ,Any
 from oserver.services import connection
 
 GOOGLE_ADS_API = "https://googleads.googleapis.com/v20"
 
 
-def get_auth_headers(client_code):
+def _get_auth_headers(client_code : str)-> Dict[str, str]:
     """Build Google Ads API auth headers."""
     access_token = connection.fetch_google_api_token_simple(client_code)
-    # access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+    
     developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
     if not access_token or not developer_token:
@@ -22,7 +23,9 @@ def get_auth_headers(client_code):
     }
 
 
-async def fetch_accessible_customers(client: httpx.AsyncClient):
+
+
+async def _fetch_accessible_customers(client: httpx.AsyncClient) -> List[str]:
     """Step 1: Fetch the list of accessible (login) customers."""
     url = f"{GOOGLE_ADS_API}/customers:listAccessibleCustomers"
     response = await client.get(url)
@@ -30,7 +33,7 @@ async def fetch_accessible_customers(client: httpx.AsyncClient):
     return response.json().get("resourceNames", [])
 
 
-async def fetch_managed_accounts(client: httpx.AsyncClient, login_customer_id: str, headers: dict):
+async def fetch_managed_accounts(client: httpx.AsyncClient, login_customer_id: str, headers: dict)-> List[Dict[str, Any]]:
     """Step 2: For a login customer, return all manager accounts under it."""
     query = """
         SELECT
@@ -58,16 +61,16 @@ async def fetch_managed_accounts(client: httpx.AsyncClient, login_customer_id: s
     return accounts
 
 
-async def list_accessible_customers(client_code: str):
+async def list_manager_customers(client_code: str):
     """
     Fetch all accessible accounts for the authenticated user,
     and fetch their managed accounts concurrently.
     """
-    headers = get_auth_headers(client_code)
+    headers = _get_auth_headers(client_code)
 
     async with httpx.AsyncClient(timeout=40.0, headers=headers) as client:
         # Step 1: Fetch login customers
-        resource_names = await fetch_accessible_customers(client)
+        resource_names = await _fetch_accessible_customers(client)
 
         if not resource_names:
             return []
@@ -83,11 +86,34 @@ async def list_accessible_customers(client_code: str):
         results = await asyncio.gather(*tasks, return_exceptions=False)
 
         return results
+#Helper function to flatten mcc accounts
+def flatten_mcc_response(raw_response: Any) -> List[Dict[str, Any]]:
+    """
+     MCC response is nested (list of single-item lists).
+    Input example:
+      [[{'id':'1002572931','name':'Test','is_manager':True}], [{'id':'2664052337','name':'Testone','is_manager':True}], ...]
+    Output:
+      [{'id':'1002572931','name':'Test'}, {'id':'1002572931','name':'Testone'}...]
+    """
+    flattened_accounts: List[Dict[str, Any]] = []
+
+    if isinstance(raw_response, list):
+        for outer_list in raw_response:
+            if isinstance(outer_list, list) and outer_list:
+                account_data = outer_list[0]  # take the single dict inside
+
+                flattened_accounts.append({
+                    "id": str(account_data.get("id", "")).strip(),
+                    "name": str(account_data.get("name", "")).strip(),
+                })
+
+    # Ensure all entries have an ID
+    return [account for account in flattened_accounts if account.get("id")]
 
 
-async def fetch_customer_accounts(mcc_id: str, client_code:str):
+async def fetch_customer_accounts(mcc_id: str, client_code:str) -> List[Dict[str, str]]:
     """Fetch L1 customers under a given MCC."""
-    headers = get_auth_headers(client_code)
+    headers = _get_auth_headers(client_code)
     url = f"{GOOGLE_ADS_API}/customers/{mcc_id}/googleAds:search"
 
     query = {
@@ -125,12 +151,3 @@ async def fetch_customer_accounts(mcc_id: str, client_code:str):
         return accounts
 
 
-
-
-async def main():
-    client_code = "MODLI9"
-    res = await list_accessible_customers(client_code)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

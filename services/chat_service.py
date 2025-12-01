@@ -1,24 +1,26 @@
-import json
+
 import uuid
-import re
+
 from datetime import datetime, timezone
 from fastapi.responses import JSONResponse
-from typing import Optional
-import logging
+
+
 
 from services.openai_client import chat_completion
 from services.session_manager import sessions, SESSION_TIMEOUT
 from utils.prompt_loader import load_prompt
-from utils.helpers import get_today_end_date_with_duration , validate_domain_exists
+from utils.helpers import get_today_end_date_with_duration
 from models.campaign_data_model import CampaignData
-
+from tools.account_selection_tool import (
+    HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA,  
+    execute_handle_account_selection,
+)
 from tools.tool_exe import (
     process_tool_call,
     validate_and_extract_fields,
     SAVE_CAMPAIGN_TOOL_SCHEMA,
-    CONFIRM_CAMPAIGN_TOOL_SCHEMA,
-    HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA,  # renamed tool schema (model-visible)
-    execute_handle_account_selection,  # renamed executor (server-side)
+    CONFIRM_CAMPAIGN_TOOL_SCHEMA, 
+    safe_args
 )
 
 TODAY = datetime.now().strftime("%Y-%m-%d")
@@ -39,8 +41,8 @@ def calculate_progress(collected_data):
     required = get_required_fields()
     trackable = get_trackable_fields(collected_data)
     # count only required fields that are present, not derived fields
-    present = sum(1 for field in required if field in collected_data)
-    return f"{present}/{len(required)}"
+    # present = sum(1 for field in required if field in collected_data)
+    return f"{len(trackable)}/{len(required)}"
 
 def all_fields_collected(collected_data):
     """Check if all required fields are collected."""
@@ -64,10 +66,7 @@ def build_summary(collected_data):
         if field in collected_data:
             value = collected_data[field]
             if field == "budget":
-                try:
-                    value = f"₹{int(float(value)):,}"
-                except Exception:
-                    value = f"₹{value}"
+                value = f"₹{int(float(value)):,}"
             elif field == "durationDays":
                 value = f"{value} days"
             lines.append(f"- {label}: {value}")
@@ -76,18 +75,10 @@ def build_summary(collected_data):
     return "\n".join(lines)
 
 
-def safe_args(tool_arguments: Optional[str]) -> dict: 
-    """
-    Safely parse tool_call.function.arguments into a dictionary.
-    Returns {} if JSON is missing or invalid.
-    """
-    try:
-        return json.loads(tool_arguments or "{}")
-    except json.JSONDecodeError:
-        return {}
 
 
-def build_response(status: str, session: dict, ai_message: str = None, **kwargs) -> JSONResponse:
+
+def build_response(status: str, session: dict, ai_message: str, **kwargs) -> JSONResponse:
     """Build standardized JSON response with mask during collection and values at confirm."""
     collected_data = session.get("campaign_data", {})
     progress = calculate_progress(collected_data)
@@ -108,14 +99,6 @@ def build_response(status: str, session: dict, ai_message: str = None, **kwargs)
     response_data.update(kwargs)
     return JSONResponse(content=response_data)
 
-
-
-# def have_business_fields(session: dict) -> bool:
-#     """Check if the non-ID business fields are collected."""
-#     cd = session.get("campaign_data", {})
-#     needed = ["businessName", "websiteURL", "budget", "durationDays"]
-#     return all(k in cd for k in needed)
-
 # System prompt
 
 system_prompt_template = load_prompt("chat_service_prompt.txt")
@@ -127,7 +110,7 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
     """Handle awaiting_confirmation state logic."""
     tools = [
         # Both tools must be wrapped in {"type":"function","function": ...}
-        CONFIRM_CAMPAIGN_TOOL_SCHEMA,  # already wrapped in your tool_exe.py
+        CONFIRM_CAMPAIGN_TOOL_SCHEMA,  # already wrapped in tool_exe.py
         {"type": "function", "function": SAVE_CAMPAIGN_TOOL_SCHEMA},
         {"type": "function", "function": HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA},
     ]
@@ -143,8 +126,7 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
     response_message = response.choices[0].message
     tool_calls = response_message.tool_calls
     ai_message = response_message.content or ""
-    print("calling tools:", tool_calls)
-    print(ai_message)
+    
 
     
     if tool_calls:
@@ -215,7 +197,7 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
 
 
 #Data-collection state handler
-async def handle_data_collection_state(session: dict, client_code: Optional[str] = None) -> JSONResponse:
+async def handle_data_collection_state(session: dict, client_code:str) -> JSONResponse:
 
 
     # Expose only the tools the model may call directly.
@@ -236,9 +218,6 @@ async def handle_data_collection_state(session: dict, client_code: Optional[str]
     tool_calls = response_message.tool_calls
     ai_message = response_message.content or ""
 
-    # logging.debug("MODEL OUTPUT content: %s", ai_message)
-    # logging.debug("MODEL TOOL CALLS: %s", tool_calls)
-    
 
     # Process tool calls (business extraction + unified accounts discovery)
     if tool_calls:
@@ -247,7 +226,7 @@ async def handle_data_collection_state(session: dict, client_code: Optional[str]
 
             if fname == SAVE_CAMPAIGN_TOOL_SCHEMA["name"]:
                 # Business fields extraction/validation
-                ai_message ,failed_fields = await process_tool_call(session, tool_call, response_message)
+                ai_message ,_ = await process_tool_call(session, tool_call, response_message)
                 
             elif fname == HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA["name"]:
                 # If model requests handle_account_selection explicitly, route to server executor
@@ -295,7 +274,7 @@ async def start_session():
     }
     return {"session_id": session_id, "message": "New session started."}
 
-async def process_chat(session_id: str, message: str, client_code: Optional[str] = None):
+async def process_chat(session_id: str, message: str, client_code: str):
     """Process chat message and manage conversation state."""
     # Validate session
     if session_id not in sessions:
