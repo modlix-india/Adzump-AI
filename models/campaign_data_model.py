@@ -13,7 +13,7 @@ class CampaignData(OpenAISchema):
     budget: Optional[str] = Field(None, description="Advertising budget (numeric value)")
     durationDays: Optional[int] = Field(None, description="Campaign duration in days (numeric value)")
     loginCustomerId: Optional[str] = Field(None, description="The user's Google Ads customer ID.")
-
+    customerId: Optional[str] = None 
 
     @field_validator('websiteURL')
     def validate_website_url(cls, v):
