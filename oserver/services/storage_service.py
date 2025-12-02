@@ -8,7 +8,6 @@ from oserver.models.storage_request_model import (
 )
 from oserver.models.storage_response_model import StorageResponse
 from oserver.services.base_api_service import BaseAPIService
-from oserver.utils.helpers import get_base_url
 
 
 class StorageService:
@@ -23,7 +22,7 @@ class StorageService:
         self.client_code = client_code
         self.x_forwarded_host = x_forwarded_host
         self.x_forwarded_port = x_forwarded_port
-        self.client = BaseAPIService(base_url=get_base_url())
+        self.client = BaseAPIService()
 
     def _headers(self):
         return {
@@ -37,7 +36,7 @@ class StorageService:
     async def read_storage(self, request: StorageRequest) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/Read"
         try:
-            result = await self.client._request("POST", url, headers=self._headers(), json=request.model_dump())
+            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")
@@ -47,7 +46,7 @@ class StorageService:
     async def read_page_storage(self, request: StorageReadRequest) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/ReadPage"
         try:
-            result = await self.client._request("POST", url, headers=self._headers(), json=request.model_dump())
+            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")
@@ -57,7 +56,7 @@ class StorageService:
     async def write_storage(self, request: StorageRequestWithPayload) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/Create"
         try:
-            result = await self.client._request("POST", url, headers=self._headers(), json=request.model_dump())
+            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")
@@ -67,7 +66,7 @@ class StorageService:
     async def update_storage(self, request: StorageUpdateWithPayload) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/Update"
         try:
-            result = await self.client._request("POST", url, headers=self._headers(), json=request.model_dump())
+            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")

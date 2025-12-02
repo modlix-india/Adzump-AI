@@ -1,6 +1,7 @@
 import json
 import logging
 from fastapi import HTTPException
+from models.business_model import WebsiteSummaryResponse
 from services.business_service import generate_website_summary
 from services.scraper_service import scrape_website
 from utils.helpers import normalize_url
@@ -71,12 +72,14 @@ async def process_external_link(
         # CASE A1 — Summary exists & rescrape=False → return cached
         if existing_summary and not rescrape:
             logger.info("[ExternalLink] Returning cached external summary")
-            return {
-                "externalUrl": external_url,
-                "externalSummary": existing_summary,
-                "finalSummary": record.get("finalSummary", ""),
-                "storageId": storage_id,
-            }
+
+            return WebsiteSummaryResponse(
+            storage_id=storage_id,
+            business_url=business_url,
+            external_url=external_url,
+            summary=existing_summary,
+            final_summary=record.get("finalSummary", "")
+        )
         # CASE A2 — Summary missing OR rescrape=True → regenerate
         logger.info(
             "[ExternalLink] Summary missing or rescrape=True → regenerating external summary"
@@ -139,9 +142,10 @@ async def process_external_link(
         )
         merged_final_summary = record.get("finalSummary", "")
     # STEP 8: RETURN RESPONSE
-    return {
-        "externalUrl": external_url,
-        "externalSummary": summary_text,
-        "finalSummary": merged_final_summary,
-        "storageId": storage_id,
-    }
+    return WebsiteSummaryResponse(
+            storage_id=storage_id,
+            business_url=business_url,
+            external_url=external_url,
+            summary=summary_text,
+            final_summary=merged_final_summary,
+        )

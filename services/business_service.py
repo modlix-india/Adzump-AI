@@ -6,9 +6,8 @@ from exceptions.custom_exceptions import (
     BusinessValidationException,
 )
 from services.scraper_service import scrape_website
-from services.screenshot_service import take_and_upload_screenshot
 from utils import prompt_loader
-from models.business_model import BusinessMetadata
+from models.business_model import BusinessMetadata, WebsiteSummaryResponse
 from fastapi import HTTPException
 from oserver.models.storage_request_model import (
     StorageFilter,
@@ -153,7 +152,6 @@ async def process_website_data(
             filter=StorageFilter(field="businessUrl", value=website_url),
         )
         existing_data_response = await storage_service.read_page_storage(read_request)
-        logger.info(f"Storage read response: {existing_data_response}")
 
         existing_record = None
         existing_id = None
@@ -186,15 +184,14 @@ async def process_website_data(
             and existing_summary.strip()
             and not rescrape
         ):
-            logger.info(f"Returning cached summary for {website_url}")
 
-            return {
-                "websiteUrl": website_url,
-                "summary": existing_summary,
-                "businessType": existing_businessType,
-                "finalSummary": existing_finalSummary,
-                "storageId": existing_id,
-            }
+            return WebsiteSummaryResponse(
+                storage_id=existing_id,
+                business_url=website_url,
+                business_type=existing_businessType,
+                summary=existing_summary,
+                final_summary=existing_finalSummary,
+            )
 
         # STEP 3: SCRAPE WEBSITE
         logger.info(f"Scraping website: {website_url}")
@@ -233,15 +230,15 @@ async def process_website_data(
                 },
             )
 
-            response = await storage_service.update_storage(update_payload)
-            logger.info(f"Update response: {response}")
-            return {
-                "websiteUrl": website_url,
-                "summary": summary_text,
-                "businessType": businessType,
-                "finalSummary": summary_text,
-                "storageId": existing_id,
-            }
+            await storage_service.update_storage(update_payload)
+            logger.info("Storage is updated successfully")
+            return WebsiteSummaryResponse(
+                storage_id=existing_id,
+                business_url=website_url,
+                business_type=businessType,
+                summary=summary_text,
+                final_summary=summary_text,
+            )
 
         # Case B: CREATE NEW RECORD
         logger.info("No existing record found → creating new")
@@ -284,13 +281,13 @@ async def process_website_data(
 
         logger.info(f"Extracted Storage ID: {new_storage_id}")
 
-        return {
-            "websiteUrl": website_url,
-            "summary": summary_text,
-            "businessType": businessType,
-            "finalSummary": summary_text,
-            "storageId": new_storage_id,
-        }
+        return WebsiteSummaryResponse(
+            storage_id=new_storage_id,
+            business_url=website_url,
+            business_type=businessType,
+            summary=summary_text,
+            final_summary=summary_text,
+        )
 
     except HTTPException:
         raise
@@ -310,7 +307,7 @@ async def generate_website_summary(scraped_data: dict) -> str:
 
     try:
         prompt = prompt_loader.format_prompt(
-            "website_summary_prompt.txt", scraped_data=scraped_data
+            "business/website_summary_prompt.txt", scraped_data=scraped_data
         )
         response = await chat_completion(
             messages=[{"role": "user", "content": prompt}],
@@ -325,221 +322,3 @@ async def generate_website_summary(scraped_data: dict) -> str:
     except Exception as e:
         logger.error(f"Error generating summary: {e}")
         raise AIProcessingException("Failed to generate summary")
-
-
-async def process_screenshot_flow(
-    business_url: str,
-    retake: bool,
-    access_token: str,
-    client_code: str,
-    x_forwarded_host: str,
-    x_forwarded_port: str,
-    external_url: str | None = None,
-):
-    business_url = normalize_url(business_url)
-    external_url = normalize_url(external_url) if external_url else None
-
-    logger.info(
-        f"[ScreenshotFlow] Started businessUrl={business_url}, externalUrl={external_url}, retake={retake}"
-    )
-
-    storage_service = StorageService(
-        access_token=access_token,
-        client_code=client_code,
-        x_forwarded_host=x_forwarded_host,
-        x_forwarded_port=x_forwarded_port,
-    )
-
-    # READ EXISTING RECORD
-    read_request = StorageReadRequest(
-        storageName="AISuggestedData",
-        appCode="marketingai",
-        clientCode=client_code,
-        filter=StorageFilter(field="businessUrl", value=business_url),
-    )
-    read_response = await storage_service.read_page_storage(read_request)
-
-    existing_record = None
-    if read_response.success and read_response.result:
-        items = (
-            read_response.result[0]
-            .get("result", {})
-            .get("result", {})
-            .get("content", [])
-        )
-        if items:
-            existing_record = items[0]
-
-    record_exists = existing_record is not None
-    storage_record_id = existing_record["_id"] if record_exists else None
-
-    logger.info(f"[ScreenshotFlow] Existing Record ID = {storage_record_id}")
-
-    # EXTERNAL LINK SCREENSHOT FLOW
-    if external_url:
-        if not record_exists:
-            raise BusinessValidationException(
-                "No record found for this businessUrl. Cannot process externalUrl screenshot."
-            )
-        logger.info("[ScreenshotFlow] External URL screenshot flow")
-
-        # Load existing external links
-        external_links_list = existing_record.get("externalLinks", [])
-
-        # Deduplicate by normalized URL (keep latest entry)
-        normalized_map = {}
-        for entry in external_links_list:
-            key = normalize_url(entry.get("url", ""))
-            normalized_map[key] = entry
-
-        external_links_list = list(normalized_map.values())
-        existing_external_item = normalized_map.get(external_url)
-
-        screenshot_missing = (
-            not existing_external_item or not existing_external_item.get("screenshot")
-        )
-
-        # retake = TRUE
-        if retake:
-            screenshot_url = await take_and_upload_screenshot(
-                external_url,
-                access_token,
-                client_code,
-                x_forwarded_host,
-                x_forwarded_port,
-            )
-
-            if existing_external_item:
-                existing_external_item["screenshot"] = screenshot_url
-            else:
-                external_links_list.append(
-                    {"url": external_url, "screenshot": screenshot_url}
-                )
-
-            update_request = StorageUpdateWithPayload(
-                storageName="AISuggestedData",
-                clientCode=client_code,
-                appCode="marketingai",
-                dataObjectId=storage_record_id,
-                dataObject={"externalLinks": external_links_list},
-            )
-
-            await storage_service.update_storage(update_request)
-
-            return {
-                "businessUrl": business_url,
-                "externalUrl": external_url,
-                "externalScreenshotUrl": screenshot_url,
-                "storageId": storage_record_id,
-            }
-
-        # retake = FALSE + screenshot EXISTS → return cached
-        if existing_external_item and not screenshot_missing:
-            return {
-                "businessUrl": business_url,
-                "externalUrl": external_url,
-                "externalScreenshotUrl": existing_external_item["screenshot"],
-                "storageId": storage_record_id,
-            }
-
-        # retake = FALSE + screenshot missing → take screenshot
-        screenshot_url = await take_and_upload_screenshot(
-            external_url, access_token, client_code, x_forwarded_host, x_forwarded_port
-        )
-
-        if existing_external_item:
-            existing_external_item["screenshot"] = screenshot_url
-        else:
-            external_links_list.append(
-                {"url": external_url, "screenshot": screenshot_url}
-            )
-
-        update_request = StorageUpdateWithPayload(
-            storageName="AISuggestedData",
-            clientCode=client_code,
-            appCode="marketingai",
-            dataObjectId=storage_record_id,
-            dataObject={"externalLinks": external_links_list},
-        )
-        await storage_service.update_storage(update_request)
-
-        return {
-            "businessUrl": business_url,
-            "externalUrl": external_url,
-            "externalScreenshotUrl": screenshot_url,
-            "storageId": storage_record_id,
-        }
-
-    # MAIN BUSINESS URL SCREENSHOT FLOW (NO external_url)
-    logger.info("[ScreenshotFlow] Main business URL screenshot flow")
-
-    screenshot_missing = not record_exists or not existing_record.get("screenshot")
-
-    # No retake + screenshot exists → return cached
-    if not retake and record_exists and not screenshot_missing:
-        return {
-            "businessUrl": business_url,
-            "businessScreenshotUrl": existing_record["screenshot"],
-            "storageId": storage_record_id,
-        }
-
-    # No retake + record exists + screenshot missing → take screenshot
-    if not retake and record_exists and screenshot_missing:
-        screenshot_url = await take_and_upload_screenshot(
-            business_url, access_token, client_code, x_forwarded_host, x_forwarded_port
-        )
-
-        update_request = StorageUpdateWithPayload(
-            storageName="AISuggestedData",
-            clientCode=client_code,
-            appCode="marketingai",
-            dataObjectId=storage_record_id,
-            dataObject={"screenshot": screenshot_url},
-        )
-        await storage_service.update_storage(update_request)
-
-        return {
-            "businessUrl": business_url,
-            "businessScreenshotUrl": screenshot_url,
-            "storageId": storage_record_id,
-        }
-
-    # No record → create one
-    if not record_exists:
-        screenshot_url = await take_and_upload_screenshot(
-            business_url, access_token, client_code, x_forwarded_host, x_forwarded_port
-        )
-
-        create_request = StorageRequestWithPayload(
-            storageName="AISuggestedData",
-            clientCode=client_code,
-            appCode="marketingai",
-            dataObject={
-                "businessUrl": business_url,
-                "screenshot": screenshot_url,
-                "externalLinks": [],
-            },
-        )
-        await storage_service.write_storage(create_request)
-
-        return {"businessUrl": business_url, "businessScreenshotUrl": screenshot_url}
-
-    # retake=True + record exists
-    screenshot_url = await take_and_upload_screenshot(
-        business_url, access_token, client_code, x_forwarded_host, x_forwarded_port
-    )
-
-    update_request = StorageUpdateWithPayload(
-        storageName="AISuggestedData",
-        clientCode=client_code,
-        appCode="marketingai",
-        dataObjectId=storage_record_id,
-        dataObject={"screenshot": screenshot_url},
-    )
-    await storage_service.update_storage(update_request)
-
-    return {
-        "businessUrl": business_url,
-        "businessScreenshotUrl": screenshot_url,
-        "storageId": storage_record_id,
-    }

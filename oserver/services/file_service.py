@@ -2,7 +2,6 @@ from typing import Optional
 import httpx
 from oserver.services.base_api_service import BaseAPIService
 from oserver.models.storage_response_model import StorageResponse
-from oserver.utils.helpers import get_base_url
 
 class StorageFileService:
     def __init__(
@@ -32,7 +31,7 @@ class StorageFileService:
     async def create_folder(self, folder_name: str) -> StorageResponse:
         url = f"{self.client.base_url}/api/files/secured/directory/{folder_name}"
         try:
-            result = await self.client._request("POST", url, headers=self._headers())
+            result = await self.client.request("POST", url, headers=self._headers())
             return StorageResponse(success=True, result=result)
         except Exception as e:
             return StorageResponse(success=False, error=str(e))
@@ -40,7 +39,7 @@ class StorageFileService:
     async def get_folder(self, folder_name: str) -> StorageResponse:
         url = f"{self.client.base_url}/api/files/secured/{folder_name}"
         try:
-            result = await self.client._request("GET", url, headers=self._headers())
+            result = await self.client.request("GET", url, headers=self._headers())
             return StorageResponse(success=True, result=result)
         except Exception as e:
             return StorageResponse(success=False, error=str(e))
@@ -58,7 +57,7 @@ class StorageFileService:
             await self.ensure_folder(folder_name)
             url = f"{self.client.base_url}/api/files/secured/{folder_name}?clientCode={self.client_code}"
             files = {"file": (filename, image_bytes, "image/png")}
-            result = await self.client._request("POST", url, headers=self._headers(), files=files)
+            result = await self.client.request("POST", url, headers=self._headers(), files=files)
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")

@@ -1,6 +1,12 @@
 from typing import Optional
 from fastapi import Header
-from models.business_model import CommonHeaders
+from openai import BaseModel
+
+class CommonHeaders(BaseModel):
+    access_token: str
+    client_code: str
+    x_forwarded_host: Optional[str] = None
+    x_forwarded_port: Optional[str] = None
 
 
 async def get_common_headers(

@@ -65,13 +65,6 @@ class BusinessMetadata(BaseModel):
     }
 
 
-class CommonHeaders(BaseModel):
-    access_token: str
-    client_code: str
-    x_forwarded_host: Optional[str] = None
-    x_forwarded_port: Optional[str] = None
-
-
 class ScreenshotRequest(BaseModel):
     business_url: str
     external_url: Optional[str] = None
@@ -83,19 +76,15 @@ class ScreenshotResponse(BaseModel):
     storage_id: Optional[str]
     screenshot: Optional[str]
 
-
-class AnalyzeRequest(BaseModel):
+class WebsiteSummaryRequest(BaseModel):
     business_url: str
+    external_url: Optional[str] = None
     rescrape: bool = False
 
-class AnalyzeResponse(BaseModel):
-    storage_id: Optional[str] = None
+class WebsiteSummaryResponse(BaseModel):
     business_url: str
+    storage_id: Optional[str] = None
+    external_url: Optional[str] = None 
     business_type: Optional[str] = None
     summary: Optional[str] = None
     final_summary: Optional[str] = None
-
-class ExternalSummaryRequest(BaseModel):
-    business_url: str
-    external_url: str
-    rescrape: bool = False

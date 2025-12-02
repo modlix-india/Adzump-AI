@@ -2,9 +2,9 @@ import os
 import httpx
 import logging
 
-from oserver.models.storage_request_model import StorageReadRequest
+from oserver.models.storage_request_model import StorageFilter, StorageReadRequest
 from oserver.services.connection import fetch_google_api_token_simple
-from oserver.services.storage_service import read_storage_page
+from oserver.services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -83,19 +83,17 @@ async def fetch_ads(
 
             for url in final_urls:
                 final_url = url.rstrip('/') 
-                payload = StorageReadRequest(
-                storageName="AISuggestedData",
-                appCode="marketingai",
-                clientCode=client_code,
-                dataObjectId=final_url,
-                eager=False,
-                eagerFields=[],
-                filter={
-                     "field":"businessUrl",
-                    "value":final_url
-                }
+                storage_service = StorageService(
+                    access_token=access_token,
+                    client_code=client_code
                 )
-                product_summary = await read_storage_page(payload, access_token ,client_code)
+                read_request = StorageReadRequest(
+                    storageName="AISuggestedData",
+                    appCode="marketingai",
+                    clientCode=client_code,
+                    filter=StorageFilter(field="businessUrl", value=final_url),
+                )
+                product_summary = await storage_service.read_page_storage(read_request)
                 summary = ""
                 try:
                     summary = product_summary.result[0]["result"]["result"]["content"][0].get("summary", "")

@@ -75,7 +75,7 @@ async def generate_final_summary(
 
 
     prompt = prompt_loader.format_prompt(
-        "final_summary_prompt.txt",
+        "business/final_summary_prompt.txt",
         website_summary=website_summary,
         external_summary=external_summary,
         assets_summary=assets_summary
