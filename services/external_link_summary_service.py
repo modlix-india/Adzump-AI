@@ -1,7 +1,7 @@
 import json
 import logging
 from fastapi import HTTPException
-from services.business_service import generate_summary
+from services.business_service import generate_website_summary
 from services.scraper_service import scrape_website
 from utils.helpers import normalize_url
 from oserver.models.storage_request_model import (
@@ -92,7 +92,7 @@ async def process_external_link(
         raise HTTPException(500, "Scraper returned empty content for external website")
     # STEP 5: LLM SUMMARY GENERATION
     logger.info(f"[ExternalLink] Generating summary for {external_url}")
-    summary_raw = await generate_summary(scraped_data)
+    summary_raw = await generate_website_summary(scraped_data)
     try:
         parsed = json.loads(summary_raw)
     except:

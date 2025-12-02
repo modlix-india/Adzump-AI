@@ -17,7 +17,7 @@ class StorageFileService:
         self.x_forwarded_host = x_forwarded_host
         self.x_forwarded_port = x_forwarded_port
         self.app_code = "marketingai"
-        self.client = BaseAPIService(base_url=get_base_url())
+        self.client = BaseAPIService()
 
     def _headers(self):
         return {

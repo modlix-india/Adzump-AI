@@ -205,7 +205,7 @@ async def process_website_data(
 
         # STEP 4: GENERATE SUMMARY USING LLM
         logger.info(f"Generating summary for {website_url}")
-        summary_raw = await generate_summary(scraped_data)
+        summary_raw = await generate_website_summary(scraped_data)
 
         try:
             parsed = json.loads(summary_raw)
@@ -302,7 +302,7 @@ async def process_website_data(
         )
 
 
-async def generate_summary(scraped_data: dict) -> str:
+async def generate_website_summary(scraped_data: dict) -> str:
     if not scraped_data:
         raise BusinessValidationException(
             "Scraped data is required for summary generation"

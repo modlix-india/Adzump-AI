@@ -9,43 +9,11 @@ from models.business_model import AnalyzeRequest, AnalyzeResponse, CommonHeaders
 from services.business_service import process_screenshot_flow, process_website_data
 from services.external_link_summary_service import process_external_link
 from services.pdf_service import process_pdf_from_path
-from services.scraper_service import scrape_website
-from services.summary_service import generate_summary
 from utils.response_helpers import error_response, success_response
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
 logger = logging.getLogger(__name__)
 
-
-@router.post("/scrape")
-async def analyze(
-    websiteUrl: str = Body(..., embed=True),
-    access_token: str = Header(..., alias="access-token"),
-    client_code: str = Header(..., alias="clientCode"),
-    x_forwarded_host: str = Header(alias="x-forwarded-host", default=None),
-    x_forwarded_port: str = Header(alias="x-forwarded-port", default=None),
-):
-    try:
-        scraped_data = await scrape_website(
-            websiteUrl,
-            access_token=access_token,
-            client_code=client_code,
-            x_forwarded_host=x_forwarded_host,
-            x_forwarded_port=x_forwarded_port,
-        )
-        response = {
-            "status": "success",
-            "data": {"websiteUrl": websiteUrl, "scrapedData": scraped_data},
-        }
-        return success_response(response)
-    except Exception as e:
-        return error_response(str(e))
-
-
-@router.post("/generate/summary")
-async def generate_summary_endpoint(scrapedData: dict = Body(..., embed=True)):
-    result = await generate_summary(scrapedData)
-    return success_response(result)
 
 
 @router.post("/generate/pdf-summary")
@@ -84,7 +52,7 @@ async def summarize_pdf(
         return error_response(str(e))
 
 
-@router.post("/analyze")
+@router.post("/websiteSummary")
 async def analyze_website(
     payload: AnalyzeRequest = Body(...),
     headers: CommonHeaders = Depends(get_common_headers)

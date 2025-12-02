@@ -79,12 +79,9 @@ class ScreenshotRequest(BaseModel):
 
 
 class ScreenshotResponse(BaseModel):
-    business_url: str
-    external_url: Optional[str] = None
-    retake: bool
-    storage_id: Optional[str] = None
-    business_screenshot_url: Optional[str] = None
-    external_screenshot_url: Optional[str] = None
+    url: str
+    storage_id: Optional[str]
+    screenshot: Optional[str]
 
 
 class AnalyzeRequest(BaseModel):
