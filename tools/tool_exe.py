@@ -1,10 +1,27 @@
+
 import json
-from typing import Tuple
 from pydantic import  ValidationError
+import logging
 
 from services.openai_client import chat_completion
 from models.campaign_data_model import CampaignData
 from utils.helpers import validate_domain_exists
+from typing import Tuple , Optional
+
+
+logger = logging.getLogger(__name__)
+
+# --- ADD THESE HELPERS (NEAR OTHER HELPERS) ---
+
+def safe_args(tool_arguments: Optional[str]) -> dict: 
+    """
+    Safely parse tool_call.function.arguments into a dictionary.
+    Returns {} if JSON is missing or invalid.
+    """
+    try:
+        return json.loads(tool_arguments or "{}")
+    except json.JSONDecodeError:
+        return {}
 
 def model_to_openai_schema(model_class, name, description):
     """Convert Pydantic model to OpenAI function schema."""
@@ -29,8 +46,6 @@ def get_user_friendly_error(error_message: str, field_name: str) -> str:
         return "Could you provide the budget as a number? For example: 5000 or 5k"
     elif field_name == "durationDays":
         return "How many days should the campaign run? For example: 7 or 14"
-    elif field_name == "loginCustomerId":
-        return "Could you provide a valid customer ID? It should be a 10-digit number."
     else:
         return f"Could you please provide a valid {field_name}?"
 
@@ -137,4 +152,4 @@ async def process_tool_call(session: dict, tool_call, response_message) -> Tuple
     if user_messages and not ai_message.strip():
         ai_message = " ".join(user_messages)
     
-    return ai_message, data_was_extracted
+    return ai_message, data_was_extracted, 
