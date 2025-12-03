@@ -69,6 +69,29 @@ async def execute_list_accessible_customers(session: dict, client_code: str) -> 
             return msg
 
         session["mcc_options"] = mccs
+        # If exactly one MCC -> auto-select it and immediately fetch customers
+        if len(mccs) == 1:
+            mcc_account = mccs[0]
+            login_customer_id = mcc_account.get("id")
+            login_customer_name = mcc_account.get("name")
+
+            # Persist selected MCC on campaign data
+            campaign = session.setdefault("campaign_data", {})
+            campaign["loginCustomerId"] = login_customer_id
+
+            # Update status to reflect next step (fetching customers)
+            session["status"] = "selecting_customer"
+
+            info_msg = (
+                f"I found only one manager account associated with your profile:\n"
+                f"- {login_customer_name} ({login_customer_id})\n\n"
+                "I'll select this account automatically and fetch the customer accounts under it."
+            )
+
+            # Fetch customers under this MCC and return combined message
+            customers_msg = await execute_fetch_customer_accounts(session, login_customer_id, client_code) # type: ignore
+            # Prepend info message so user knows why we immediately listed customers
+            return f"{info_msg}\n\n{customers_msg}"
         session["status"] = "selecting_mcc"
 
         formatted_options_text = get_formatted_accounts_string(
@@ -98,6 +121,26 @@ async def execute_fetch_customer_accounts(session: dict, login_customer_id: str,
                     "Please select a different manager from the list above or try again later.")
 
         session["customer_options"] = customer_accounts
+        # Auto-select single customer
+        if len(customer_accounts) == 1:
+            customer_accs = customer_accounts[0]
+            customer_id = customer_accs.get("id")
+            customer_name = customer_accs.get("name")
+
+            # Persist selected customer on campaign data
+            campaign = session.setdefault("campaign_data", {})
+            campaign["customerId"] = customer_id
+
+            #status as in_progress so handler can decide next step (summary or more collection)
+            session["status"] = "in_progress"
+
+            info_msg = (
+                f"I found only one customer account under the manager (MCC) {login_customer_id}:\n"
+                f"- {customer_name} ({customer_id})\n\n"
+                "I've selected this customer automatically and will proceed with the setup."
+            )
+
+            return info_msg
         session["status"] = "selecting_customer"
 
         formatted_options_text = get_formatted_accounts_string(

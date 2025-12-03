@@ -3,7 +3,7 @@ import uuid
 
 from datetime import datetime, timezone
 from fastapi.responses import JSONResponse
-
+import logging
 
 
 from services.openai_client import chat_completion
@@ -126,6 +126,7 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
     response_message = response.choices[0].message
     tool_calls = response_message.tool_calls
     ai_message = response_message.content or ""
+    logging.info(tool_calls)
     
 
     
@@ -284,6 +285,16 @@ async def process_chat(session_id: str, message: str, client_code: str):
         )
 
     session = sessions[session_id]
+
+    #If already completed, just return final data (no model/tool flow)
+    if session.get("status") == "completed":
+        return JSONResponse(
+            content={
+                "status": "completed",
+                "data": session.get("campaign_data", {}),
+                "message": "This campaign session is already completed.",
+            }
+        )
     current_time = datetime.now(timezone.utc)
 
     # Update stored client_code if provided by caller
@@ -309,6 +320,40 @@ async def process_chat(session_id: str, message: str, client_code: str):
         return await handle_confirmation_state(session)
     else:
         return await handle_data_collection_state(session, client_code)
+
+
+
+async def get_basic_details(session_id: str)-> JSONResponse:
+    """Read-only view of a chat session for UI (no model/tool calls)."""
+    if session_id not in sessions:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Invalid or expired session_id"},
+        )
+
+    session = sessions[session_id]
+    collected_data = session.get("campaign_data", {})
+    status = session.get("status", "in_progress")
+    progress = calculate_progress(collected_data)
+
+    
+    if status == "awaiting_confirmation" or status == "completed":
+        payload_collected = collected_data
+    else:
+        trackable_fields = get_trackable_fields(collected_data)
+        payload_collected = trackable_fields if trackable_fields else None
+
+    return JSONResponse(
+        content={
+            "status": status,
+            "data": payload_collected,
+            "progress": progress,
+            "last_activity": session.get("last_activity").isoformat()
+            if session.get("last_activity")
+            else None,
+        }
+    )
+
 
 async def end_session(session_id: str):
     """End and cleanup a chat session."""
