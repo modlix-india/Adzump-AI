@@ -91,6 +91,7 @@ class BusinessService:
             storageName="AISuggestedData",
             appCode="marketingai",
             dataObjectId=data_object_id,
+            clientCode=client_code,
             eager=False,
             eagerFields=[],
         )

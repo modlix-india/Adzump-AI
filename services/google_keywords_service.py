@@ -382,6 +382,8 @@ class GoogleKeywordService:
         client_code: str,
         session_id: str,
         access_token: str,
+        x_forwarded_host: str,
+        x_forwarded_port: str,
     ) -> KeywordResearchResult:
 
         location_ids = keyword_request.location_ids or self.DEFAULT_LOCATION_IDS
@@ -401,6 +403,8 @@ class GoogleKeywordService:
         session = sessions[session_id]
         login_customer_id = session.get(
             "campaign_data", {}).get("loginCustomerId")
+        customer_id = session.get(
+            "campaign_data", {}).get("customerId")
 
         if not login_customer_id:
             raise HTTPException(
@@ -410,8 +414,10 @@ class GoogleKeywordService:
         business_data = await self.business_extractor.fetch_product_details(
             data_object_id=keyword_request.data_object_id,
             access_token=access_token,
-            client_code=client_code)
-        scraped_data = business_data.get("summary", "")
+            client_code=client_code,
+            x_forwarded_host=x_forwarded_host,
+            x_forwarded_port=x_forwarded_port,)
+        scraped_data = business_data.get("finalSummary", "")
         url = business_data.get("businessUrl", "")
 
         # validate we got data
@@ -462,7 +468,7 @@ class GoogleKeywordService:
             logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(
                 seed_keywords))
             all_suggestions = await self.fetch_google_ads_suggestions(
-                customer_id=keyword_request.customer_id,
+                customer_id=customer_id,
                 login_customer_id=login_customer_id,
                 client_code=client_code,
                 seed_keywords=seed_keywords,
@@ -519,6 +525,8 @@ class GoogleKeywordService:
         keyword_request: GoogleNegativeKwReq,
         client_code: str,
         access_token: str,
+        x_forwarded_host: str,
+        x_forwarded_port: str,
     ) -> List[NegativeKeyword]:
 
         data_object_id = keyword_request.data_object_id
@@ -529,9 +537,11 @@ class GoogleKeywordService:
             business_data = await self.business_extractor.fetch_product_details(
                 data_object_id=data_object_id,
                 access_token=access_token,
-                client_code=client_code
+                client_code=client_code,
+                x_forwarded_host=x_forwarded_host,
+                x_forwarded_port=x_forwarded_port,
             )
-            scraped_data = business_data.get("summary", "")
+            scraped_data = business_data.get("finalSummary", "")
             url = business_data.get("businessUrl", "")
 
             # Validate we got data
