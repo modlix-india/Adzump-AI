@@ -137,7 +137,6 @@ class NegativeKeywordResponse(BaseModel):
 
 # SERVICE REQUEST/RESPONSE MODELS  
 class KeywordResearchRequest(BaseModel):
-    customer_id: str = Field(..., description="Google Ads customer ID")
     data_object_id:str = Field(..., description="Data object ID")
     keyword_type: KeywordType = Field(default=KeywordType.GENERIC, description="Type of keywords to generate")
     location_ids: List[str] = Field(default_factory=lambda: ["geoTargetConstants/2840"], description="Target location IDs")
@@ -148,7 +147,6 @@ class KeywordResearchRequest(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "customer_id": "1234567890",
                 "data_object_id": "abc123xyz", 
                 "keyword_type": "brand",
                 "location_ids": ["geoTargetConstants/2356"],

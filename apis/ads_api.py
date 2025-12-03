@@ -44,6 +44,8 @@ async def gks_positive(
     client_code: str = Header(..., alias="clientCode"),
     session_id: str = Header(..., alias="sessionId"),
     access_token: str = Header(..., alias="access-token"),
+    x_forwarded_host: str = Header(..., alias="x-forwarded-host"),
+    x_forwarded_port: str = Header(..., alias="x-forwarded-port")
 ):
     try:
         positives = await gks.extract_positive_strategy(
@@ -51,6 +53,8 @@ async def gks_positive(
             client_code=client_code,
             session_id=session_id,
             access_token=access_token,
+            x_forwarded_host=x_forwarded_host,
+            x_forwarded_port=x_forwarded_port
         )
         return {"status": "success", "data": positives}
     except Exception as e:
@@ -62,12 +66,16 @@ async def gks_negative(
     google_keyword_request: GoogleNegativeKwReq,
     client_code: str = Header(..., alias="clientCode"),
     access_token: str = Header(..., alias="access-token"),
+    x_forwarded_host: str = Header(..., alias="x-forwarded-host"),
+    x_forwarded_port: str = Header(..., alias="x-forwarded-port")
 ):
     try:
         negatives = await gks.extract_negative_strategy(
             keyword_request=google_keyword_request,
             client_code=client_code,
             access_token=access_token,
+            x_forwarded_host=x_forwarded_host,
+            x_forwarded_port=x_forwarded_port
         )
         return {
             "status": "success",
