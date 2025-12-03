@@ -95,7 +95,7 @@ def chunk_text(text: str, max_chars=3000) -> list[str]:
 async def summarize_chunk(chunk: str) -> str:
     logger.info(f"[PDF-Chunk] Summarizing chunk length={len(chunk)}")
 
-    prompt = prompt_loader.format_prompt("pdf_chunk_summary.txt", text=chunk)
+    prompt = prompt_loader.format_prompt("business/pdf_chunk_summary.txt", text=chunk)
 
     response = await chat_completion(
         messages=[{"role": "user", "content": prompt}],
@@ -119,7 +119,7 @@ async def merge_summaries(summaries: list[str]) -> str:
     combined = "\n".join(summaries)
     logger.debug(f"[PDF-Merge] Combined text length before merge={len(combined)}")
 
-    prompt = prompt_loader.format_prompt("pdf_merge_summary.txt", summaries=combined)
+    prompt = prompt_loader.format_prompt("business/pdf_merge_summary.txt", summaries=combined)
 
     response = await chat_completion(
         messages=[{"role": "user", "content": prompt}],
