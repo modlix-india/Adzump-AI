@@ -13,17 +13,21 @@ ASSET_SERVICE_MAP = {
     "CALLOUTS": CalloutsService.generate,
     "SITE_LINKS": SitelinksService.generate,
     "STRUCTURED_SNIPPETS": StructuredSnippetsService.generate,
-    "CALL_ASSETS": CallAssetsService.generate
+    "CALL_ASSETS": CallAssetsService.generate,
 }
 
+
 @router.post("/generate", response_model=AssetResponse)
-async def generate_asset(request: AssetRequest,access_token: str = Header(...),clientCode: str = Header(...)):
+async def generate_asset(
+    request: AssetRequest,
+    access_token: str = Header(...),
+    clientCode: str = Header(...),
+):
     results = {}
     invalid_assets = [a for a in request.asset_type if a not in ASSET_SERVICE_MAP]
     if invalid_assets:
         raise HTTPException(
-            status_code=400,
-            detail=f"Invalid asset types: {', '.join(invalid_assets)}"
+            status_code=400, detail=f"Invalid asset types: {', '.join(invalid_assets)}"
         )
     try:
         tasks = [
@@ -31,7 +35,7 @@ async def generate_asset(request: AssetRequest,access_token: str = Header(...),c
             for asset in request.asset_type
         ]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
-        for asset, response in zip(request.asset_type, responses): 
+        for asset, response in zip(request.asset_type, responses):
             if isinstance(response, Exception):
                 results[asset] = {"success": False, "error": str(response)}
             else:
