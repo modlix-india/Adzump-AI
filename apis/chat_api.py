@@ -18,6 +18,3 @@ async def chat(session_id: str, message: str, clientCode: str = Query(...)):
 async def end_session(session_id: str):
     return await chat_service.end_session(session_id)
 
-@router.get("/session/{session_id}")
-async def get_session(session_id: str):
-    return await chat_service.get_session_data(session_id)

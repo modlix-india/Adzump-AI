@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi.responses import JSONResponse
 import logging
 
+
 from services.openai_client import chat_completion
 from services.session_manager import sessions, SESSION_TIMEOUT
 from utils.prompt_loader import load_prompt
@@ -322,7 +323,7 @@ async def process_chat(session_id: str, message: str, client_code: str):
 
 
 
-async def get_session_data(session_id: str):
+async def get_basic_details(session_id: str)-> JSONResponse:
     """Read-only view of a chat session for UI (no model/tool calls)."""
     if session_id not in sessions:
         return JSONResponse(

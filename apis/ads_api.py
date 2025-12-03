@@ -13,7 +13,8 @@ from models.keyword_model import (
 )
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
-from services import create_campaign_service
+from services import create_campaign_service ,chat_service
+
 
 
 
@@ -159,3 +160,7 @@ async def generate_campaign(
     except Exception as e:
         # unexpected errors
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    
+@router.get("/get-basic-details/{session_id}")
+async def get_session(session_id: str):
+    return await chat_service.get_basic_details(session_id)
