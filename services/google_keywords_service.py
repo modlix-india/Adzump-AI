@@ -403,6 +403,8 @@ class GoogleKeywordService:
         session = sessions[session_id]
         login_customer_id = session.get(
             "campaign_data", {}).get("loginCustomerId")
+        customer_id = session.get(
+            "campaign_data", {}).get("customerId")
 
         if not login_customer_id:
             raise HTTPException(
@@ -466,7 +468,7 @@ class GoogleKeywordService:
             logger.info("STEP 3: Getting Google Ads suggestions for %d strategic seeds", len(
                 seed_keywords))
             all_suggestions = await self.fetch_google_ads_suggestions(
-                customer_id=keyword_request.customer_id,
+                customer_id=customer_id,
                 login_customer_id=login_customer_id,
                 client_code=client_code,
                 seed_keywords=seed_keywords,
