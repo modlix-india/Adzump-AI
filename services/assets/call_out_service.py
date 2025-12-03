@@ -1,12 +1,13 @@
 from fastapi import HTTPException
 from services.assets.base_asset_service import BaseAssetService
+from services.business_service import BusinessService
 
 
 class CalloutsService(BaseAssetService):
     
     @staticmethod
     async def generate(data_object_id: str, access_token: str, client_code: str):
-        product_data = await BaseAssetService.fetch_product_details(data_object_id, access_token, client_code)
+        product_data = await BusinessService.fetch_product_details(data_object_id, access_token, client_code)
         summary = product_data.get("summary", "")
 
         if not summary:
@@ -16,4 +17,10 @@ class CalloutsService(BaseAssetService):
             "callouts_prompt.txt", {"summary": summary}
         )
 
-        return [{"callout_text": c[:25]} for c in callouts if isinstance(c, str) and c.strip()]
+        valid_callouts = [
+            {"callout_text": c}
+            for c in callouts
+            if isinstance(c, str) and len(c) <= 25
+        ]
+
+        return valid_callouts

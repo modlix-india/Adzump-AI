@@ -4,9 +4,7 @@ import json
 from typing import List,Dict,Set
 from utils.text_utils import normalize_text
 from models.keyword_model import ( 
-    KeywordSuggestion, 
     OptimizedKeyword,
-    MatchType, 
     NegativeKeyword,
 )
 
@@ -43,41 +41,6 @@ class KeywordUtils:
                 seen.add(k)
         return normalized[:limit]
 
-    @staticmethod
-    def create_distributed_keywords(
-        suggestions: List[KeywordSuggestion],
-        rationale: str = "Distributed selection"
-    ) -> List[OptimizedKeyword]:
-        """Create keywords with 10/70/20 match type distribution.
-            - 10% BROAD (first 10%)
-            - 70% PHRASE (next 70%)
-            - 20% EXACT (last 20%)
-        """
-        optimized_keywords = []
-        total = len(suggestions)
-
-        for i, suggestion in enumerate(suggestions):
-            ratio = (i + 1) / total if total > 0 else 0
-            
-            if ratio <= 0.10:
-                match_type = MatchType.BROAD
-            elif ratio <= 0.80:
-                match_type = MatchType.PHRASE
-            else:
-                match_type = MatchType.EXACT
-
-            optimized = OptimizedKeyword(
-                keyword=suggestion.keyword,
-                volume=suggestion.volume,
-                competition=suggestion.competition,
-                competitionIndex=suggestion.competitionIndex,
-                match_type=match_type,
-                rationale=rationale,
-                is_cross_business=False
-            )
-            optimized_keywords.append(optimized)
-
-        return optimized_keywords
     
     @staticmethod
     def filter_and_validate_negatives(

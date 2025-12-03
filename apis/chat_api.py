@@ -14,6 +14,7 @@ async def chat(session_id: str, message: str, clientCode: str = Query(...)):
     return await chat_service.process_chat(session_id, message, clientCode)
 
 
+
 @router.post("/end-session/{session_id}")
 async def end_session(session_id: str):
     return await chat_service.end_session(session_id)

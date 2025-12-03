@@ -10,9 +10,7 @@ import time
 from datetime import datetime
 from typing import Dict, Any
 from colorama import init, Fore, Style
-from dotenv import load_dotenv
 
-load_dotenv()
 
 # Initialize colorama for colored output
 init(autoreset=True)

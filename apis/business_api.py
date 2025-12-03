@@ -1,60 +1,120 @@
-
 import os
 import tempfile
-import requests
-from fastapi import APIRouter, HTTPException, Header, Body
+import logging
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Header, Body
+from dependencies.header_dependencies import CommonHeaders, get_common_headers
+from exceptions.custom_exceptions import BaseAppException
+from models.business_model import  ScreenshotRequest, WebsiteSummaryRequest
+from services.business_service import process_website_data
+from services.external_link_summary_service import process_external_link
 from services.pdf_service import process_pdf_from_path
-from services.scraper_service import scrape_website
-from services.summary import make_readable
+from services.screenshot_service import ScreenshotService
 from utils.response_helpers import error_response, success_response
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
+logger = logging.getLogger(__name__)
 
-@router.post("/scrape")
-async def analyze_website(websiteUrl: str = Body(..., embed=True),access_token: str = Header(..., alias="access-token"),
-    client_code: str = Header(..., alias="clientCode"),):
+
+@router.post("/screenshot")
+async def take_screenshot(
+    payload: ScreenshotRequest = Body(...),
+    headers: CommonHeaders = Depends(get_common_headers),
+):
     try:
-        scraped_data = await scrape_website(websiteUrl,access_token=access_token,
-            client_code=client_code)
-        response = {
-            "status": "success",
-            "data": {
-                "websiteUrl": websiteUrl,
-                "scrapedData": scraped_data
-            }
-        }
-        return success_response(response)
+        service = ScreenshotService(
+            access_token=headers.access_token,
+            client_code=headers.client_code,
+            xh=headers.x_forwarded_host,
+            xp=headers.x_forwarded_port,
+        )
+        target_url = payload.external_url or payload.business_url
+        result = await service.process(
+            business_url=payload.business_url,
+            url=target_url,
+            retake=payload.retake,
+        )
+        return success_response(result.model_dump())
+    except BaseAppException as e:
+        return error_response(e.message, status_code=e.status_code)
     except Exception as e:
-        return error_response(str(e))
-    
+        return error_response(f"Unexpected error: {e}")
 
-@router.post("/generate/summary")
-async def make_readable_endpoint(scrapedData: dict = Body(..., embed=True)):
+@router.post("/websiteSummary")
+async def analyze_website(
+    payload: WebsiteSummaryRequest = Body(...),
+    headers: CommonHeaders = Depends(get_common_headers)
+):
     try:
-        result = await make_readable(scrapedData)
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-        return success_response(result)
+        result = await process_website_data(
+            website_url=payload.business_url,
+            rescrape=payload.rescrape,
+            access_token=headers.access_token,
+            client_code=headers.client_code,
+            x_forwarded_host=headers.x_forwarded_host,
+            x_forwarded_port=headers.x_forwarded_port,
+        )
+        return success_response(result.model_dump())
+    except BaseAppException as e:
+        return error_response(e.message, e.status_code)
     except Exception as e:
-        return error_response(str(e))
+        logger.exception(f"[AnalyzeController] Unexpected error: {e}")
+        return error_response("Unexpected error while analyzing website")
 
+
+@router.post("/generate/external-summary")
+async def generate_external_summary(
+    payload: WebsiteSummaryRequest = Body(...),
+    headers: CommonHeaders = Depends(get_common_headers)
+):
+    try:
+        result = await process_external_link(
+            external_url=payload.external_url,
+            business_url=payload.business_url,
+            rescrape=payload.rescrape,
+            access_token=headers.access_token,
+            client_code=headers.client_code,
+            x_forwarded_host=headers.x_forwarded_host,
+            x_forwarded_port=headers.x_forwarded_port,
+        )
+        return success_response(result.model_dump())
+    except BaseAppException as e:
+        return error_response(e.message, e.status_code)
+    except Exception as e:
+        logger.exception(f"[ExternalSummaryController] Unexpected error: {e}")
+        return error_response("Unexpected error while generating external summary")
 
 @router.post("/generate/pdf-summary")
-async def summarize_pdf(pdf_url: str = Body(..., embed=True)):
+async def summarize_pdf(
+    pdf_url: str = Body(..., embed=True),
+    business_url: str = Body(..., embed=True),
+    access_token: str = Header(..., alias="access-token"),
+    client_code: str = Header(..., alias="clientCode"),
+    x_forwarded_host: str = Header(alias="x-forwarded-host", default=None),
+    x_forwarded_port: str = Header(alias="x-forwarded-port", default=None),
+):
     try:
-        # Download PDF from given URL
-        response = requests.get(pdf_url, stream=True)
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Could not download PDF")
-        # Save to temp file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            for chunk in response.iter_content(chunk_size=8192):
-                tmp_file.write(chunk)
-            tmp_file_path = tmp_file.name
-        # Process PDF
-        result = process_pdf_from_path(tmp_file_path, pdf_url)
-        # Cleanup
-        os.remove(tmp_file_path)
+        # 1. Download PDF using async
+        async with httpx.AsyncClient() as client:
+            response = await client.get(pdf_url)
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Could not download PDF")
+        # 2. Save to temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(response.content)
+            file_path = tmp.name
+        # 3. Process PDF (async)
+        result = await process_pdf_from_path(
+            file_path=file_path,
+            source_url=pdf_url,
+            business_url=business_url,
+            access_token=access_token,
+            client_code=client_code,
+            x_forwarded_host=x_forwarded_host,
+            x_forwarded_port=x_forwarded_port,
+        )
+        # 4. Cleanup temp file
+        os.remove(file_path)
         return success_response(result)
     except Exception as e:
         return error_response(str(e))

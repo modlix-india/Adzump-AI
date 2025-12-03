@@ -1,93 +1,65 @@
+from typing import Optional
 import httpx
+from oserver.services.base_api_service import BaseAPIService
 from oserver.models.storage_response_model import StorageResponse
-from oserver.utils.helpers import get_base_url
 
+class StorageFileService:
+    def __init__(
+        self,
+        access_token: str,
+        client_code: str,
+        x_forwarded_host: Optional[str] = None,
+        x_forwarded_port: Optional[str] = None,
+    ):
+        self.access_token = access_token
+        self.client_code = client_code
+        self.x_forwarded_host = x_forwarded_host
+        self.x_forwarded_port = x_forwarded_port
+        self.app_code = "marketingai"
+        self.client = BaseAPIService()
 
-async def create_folder(folder_name: str, access_token: str, client_code: str) -> StorageResponse:
-    base = get_base_url()
-    url = f"{base}/api/files/secured/directory/{folder_name}"
+    def _headers(self):
+        return {
+            "accept": "application/json",
+            "Authorization": self.access_token,
+            "ClientCode": self.client_code,
+            "AppCode": self.app_code,
+            "X-Forwarded-Host": self.x_forwarded_host or "",
+            "X-Forwarded-Port": self.x_forwarded_port or "",
+        }
 
-    headers = {
-        "accept": "application/json",
-        "Authorization": access_token,
-        "ClientCode": client_code,
-        "AppCode": "marketingai"
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, headers=headers)
-            response.raise_for_status()
-            return StorageResponse(success=True, result=response.json())
-    except httpx.RequestError as e:
-        return StorageResponse(success=False, error=str(e))
-    except httpx.HTTPStatusError as e:
-        return StorageResponse(success=False, error=f"HTTP error: {str(e)}")
-    
+    async def create_folder(self, folder_name: str) -> StorageResponse:
+        url = f"{self.client.base_url}/api/files/secured/directory/{folder_name}"
+        try:
+            result = await self.client.request("POST", url, headers=self._headers())
+            return StorageResponse(success=True, result=result)
+        except Exception as e:
+            return StorageResponse(success=False, error=str(e))
 
-async def get_folder(folder_name: str, access_token: str, client_code: str) -> StorageResponse:
-    base = get_base_url()
-    url = f"{base}/api/files/secured/{folder_name}"
+    async def get_folder(self, folder_name: str) -> StorageResponse:
+        url = f"{self.client.base_url}/api/files/secured/{folder_name}"
+        try:
+            result = await self.client.request("GET", url, headers=self._headers())
+            return StorageResponse(success=True, result=result)
+        except Exception as e:
+            return StorageResponse(success=False, error=str(e))
 
-    headers = {
-        "accept": "application/json",
-        "Authorization": access_token,
-        "ClientCode": client_code,
-        "AppCode": "marketingai"
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            return StorageResponse(success=True, result=response.json())
-    except httpx.RequestError as e:
-        return StorageResponse(success=False, error=str(e))
-    except httpx.HTTPStatusError as e:
-        return StorageResponse(success=False, error=f"HTTP error: {str(e)}")
-    
-
-async def upload_file(
-    image_bytes: bytes,
-    filename: str,
-    folder_name: str,
-    client_code: str,
-    access_token: str
-) -> StorageResponse:
-    
-    base = get_base_url()
-    url = f"{base}/api/files/secured/{folder_name}?clientCode={client_code}"
-    headers = {
-        "accept": "application/json",
-        "Authorization": access_token,
-        "ClientCode": client_code,
-        "AppCode": "marketingai"
-    }
-    files = {
-        "file": (filename, image_bytes, "image/png"),
-    }    
-    folder_ok = await ensure_folder(folder_name, access_token, client_code)
-    print("Folder check/create status:", folder_ok)
-    if not folder_ok:
-        raise Exception(f"Folder '{folder_name}' does not exist and could not be created")
-
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url, headers=headers, files=files)
-            print("Upload response status code:", response)
-            response.raise_for_status()
-            data = response.json()
-            print("Upload response data:", data)
-            return StorageResponse(success=True, result=data)
-    except httpx.RequestError as e:
-        return StorageResponse(success=False, error=str(e))
-    except httpx.HTTPStatusError as e:
-        return StorageResponse(success=False, error=f"HTTP error: {str(e)}")
-
-
-async def ensure_folder(folder_name: str, access_token: str, client_code: str) -> bool:
-        folder_resp = await get_folder(folder_name, access_token, client_code)
-        if folder_resp.success and folder_resp.result:
+    async def ensure_folder(self, folder_name: str) -> bool:
+        get_resp = await self.get_folder(folder_name)
+        if get_resp.success:
             return True
 
-        create_resp = await create_folder(folder_name, access_token, client_code)
+        create_resp = await self.create_folder(folder_name)
         return create_resp.success
+
+    async def upload_file(self, image_bytes: bytes, filename: str, folder_name: str) -> StorageResponse:
+        try:
+            await self.ensure_folder(folder_name)
+            url = f"{self.client.base_url}/api/files/secured/{folder_name}?clientCode={self.client_code}"
+            files = {"file": (filename, image_bytes, "image/png")}
+            result = await self.client.request("POST", url, headers=self._headers(), files=files)
+            return StorageResponse(success=True, result=result)
+        except httpx.RequestError as e:
+            return StorageResponse(success=False, error=f"Network error: {str(e)}")
+        except Exception as e:
+            return StorageResponse(success=False, error=f"Unexpected error: {str(e)}")
