@@ -617,7 +617,7 @@ When both MCC and Customer are confirmed:
 **Example 1: Budget extraction**
 User: "5k"
 Assistant Action: Call save_campaign_data({{ "budget": "5k" }})
-Assistant Response: "Perfect! Budget of ₹5,000 set. What's your business name?"
+Assistant Response: "Perfect! daily Budget of ₹5,000 set. What's your business name?"
 
 **Example 2: All at once**
 User: "I run TechCorp, techcorp.com, 10k budget, 2 weeks"

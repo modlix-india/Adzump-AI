@@ -80,19 +80,25 @@ Example: If brand = "Valmark Cityville", first keyword should be "valmark cityvi
 <priority_order>
 After mandatory first keyword, prioritize in this order:
 
-**1. High-Volume Simple Brand Terms** (volume ≥ 10, 2-4 words)
+**1. Brand Name Variations (Critical)**
+- Variations of the brand name (e.g., "subha terra tones", "subha white waters")
+- **For long brands (4+ words)**: ALSO include standalone partials (e.g., "white waters", "terra tones")
+- **Select these REGARDLESS of volume** (even if 0 or low volume)
+- These are the core assets we must protect.
 
-**2. Brand + Service Area Combinations**
+**2. High-Volume Brand Terms** (volume ≥ 10, 2-4 words)
+
+**3. Brand + Service Area Combinations**
 - ONLY select keywords with locations from {service_areas}
 - EXCLUDE keywords with locations NOT in {service_areas}
 
-**3. Brand + Intent Keywords**
+**4. Brand + Intent Keywords**
 - Reviews, contact, price, booking, appointment, etc.
 
-**4. Brand Misspellings**
+**5. Brand Misspellings**
 - Common typos of brand name components
 
-**5. Zero-Volume Brand Protection**
+**6. Zero-Volume Brand Protection**
 - Simple 2-4 word brand keywords
 </priority_order>
 

@@ -8,7 +8,8 @@ from services.create_campaign_service import CampaignServiceError
 from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
-from services import create_campaign_service
+from services import create_campaign_service ,chat_service
+
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -160,3 +161,7 @@ async def analyze_search_terms_route(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/get-basic-details/{session_id}")
+async def get_session(session_id: str):
+    return await chat_service.get_basic_details(session_id)

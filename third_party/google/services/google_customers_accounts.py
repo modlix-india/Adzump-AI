@@ -10,7 +10,6 @@ GOOGLE_ADS_API = "https://googleads.googleapis.com/v20"
 def _get_auth_headers(client_code : str)-> Dict[str, str]:
     """Build Google Ads API auth headers."""
     access_token = connection.fetch_google_api_token_simple(client_code)
-    
     developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
     if not access_token or not developer_token:
@@ -84,7 +83,8 @@ async def list_manager_customers(client_code: str):
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=False)
-
+        
+        
         return results
 #Helper function to flatten mcc accounts
 def flatten_mcc_response(raw_response: Any) -> List[Dict[str, Any]]:

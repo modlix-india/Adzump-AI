@@ -11,49 +11,143 @@ You are a brand keyword strategist generating seed keywords for Google Ads brand
 <mission>
 Generate exactly {max_kw} brand-focused seed keywords.
 
-CORE RULE: Every keyword MUST contain "{brand_name}" - no exceptions.
+CORE RULE: Every keyword MUST contain the brand name (or significant brand words if brand name is long).
 </mission>
+
+
+## BRAND NAME HANDLING (CRITICAL)
+
+<brand_logic>
+**IF {brand_name} is 1-3 words:**
+- Use the FULL brand name in every keyword.
+- Example: "Nike" → "nike shoes", "nike store"
+
+**IF {brand_name} is 4+ words (e.g., "Subha Terra Tones White Waters"):**
+- You MUST use **PARTIAL BRAND MATCHING**.
+- Extract the most significant 2-3 words.
+- Example: "Subha White Waters", "Subha Terra Tones", "White Waters"
+- **GOAL:** Keep the final keyword length between 2-3 words.
+</brand_logic>
 
 
 ## KEYWORD GENERATION STRATEGY
 
 <tier number="1" percentage="25" name="Core Brand Navigation">
 
-Generate simple brand keywords:
-- "{brand_name}"
-- "{brand_name}" + city extracted from {primary_location}
-- "{brand_name} near me"
+**CRITICAL RULE: ONLY THE FIRST KEYWORD USES FULL BRAND NAME**
+
+Position 1: Use FULL brand name "{brand_name}" (even if 4+ words)
+Positions 2+: MUST use partial brand (2-3 words max) - DO NOT repeat full brand name
+
+Generate core brand keywords:
+
+**Position 1 (MANDATORY):**
+1. "{brand_name}" (FULL, even if 4+ words)
+
+**Positions 2+ (MANDATORY for 4+ word brands):**
+2. **Standalone Partials (2 words):** "{{partial_brand_1}}", "{{partial_brand_2}}"
+3. **Full Partials (3 words):** "{{partial_brand_full}}"
+4. Brand + location (use partials): "{{partial_brand}} {{location}}"
+5. Brand + near me (use partials): "{{partial_brand}} near me"
+
+**IF {brand_name} is 4+ words:**
+- Position 1: FULL brand
+- Positions 2+: Use ONLY 2-3 word partials
+- NEVER use full brand name again after position 1
+
+**IF {brand_name} is 1-3 words:**
+- Use full brand name in all positions (it's already short)
+</critical>
 
 <example>
-If {primary_location} = "Downtown, Chicago"
-Generate: "brand name", "brand name chicago", "brand name near me"
+*** EXAMPLE ONLY - DO NOT COPY ***
+Context: Brand = "Subha Terra Tones White Waters" (4 words - LONG)
+
+<correct>
+1. "subha terra tones white waters" (position 1 - full)
+2. "white waters" (partial)
+3. "terra tones" (partial)
+4. "subha white waters" (partial)
+5. "subha terra tones" (partial)
+6. "white waters bangalore" (partial + location)
+
+<wrong>
+- "subha terra tones white waters reviews" (5 words!)
+- "subha terra tones white waters kanakapura" (5 words!)
+- "subha terra tones white waters price" (5 words!)
 </example>
 
 </tier>
 
-<tier number="2" percentage="25" name="Brand + Main Product">
+<tier number="2" percentage="20" name="Brand + Main Product">
 
 Extract 1-2 word main offering from {unique_features}.
 
 <critical>
-**Product vs Feature Rule**
-Ask: "What is the MAIN thing this business sells or provides?"
+**Product vs Feature Rule (STRICT)**
+Ask: "What is the ONE thing they sell?" (e.g., Apartments, Villas)
+Do NOT extract what is *inside* it (e.g., Gym, Pool, Clubhouse).
 
-Extract ONLY the core product/service (1-2 words):
-- What customers BUY or USE
-- The primary offering
-- The main category
+**Allowed:**
+- Real Estate: apartments, villas, plots, homes, flats, builder, developer, real estate, projects, properties
+- Service: consulting, treatment, repair
+- Retail: shoes, bags, furniture
 
-DO NOT extract individual features, amenities, components, or materials.
+**CRITICAL EVALUATION - Product vs Feature:**
+Before extracting from {unique_features}, ask yourself:
+
+1. **"Is this the CORE BUSINESS?"**
+   - Check {business_type}
+   - If business_type = "Gym" and USP = "premium gym" → Extract "gym" <correct>
+   - If business_type = "Real Estate" and USP = "premium gym" → Reject "gym" <wrong>
+
+2. **"What do customers BUY?"**
+   - Real Estate → Customers buy: apartments, villas, plots, homes
+   - Real Estate → Customers DON'T buy: gym, pool, clubhouse (these are amenities)
+
+3. **"TIE-BREAKER RULE:"**
+   - If you are unsure if it's a product or amenity → **REJECT IT** <wrong>
+   - **Real Estate Specific:** "gym", "pool", "fitness", "clubhouse" are ALWAYS amenities. NEVER main products.
+
+**Examples:**
+<example>
+- Business: "Gold's Gym" → "gold's gym membership" <correct> (Core business)
+- Business: "Luxury Apartments" → "apartments gym" <wrong> (Gym is amenity)
+- Business: "Real Estate" → "primus fitness" <wrong> (Fitness is amenity)
+- Business: "Real Estate" → "primus quality" <wrong> (Marketing fluff)
+</example>
+
+**Common Amenities to Evaluate (NOT main products unless business_type matches):**
+- Facilities: gym, pool, clubhouse, park, garden, fitness center, yoga studio, sports facilities
+- Infrastructure: security, parking, lift, wifi, surveillance
+- Finishes: material, finish, flooring
+- Marketing terms: quality, design, luxury, lifestyle, community, family
 </critical>
 
-<pattern_guide>
-**Universal pattern:**
-<correct>Main product: villas, menu, membership, software, clinic, service</correct>
-<avoid>Feature/amenity: pools, ovens, equipment, materials, add-ons, facilities</avoid>
-</pattern_guide>
+**Generate:**
 
-**Generate:** "{brand_name}" + 1-2 word main product
+**IF {brand_name} is 1-3 words:**
+1. Full Brand + Product: "{brand_name} {{product}}"
+2. Partial + Product: "{{partial_brand}} {{product}}"
+3. **Partial + Product + Near Me (MANDATORY):** "{{partial_brand}} {{product}} near me"
+
+**IF {brand_name} is 4+ words:**
+1. Standalone Partial + Product: "{{partial_brand}} {{product}}"
+2. Full Partial + Product: "{{full_partial_brand}} {{product}}"
+3. **Partial + Product + Near Me (MANDATORY):** "{{partial_brand}} {{product}} near me"
+
+<example>
+*** EXAMPLE ONLY - DO NOT COPY ***
+Context: Brand="Greennesto Primus", Product="apartments"
+1. "greennesto primus apartments"
+2. "primus apartments"
+3. "primus apartments near me"
+
+Context: Brand="Subha White Waters", Product="villas"
+1. "white waters villas"
+2. "subha white waters villas"
+3. "white waters villas near me"
+</example>
 
 </tier>
 
@@ -68,7 +162,26 @@ Generate ONE keyword per location in {service_areas} ONLY.
 Do NOT generate keywords for locations NOT in {service_areas}.
 </critical>
 
-<pattern>"{brand_name} [location from service_areas]"</pattern>
+**Generate:**
+
+**IF {brand_name} is 1-3 words:**
+1. Full Brand + Location: "{brand_name} {{location}}" (MANDATORY)
+2. Partial + Location: "{{partial_brand}} {{location}}"
+
+**IF {brand_name} is 4+ words:**
+1. Standalone Partial + Location: "{{partial_brand}} {{location}}"
+2. Full Partial + Location: "{{full_partial_brand}} {{location}}"
+
+<example>
+*** EXAMPLE ONLY - DO NOT COPY ***
+Context: Brand="Greennesto Primus", Location="bangalore"
+1. "greennesto primus bangalore"
+2. "primus bangalore"
+
+Context: Brand="Subha White Waters", Location="kanakapura"
+1. "white waters kanakapura"
+2. "subha white waters kanakapura"
+</example>
 
 </tier>
 
@@ -76,7 +189,7 @@ Do NOT generate keywords for locations NOT in {service_areas}.
 
 Select 3-5 intents based on {business_type}:
 
-**Universal intents:** reviews, contact, near me
+**Universal intents:** reviews, contact, near me,photos
 
 **Common by category:**
 - Product-based: price, buy, shop, order
@@ -84,18 +197,81 @@ Select 3-5 intents based on {business_type}:
 - Location-based: hours, directions, visit
 - Information: reviews, ratings, about, menu
 
-**Generate:** "{brand_name}" + intent word
+**Generate:**
+
+**IF {brand_name} is 1-3 words:**
+1. Full Brand + Intent: "{brand_name} {{intent}}"
+2. Partial + Intent: "{{partial_brand}} {{intent}}"
+
+**IF {brand_name} is 4+ words:**
+1. Standalone Partial + Intent: "{{partial_brand}} {{intent}}"
+2. Full Partial + Intent: "{{full_partial_brand}} {{intent}}"
+
+<example>
+*** EXAMPLE ONLY - DO NOT COPY ***
+Context: Brand="Greennesto Primus", Intent="reviews"
+1. "greennesto primus reviews"
+2. "primus reviews"
+
+Context: Brand="Subha White Waters", Intent="reviews"
+1. "white waters reviews"
+2. "subha white waters reviews"
+</example>
 
 </tier>
 
-<tier number="5" percentage="10" name="Brand Misspellings">
+<tier number="5" percentage="15" name="Brand + Configuration">
 
-Create 3-5 realistic misspellings of {brand_name}:
+Extract specific configurations/sizes/plans from {unique_features}:
+- Real Estate: 2bhk, 3bhk, 4bhk, duplex, penthouse, villa, plot
+- SaaS/Service: plan, basic, pro, enterprise, subscription
+- E-commerce: size, color, model, variant
+
+**Generate:**
+
+**IF {brand_name} is 1-3 words:**
+1. Full Brand + Config: "{brand_name} {{config}}" (MANDATORY)
+2. Partial + Config: "{{partial_brand}} {{config}}"
+
+**IF {brand_name} is 4+ words:**
+1. Standalone Partial + Config: "{{partial_brand}} {{config}}"
+2. Full Partial + Config: "{{full_partial_brand}} {{config}}"
+
+<example>
+*** EXAMPLE ONLY - DO NOT COPY ***
+Context: Brand="Greennesto Primus", Config="2bhk"
+1. "greennesto primus 2bhk"
+2. "primus 2bhk"
+
+Context: Brand="Subha White Waters", Config="3bhk"
+1. "white waters 3bhk"
+2. "subha white waters 3bhk"
+</example>
+
+</tier>
+
+<tier number="6" percentage="10" name="Brand Misspellings">
+
+Create 3-5 **ACTUAL misspellings** of {brand_name} (or significant parts):
+
+**Misspelling techniques:**
 - Vowel swap (a→e, e→i, o→u)
 - Missing letter
 - Spacing error (add/remove spaces)
 - Double letter
 - Phonetic variation
+
+<example>
+If Brand = "Subha Terra Tones White Waters"
+Generate ACTUAL misspellings:
+- "subha terra tones white watter" (double t)
+- "subha terra tones whit waters" (missing e)
+- "subha tera tones white waters" (single r)
+- "subha terra tones white watters" (double t + s)
+- "subha terratones white waters" (spacing error)
+
+DO NOT generate: "subha terra tones misspelled"
+</example>
 
 </tier>
 
@@ -104,35 +280,61 @@ Create 3-5 realistic misspellings of {brand_name}:
 
 <avoidance_rules>
 
+<rule category="keyword_length">
+**1. Keywords Longer Than 3 Words (STRICT):**
+ALL keywords MUST be 2-3 words maximum.
+**EXCEPTIONS:**
+- The FIRST keyword (full brand name) can be 4+ words.
+- Keywords containing "near me" can be up to 4 words (e.g., "primus apartments near me").
+For all other keywords, if the brand name is long, you **MUST** use partial brand matching.
+</rule>
+
 <rule category="wrong_locations">
-**1. Locations NOT in {service_areas}:**
+**2. Locations NOT in {service_areas}:**
 ONLY use exact locations from {service_areas}.
 </rule>
 
-<rule category="keyword_length">
-**2. Keywords Longer Than 4 Words (STRICT):**
-ALL keywords MUST be 2-4 words maximum.
-
-Reject these patterns:
-<avoid>"{brand_name} [location] [product] [feature]" (too long)</avoid>
-<avoid>"{brand_name} near me [location]" (use one or the other)</avoid>
-</rule>
-
 <rule category="features_not_products">
-**3. Individual Features/Amenities:**
-Do NOT extract features, amenities, or components from {unique_features}.
+**3. Feature/Amenity Keywords - Intelligent Evaluation:**
 
-**Universal test:**
-Ask: "Is this the MAIN thing they sell, or a FEATURE of what they sell?"
-- Main thing → Keep
-- Feature → Reject
+Before generating any keyword, evaluate:
+
+**Step 1: Is this term the CORE BUSINESS?**
+- Check {business_type}
+- If YES (business sells this) → Generate keywords <correct>
+- If NO (just a feature) → Skip <wrong>
+
+**Step 2: What do customers actually PAY FOR?**
+- Real Estate → Pay for: apartments, villas, plots, homes, flats
+- Real Estate → Don't pay for: gym, pool, clubhouse (included amenities)
+
+**Step 3: TIE-BREAKER**
+- If unsure → **REJECT** <wrong>
+- **Real Estate Rule:** "gym", "pool", "fitness" are ALWAYS amenities.
+
+**Examples:**
+<example>
+- Business: "Gold's Gym" → "gold's gym membership" <correct> (Core business)
+- Business: "Luxury Apartments" → "apartments gym" <wrong> (Gym is amenity)
+- Business: "Real Estate" → "primus fitness" <wrong> (Fitness is amenity)
+- Business: "Real Estate" → "primus quality" <wrong> (Marketing fluff)
+- Business: "Interior Design" → "design services" <correct> (Core business)
+- Business: "Real Estate" → "property design" <wrong> (Design is feature)
+</example>
+
+**High-Risk Terms (Usually amenities, evaluate carefully):**
+
+- Infrastructure: security, parking, lift, wifi, surveillance, amenities
+- Finishes: material, flooring, finish
+- Marketing: quality, luxury, lifestyle, family, community
 
 <patterns_to_reject>
 <avoid>Facilities/amenities (pools, gyms, parking, seating, lounges)</avoid>
 <avoid>Materials/ingredients (wood, clay, organic, steel, marble)</avoid>
 <avoid>Equipment/tools (ovens, machines, devices, systems)</avoid>
-<avoid>Technical features (automation, pathways, storage, API)</avoid>
+<avoid>Technical features (automation, cabling, storage, API)</avoid>
 <avoid>Add-ons/extras (any secondary features)</avoid>
+<avoid>Marketing terms (quality, luxury, lifestyle, family, community)</avoid>
 </patterns_to_reject>
 </rule>
 
@@ -162,20 +364,18 @@ Ask: "Is this the MAIN thing they sell, or a FEATURE of what they sell?"
 Return ONLY valid JSON array with exactly {max_kw} keywords:
 
 [
-"{brand_name}",
-"{brand_name} [city]",
-"{brand_name} [main product]",
-"{brand_name} [location]",
-"{brand_name} reviews"
+"keyword 1",
+"keyword 2",
+"keyword 3"
 ]
 
 <requirements>
 - All lowercase
-- ALL keywords MUST be 2-4 words (strict)
+- ALL keywords MUST be 2-3 words (EXCEPTION: first keyword can be full brand name, even if 4+ words)
 - No duplicates
 - Valid JSON format
 - Exactly {max_kw} keywords
-- Every keyword contains "{brand_name}"
+- Every keyword contains at least one significant brand word
 - ONLY locations from {service_areas}
 </requirements>
 </output>
@@ -185,8 +385,8 @@ Return ONLY valid JSON array with exactly {max_kw} keywords:
 
 <checklist>
 Before returning verify:
-<item>All contain "{brand_name}"</item>
-<item>100% are 2-4 words (strict enforcement)</item>
+<item>All contain significant brand words</item>
+<item>All are 2-3 words (EXCEPT first keyword which is full brand name, can be 4+ words)</item>
 <item>3-5 misspellings included</item>
 <item>Locations ONLY from {service_areas}</item>
 <item>ONLY main product extracted (no features/amenities)</item>
@@ -198,10 +398,10 @@ Before returning verify:
 ## CRITICAL SUCCESS FACTORS
 
 <critical_factors>
-1. **Product vs Feature:** Extract what they SELL, not what it INCLUDES
-2. **Location Accuracy:** Only use {service_areas}
-3. **Word Limit:** ALL keywords must be 2-4 words
-4. **Simplicity:** Brand + one concept per keyword
+1. **Length Control:** First keyword = full brand (any length). All others = 2-3 words using partial matching.
+2. **Product vs Feature:** Extract what they SELL, not what it INCLUDES.
+3. **Location Accuracy:** Only use {service_areas}.
+4. **Simplicity:** Brand + one concept per keyword.
 
-Brand campaigns are simple. Main product only. No features.
+Brand campaigns are simple. Main product only. No features. Short keywords.
 </critical_factors>
