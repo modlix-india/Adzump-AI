@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta
 from typing import Tuple
-from urllib.parse import urlparse
+from urllib.parse import urlparse,urlunparse
 import dns.resolver
 
 def get_today_end_date_with_duration(duration_days):
@@ -41,3 +41,34 @@ async def validate_domain_exists(url:str)-> Tuple[bool,str]:
         return True, ""
     except Exception:
         return False, f"Invalid domain '{domain}'. Please check the URL."
+    
+def normalize_url(url: str) -> str:
+    if not url:
+        return url
+
+    # Trim outer spaces
+    url = url.strip()
+
+    # Remove trailing slashes
+    url = url.rstrip("/")
+
+    # Parse URL
+    parsed = urlparse(url)
+
+    # Lowercase only the domain
+    netloc = parsed.netloc.lower()
+
+    # Remove duplicate slashes in path
+    path = '/'.join(filter(None, parsed.path.split('/')))
+
+    # Rebuild URL
+    normalized = urlunparse((
+        parsed.scheme,
+        netloc,
+        f"/{path}" if path else "",
+        parsed.params,
+        parsed.query,
+        parsed.fragment
+    ))
+
+    return normalized
