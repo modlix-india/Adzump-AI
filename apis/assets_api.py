@@ -22,6 +22,8 @@ async def generate_asset(
     request: AssetRequest,
     access_token: str = Header(...),
     clientCode: str = Header(...),
+    x_forwarded_host: str = Header(..., alias="x-forwarded-host"),
+    x_forwarded_port: str = Header(..., alias="x-forwarded-port"),
 ):
     results = {}
     invalid_assets = [a for a in request.asset_type if a not in ASSET_SERVICE_MAP]
@@ -31,7 +33,8 @@ async def generate_asset(
         )
     try:
         tasks = [
-            ASSET_SERVICE_MAP[asset](request.data_object_id, access_token, clientCode)
+            ASSET_SERVICE_MAP[asset](request.data_object_id, access_token, clientCode,x_forwarded_host,
+            x_forwarded_port)
             for asset in request.asset_type
         ]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
