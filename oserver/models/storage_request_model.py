@@ -4,6 +4,7 @@ from typing import Any, List, Optional
 class StorageRequest(BaseModel):
     storageName: str = Field(..., description="Name of the storage to read from")
     appCode: str = Field(default="marketingai", description="App code in NCLC")
+    clientCode: str = Field(..., description="Client code for tenant identification")
     dataObjectId: str
     eager: bool = False
     eagerFields: List[str] = []
@@ -12,6 +13,15 @@ class StorageRequestWithPayload(BaseModel):
     storageName: str = Field(..., description="Name of the storage to create in")
     appCode: str = Field(default="marketingai", description="App code in NCLC")
     dataObject: Any
+    eager: bool = False
+    eagerFields: List[str] = []
+
+class StorageUpdateWithPayload(BaseModel):
+    storageName: str = Field(..., description="Name of the storage to create in")
+    appCode: str = Field(default="marketingai", description="App code in NCLC")
+    dataObject: Any
+    dataObjectId: str
+    isPartial: bool = Field(default=True, description="Whether to partially update the record")
     eager: bool = False
     eagerFields: List[str] = []
 

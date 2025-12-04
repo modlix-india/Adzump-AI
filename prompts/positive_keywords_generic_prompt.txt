@@ -54,9 +54,8 @@ Analyze each keyword and assign the appropriate match type based on its:
 
 <target_distribution>
 **Aim for approximately:**
-- 10% BROAD match (discovery keywords)
-- 70% PHRASE match (core keywords)
-- 20% EXACT match (high-precision keywords)
+- 80-90% PHRASE match (core keywords)
+- 10-20% EXACT match (high-precision keywords)
 
 But prioritize correct match type assignment over hitting exact percentages.
 Quality of assignment matters more than rigid distribution.
@@ -138,45 +137,7 @@ After pre-filter, prioritize in this order:
 <assignment_criteria>
 Analyze each keyword and assign match type based on these criteria:
 
-## BROAD MATCH [~10%]
-
-<when_to_use_broad>
-**Assign BROAD match when ALL of these are true:**
-
-1. **High Relevance:** Core service/product keyword directly related to {business_type}
-2. **Discovery Intent:** Broad search term for reaching new audiences
-3. **Low Risk:** Won't attract completely irrelevant searches
-4. **NOT Cross-Business:** Keyword is NOT from a different industry
-5. **Expansion Potential:** Query expansion will likely stay relevant
-
-**Keyword Characteristics:**
-- Short, general terms (2-3 words)
-- High search volume potential
-- Clear business category match
-- Room for beneficial query expansion
-
-**Examples:**
-- Real Estate: "villas bangalore", "buy property"
-- Restaurant: "italian restaurant", "food delivery"
-- Fitness: "gym bangalore", "personal training"
-
-<never_broad>
-**NEVER Assign BROAD to:**
-- Cross-business keywords (different industry)
-- Highly specific technical terms
-- Ambiguous multi-intent keywords
-- Low-volume, niche-specific terms
-</never_broad>
-
-**Why this restriction?** 
-Broad match expands reach significantly through Google's query matching. 
-If the base keyword isn't perfectly aligned with your core business, 
-expansion will generate irrelevant clicks that waste budget on users with zero purchase intent.
-</when_to_use_broad>
-
----
-
-## PHRASE MATCH [~70%]
+## PHRASE MATCH [~80-90%]
 
 <when_to_use_phrase>
 **Assign PHRASE match when:**
@@ -186,6 +147,7 @@ expansion will generate irrelevant clicks that waste budget on users with zero p
 3. **Cross-Business Keywords:** If including risky cross-industry terms
 4. **Action Intent:** Contains verbs like buy, find, book, hire
 5. **Qualified Searches:** Contains modifiers like best, affordable, near me
+6. **Core Business Terms:** High-volume terms that would previously be Broad match
 
 **Keyword Characteristics:**
 - 3-5 words with specific context
@@ -204,7 +166,7 @@ expansion will generate irrelevant clicks that waste budget on users with zero p
 
 ---
 
-## EXACT MATCH [~20%]
+## EXACT MATCH [~10-20%]
 
 <when_to_use_exact>
 **Assign EXACT match when:**
@@ -280,26 +242,22 @@ Example: Real estate business including "gym near me"
 
 **1. Is it cross-business?**
 - Would a searcher expect a different business type?
-- If YES → PHRASE or EXACT only (skip broad consideration)
+- If YES → PHRASE or EXACT only
 - If NO → Continue to next question
 
 **2. How specific is it?**
-- 2-3 words, general service → Consider BROAD (if core business)
 - 3-4 words, moderate detail → PHRASE
 - 4+ words, very specific → EXACT
 
 **3. What's the search intent?**
-- Discovery/awareness stage → BROAD or PHRASE
 - Research/consideration stage → PHRASE
 - Ready to convert → EXACT
 
 **4. What's the risk level?**
-- Low risk (perfectly matches {business_type}) → Can use BROAD
 - Medium risk (somewhat related) → PHRASE
 - High risk (cross-business, ambiguous) → PHRASE or EXACT
 
 **5. How much query expansion is beneficial?**
-- Lots of beneficial expansion → BROAD
 - Some expansion helpful → PHRASE
 - No expansion wanted → EXACT
 </decision_process>
@@ -308,21 +266,14 @@ Example: Real estate business including "gym near me"
 
 <strategic_guidelines>
 ## STRATEGIC MATCH TYPE GUIDELINES
-
-**BROAD = Discovery Engine**
-- Use sparingly (~10% of keywords)
-- Only for core business terms
-- Maximizes reach for highly relevant categories
-- Risk: Can attract irrelevant traffic if not careful
-
 **PHRASE = Workhorse**
-- Your default choice (~70% of keywords)
+- Your default choice (~80-90% of keywords)
 - Balances reach and control
 - Most keywords should land here
 - Safe choice when uncertain
 
 **EXACT = Sniper Rifle**
-- Use for precision (~20% of keywords)
+- Use for precision (~10-20% of keywords)
 - High-intent, specific searches
 - Maximum control, minimum waste
 - Worth it for high-value conversion terms
@@ -331,10 +282,9 @@ Example: Real estate business including "gym near me"
 **Key Principles:**
 
 - Think strategically - match type should serve the keyword's purpose
-- BROAD = Core business only - never for cross-business or risky terms
 - PHRASE = Default workhorse - when in doubt, use phrase
 - EXACT = Precision targeting - for specific, high-value searches
-- Aim for ~10/70/20 distribution but prioritize quality over quotas
+- Aim for ~80-90% PHRASE and ~10-20% EXACT distribution
 </critical>
 </strategic_guidelines>
 
@@ -365,7 +315,7 @@ Return ONLY valid JSON:
     "keywords": [
         {{
             "keyword": "exact text from data",
-            "match_type": "exact|phrase|broad",
+            "match_type": "exact|phrase",
             "is_cross_business": false,
             "rationale": "concise reason for selection"
         }}
@@ -377,7 +327,7 @@ Return ONLY valid JSON:
 - Select EXACTLY {target_count} keywords
 - All from provided data only (never invent)
 - Match types assigned intelligently based on keyword characteristics
-- Approximately 10% broad, 70% phrase, 20% exact (flexibility allowed)
+- Approximately 80-90% phrase, 10-20% exact (flexibility allowed)
 - Mark cross-business keywords appropriately
 - Rationale should explain BOTH selection and match type reasoning
 - Valid JSON only - regenerate if invalid
@@ -405,10 +355,9 @@ Return ONLY valid JSON:
 4. **Match type assignment:**
    - Think strategically, not positionally
    - Analyze keyword characteristics, intent, risk, specificity
-   - BROAD = core business, low risk, discovery
    - PHRASE = default workhorse, balanced control
    - EXACT = high precision, specific intent
-   - Aim for ~10/70/20 but prioritize quality over quotas
+   - Aim for ~80-90% PHRASE and ~10-20% EXACT
 
 5. **Data integrity:**
    - All keywords from provided data only
@@ -416,12 +365,11 @@ Return ONLY valid JSON:
    - Exact {target_count} keywords required
 
 6. **Risk management:**
-   - BROAD match = core business terms only
    - Cross-business = phrase/exact for controlled reach
    - Location validation prevents irrelevant geographic targeting
    - When uncertain about match type, default to PHRASE
 </final_reminders>
 
 <closing>
-Generic campaigns maximize reach while controlling relevance through intelligent match type strategy. Each keyword should have the match type that best serves its purpose - discovery (broad), balanced control (phrase), or precision (exact). Cross-business keywords are opportunities when properly managed with phrase/exact match types.
+Generic campaigns maximize reach while controlling relevance through intelligent match type strategy. Each keyword should have the match type that best serves its purpose - balanced control (phrase), or precision (exact). Cross-business keywords are opportunities when properly managed with phrase/exact match types.
 </closing>
