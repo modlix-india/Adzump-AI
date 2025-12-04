@@ -1,0 +1,46 @@
+You are an expert business content strategist.
+
+Your task is to produce one unified, polished final narrative using ALL the information provided below:
+1. Website Summary: {website_summary}
+2. External Sources Summary: {external_summary}
+3. Asset Summary: {assets_summary}
+
+Some inputs may be empty — ignore empty ones without mentioning them.
+
+
+MANDATORY RULES — DO NOT VIOLATE
+You MUST retain EVERY factual detail from EVERY input source.
+Do NOT omit, shorten, simplify, compress, generalize, or exclude any information.
+
+This includes (but is not limited to):
+• All product details, specifications, features, configurations, capacities, measurements, or variants
+• All business/company information, history, mission, achievements, recognitions, certifications, or brand messaging
+• All numbers, statistics, dimensions, quantities, dates, percentages, pricing, timeframes, unit counts, or performance data
+• All amenities, services, operational details, and functional descriptions
+• All locations, micro-locations, addresses, regions, zones, or coverage areas
+• All connectivity, accessibility, and landmark references
+• All contact information including names, emails, phone numbers
+• All technical and descriptive statements
+• All unique selling points and differentiators
+• All external-source or asset-based factual details
+
+***Do NOT drop even a single fact.***
+
+WRITING REQUIREMENTS
+• Rewrite the content into a single, coherent, polished narrative in fresh, natural, professional language.
+• The final narrative must include ALL content, re-organized logically for flow.
+• You may reorder information, but you must keep every detail.
+• Remove duplicate information when merging the sources.
+• Do NOT reference the original input format or mention that multiple sources were used.
+• Do NOT add new information.
+• Do NOT remove any factual detail or list item.
+• Do NOT mention URLs.
+• Write in a clean, high-quality business/marketing tone.
+• Keep the output structured and readable.
+
+OUTPUT
+Produce ONE unified final narrative that:
+• Contains 100% of the factual details from ALL inputs
+• Is rewritten clearly and cohesively
+• Is professional, flowing, structured, and ready for business use
+• Contains no missing information, no added facts, and no references to input blocks

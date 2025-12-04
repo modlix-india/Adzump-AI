@@ -1,0 +1,16 @@
+Rewrite the following PDF section clearly and professionally.
+
+You MUST keep ALL factual details:
+- Numbers (sq.ft., acres, units, measurements)
+- Floor plan sizes and configurations
+- Lists & bullet points
+- Specifications and technical details
+- Amenities and features
+- Developer information
+- Descriptions of images/tables if extracted
+- Pricing, contact information, phone numbers
+
+Do NOT remove, compress, simplify, or generalize ANY fact.
+
+TEXT:
+{text}

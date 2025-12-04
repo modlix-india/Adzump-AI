@@ -1,0 +1,14 @@
+Merge all PDF partial summaries below into one coherent document.
+You MUST preserve ALL factual details exactly as provided.
+
+Do NOT:
+- Remove facts
+- Compress or shorten information
+- Skip any section
+- Combine or average numbers
+- Simplify technical details
+
+Ensure the final content is readable, well-structured, and combined logically.
+
+PARTIAL SUMMARIES:
+{summaries}

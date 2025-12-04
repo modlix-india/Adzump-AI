@@ -32,9 +32,10 @@ class CallAssetsService():
         return list(set(cleaned_phone_numbers))
 
     @staticmethod
-    async def generate(data_object_id: str, access_token: str, client_code: str) -> List[str]:
+    async def generate(data_object_id: str, access_token: str, client_code: str,x_forwarded_host=str,
+            x_forwarded_port=str) -> List[str]:
         product_data = await BusinessService.fetch_product_details(
-            data_object_id, access_token, client_code
+            data_object_id, access_token, client_code,x_forwarded_host,x_forwarded_port
         )
 
         if not product_data:
