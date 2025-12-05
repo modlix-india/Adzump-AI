@@ -10,6 +10,7 @@ from services.business_service import process_website_data
 from services.external_link_summary_service import process_external_link
 from services.pdf_service import process_pdf_from_path
 from services.screenshot_service import ScreenshotService
+from services.final_summary_service import generate_final_summary
 from utils.response_helpers import error_response, success_response
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
@@ -118,3 +119,23 @@ async def summarize_pdf(
         return success_response(result)
     except Exception as e:
         return error_response(str(e))
+
+@router.post("/generate/final-summary")
+async def generate_final_summary_endpoint(
+    business_url: str = Body(..., embed=True),
+    headers: CommonHeaders = Depends(get_common_headers)
+):
+    try:
+        result = await generate_final_summary(
+            business_url=business_url,
+            access_token=headers.access_token,
+            client_code=headers.client_code,
+            x_forwarded_host=headers.x_forwarded_host,
+            x_forwarded_port=headers.x_forwarded_port,
+        )
+        return success_response(result)
+    except BaseAppException as e:
+        return error_response(e.message, e.status_code)
+    except Exception as e:
+        logger.exception(f"[FinalSummaryController] Unexpected error: {e}")
+        return error_response("Unexpected error while generating final summary")
