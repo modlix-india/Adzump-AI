@@ -38,8 +38,10 @@ class StorageFileService:
 
     async def get_folder(self, folder_name: str) -> StorageResponse:
         url = f"{self.client.base_url}/api/files/secured/{folder_name}"
+        headers= self._headers()
+        headers["x-debug"] = "kailash123"
         try:
-            result = await self.client.request("GET", url, headers=self._headers())
+            result = await self.client.request("GET", url, headers=headers)
             return StorageResponse(success=True, result=result)
         except Exception as e:
             return StorageResponse(success=False, error=str(e))
