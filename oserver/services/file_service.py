@@ -2,6 +2,10 @@ from typing import Optional
 import httpx
 from oserver.services.base_api_service import BaseAPIService
 from oserver.models.storage_response_model import StorageResponse
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class StorageFileService:
     def __init__(
@@ -40,8 +44,13 @@ class StorageFileService:
         url = f"{self.client.base_url}/api/files/secured/{folder_name}"
         headers= self._headers()
         headers["x-debug"] = "kailash123"
+
+        logger.info(f"Request URL: {url}")
+        logger.info(f"Request Headers: {headers}")
+
         try:
             result = await self.client.request("GET", url, headers=headers)
+            
             return StorageResponse(success=True, result=result)
         except Exception as e:
             return StorageResponse(success=False, error=str(e))
