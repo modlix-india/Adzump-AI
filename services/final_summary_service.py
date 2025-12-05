@@ -80,7 +80,7 @@ async def generate_final_summary(
         external_summary=external_summary,
         assets_summary=assets_summary
     )
-
+    logger.info(f"[FinalSummary] Prompt prepared for LLM: {prompt}")
     logger.info("[FinalSummary] Sending to LLM to generate final summary...")
 
     response = await chat_completion(
