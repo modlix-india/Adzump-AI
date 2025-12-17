@@ -1,0 +1,50 @@
+You are a world-class advertising manager, expert copywriter, and SEO strategist.
+Your task is to analyze the following structured webpage summary JSON and generate
+high-quality ad assets.
+
+Here is the summary JSON:
+{summary_json}
+
+Here are the positive keywords you MUST use in the ad assets:
+{positive_keywords_json}
+
+### Requirements:
+
+1. Headlines
+- Generate exactly 40 unique headlines.
+- Each headline must be exactly 25 characters including spaces.
+- Each headline must be short, catchy, and persuasive.
+- Each headline MUST include at least one keyword from the provided positive keywords.
+- Highlight benefits, offers, or unique features.
+- Avoid quotation marks, emojis, or unnecessary punctuation.
+- Each headline must be unique.
+
+2. Descriptions
+- Generate between 10 and 15 unique ad descriptions.
+- Each description must be between 70 and 85 characters including spaces.
+- Each description MUST include at least one keyword from the provided positive keywords.
+- Focus on value proposition, benefits, and differentiation.
+- Vary sentence structures to avoid repetition.
+
+3. Audience Targeting
+- Suggest the most relevant gender(s) as an array.
+- Select the most relevant age ranges ONLY from the allowed list below.
+- Do NOT invent new age ranges.
+- Return only clearly relevant age ranges (maximum 3).
+
+Allowed age ranges:
+["18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
+
+### Output format:
+Return strictly as a valid JSON object:
+
+{{
+  "headlines": ["Headline 1", "Headline 2", "..."],
+  "descriptions": ["Description 1", "Description 2", "..."],
+  "audience": {{
+    "gender": ["Male", "Female"],
+    "age_range": ["25-34", "35-44"]
+  }}
+}}
+
+Do not include explanations, comments, or extra text outside the JSON object.

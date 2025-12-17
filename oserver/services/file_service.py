@@ -66,7 +66,7 @@ class StorageFileService:
     async def upload_file(self, image_bytes: bytes, filename: str, folder_name: str) -> StorageResponse:
         try:
             await self.ensure_folder(folder_name)
-            url = f"{self.client.base_url}/api/files/secured/{folder_name}?clientCode={self.client_code}"
+            url = f"{self.client.base_url}/api/files/static/{folder_name}?clientCode={self.client_code}"
             files = {"file": (filename, image_bytes, "image/png")}
             result = await self.client.request("POST", url, headers=self._headers(), files=files)
             return StorageResponse(success=True, result=result)

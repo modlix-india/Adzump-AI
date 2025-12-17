@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Body
 from dependencies.header_dependencies import CommonHeaders, get_common_headers
 from exceptions.custom_exceptions import BaseAppException
 from models.business_model import  ScreenshotRequest, WebsiteSummaryRequest
-from services.business_service import process_website_data
+from services.business_service import BusinessService
 from services.external_link_summary_service import process_external_link
 from services.pdf_service import process_pdf_from_path
 from services.screenshot_service import ScreenshotService
@@ -47,7 +47,8 @@ async def analyze_website(
     headers: CommonHeaders = Depends(get_common_headers)
 ):
     try:
-        result = await process_website_data(
+        service = BusinessService()
+        result = await service.process_website_data(
             website_url=payload.business_url,
             rescrape=payload.rescrape,
             access_token=headers.access_token,
