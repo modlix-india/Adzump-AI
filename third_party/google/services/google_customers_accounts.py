@@ -149,5 +149,3 @@ async def fetch_customer_accounts(mcc_id: str, client_code:str) -> List[Dict[str
                 })
         
         return accounts
-
-
