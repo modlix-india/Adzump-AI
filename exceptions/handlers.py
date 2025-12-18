@@ -2,6 +2,7 @@ import logging
 from fastapi import Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 from exceptions.custom_exceptions import BaseAppException
 from utils.response_helpers import error_response
 
@@ -35,3 +36,8 @@ def setup_exception_handlers(app):
     @app.exception_handler(BaseAppException)
     async def app_exception_handler(request: Request, exc: BaseAppException):
         return error_response(exc.message, status_code=exc.status_code)
+    
+    @app.exception_handler(SQLAlchemyError)
+    async def db_exception_handler(request: Request, exc: SQLAlchemyError):
+        logger.exception(f"Database Error at {request.url.path}: {exc}")
+        return error_response("A database error occurred.", status_code=500)
