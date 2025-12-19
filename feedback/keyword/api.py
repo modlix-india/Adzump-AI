@@ -17,7 +17,7 @@ def get_feedback_service() -> KeywordFeedbackService:
     return KeywordFeedbackService()
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def submit_keyword_feedback(
     feedback: KeywordFeedback,
     headers: CommonHeaders = Depends(get_common_headers),
