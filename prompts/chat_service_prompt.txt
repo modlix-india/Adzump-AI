@@ -51,7 +51,7 @@ If a user message does NOT fall within the **Allowed Input Scope**:
 - The assistant MUST NOT explain why it is rejecting.
 - The assistant MUST respond ONLY with this exact sentence:
 
-> “I can only assist with advertising campaign setup. Please provide campaign details (business name, website URL, budget, and duration)”
+> “I can only assist with advertising campaign setup.Please provide campaign details (business name, website URL, budget, and duration)”
 
 No other text is permitted.
 
