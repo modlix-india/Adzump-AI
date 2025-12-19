@@ -1,0 +1,59 @@
+name: Dev Deployment
+
+on:
+  #To trigger manually
+  workflow_dispatch:
+  push:
+    branches: [ development ]
+
+env:
+  ENVIRONMENT: dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout to dev branch
+        uses: actions/checkout@v4
+        with:
+          ref: development
+
+      # Optional: Only needed if you run Python tooling in CI itself. Docker build doesn’t need this.
+      # - name: Set up Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: '3.12'
+
+      - name: Login to OCIR
+        uses: docker/login-action@v3
+        with:
+          registry: ocir.us-ashburn-1.oci.oraclecloud.com
+          username: ${{ secrets.OCI_NON_PROD_DOCKER_USER_NAME }}
+          password: ${{ secrets.OCI_NON_PROD_CLI_AUTH_TOKEN }}
+
+      - name: Docker version
+        id: dockerVersion
+        run: |
+          VERSION=$(date '+%Y%m%d%H%M%S')
+          echo "Setting version to ${VERSION}"
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Build ds-service Docker image
+        working-directory: .
+        run: |
+          docker build \
+            --pull \
+            --build-arg PIP_REFRESH=${{ steps.dockerVersion.outputs.VERSION }} \
+            -t dev-ds-service:${{ steps.dockerVersion.outputs.VERSION }} \
+            .
+
+      - name: Tag and push ds-service to OCIR
+        run: |
+          VERSION=${{ steps.dockerVersion.outputs.VERSION }}
+          OCIR_PATH=ocir.us-ashburn-1.oci.oraclecloud.com/idfmutpuhiky/dev-ds-service
+
+          docker tag  dev-ds-service:$VERSION $OCIR_PATH:$VERSION
+          docker push $OCIR_PATH:$VERSION
+
+          docker tag  dev-ds-service:$VERSION $OCIR_PATH:latest
+          docker push $OCIR_PATH:latest

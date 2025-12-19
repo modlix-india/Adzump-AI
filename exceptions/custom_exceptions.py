@@ -31,3 +31,8 @@ class InternalServerException(BaseAppException):
     """Unexpected error in backend logic."""
     def __init__(self, message: str = "Internal server error"):
         super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class DatabaseException(BaseAppException):
+    """Database operation failed."""
+    def __init__(self, message: str = "A database error occurred"):
+        super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR)

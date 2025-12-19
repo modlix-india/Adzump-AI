@@ -1,13 +1,17 @@
 from fastapi.responses import JSONResponse
+from typing import Any, Dict, Optional
 
-def success_response(data: any):
+
+def success_response(data: Any):
     return JSONResponse(
-        content={"success": True, "data": data, "error": None},
-        status_code=200
+        content={"success": True, "data": data, "error": None}, status_code=200
     )
 
-def error_response(message: str, status_code: int = 500):
+
+def error_response(
+    message: str, details: Optional[Dict[str, Any]] = None, status_code: int = 500
+):
     return JSONResponse(
-        content={"success": False, "data": None, "error": message},
-        status_code=status_code
+        content={"success": False, "data": None, "error": message, "details": details},
+        status_code=status_code,
     )
