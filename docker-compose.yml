@@ -11,7 +11,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./uploads:/app/uploads
+      - '/var/log/apps/:/logs'
     depends_on:
       postgres:
         condition: service_healthy
