@@ -19,15 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy only requirements first to leverage Docker cache
-# If you also use a lock/constraints file, include it here.
 COPY requirements.txt ./
 
 # Optional cache-busting arg (bump to force fresh dependency install)
 ARG PIP_REFRESH=0
 
 # Install Python deps
-# The echo line ensures changing PIP_REFRESH invalidates this layer.
-# If BuildKit is enabled, the cache mount speeds up rebuilds.
 RUN --mount=type=cache,target=/root/.cache/pip \
     echo "PIP_REFRESH=${PIP_REFRESH}" \
  && python -m pip install --upgrade pip \
@@ -35,9 +32,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Playwright (ensure `playwright` is in your requirements)
 RUN python -m playwright install --with-deps chromium \
-  && mkdir -p /app/uploads \
+  && mkdir -p /app/uploads /logs \
   && useradd -ms /bin/bash appuser \
-  && chown -R appuser:appuser /app /ms-playwright
+  && chown -R appuser:appuser /app /ms-playwright /logs
 
 # Copy the rest of the app (kept after deps to maximize cache re-use)
 COPY . .
@@ -47,4 +44,4 @@ USER appuser
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://localhost:8000/health || exit 1
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["sh", "-c", "LOG_FILE=/logs/ds-service.log uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
