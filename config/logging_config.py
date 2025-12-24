@@ -71,8 +71,21 @@ def setup_logging():
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
     
-    # Enable uvicorn access logs at INFO level
-    logging.getLogger("uvicorn.access").setLevel(logging.INFO)
+    # Route uvicorn logs through the same handlers with JSON formatting
+    uvicorn_access = logging.getLogger("uvicorn.access")
+    uvicorn_access.handlers.clear()
+    uvicorn_access.addHandler(file_handler)
+    uvicorn_access.addHandler(console_handler)
+    uvicorn_access.setLevel(logging.INFO)
+    uvicorn_access.propagate = False
+    
+    uvicorn_error = logging.getLogger("uvicorn.error")
+    uvicorn_error.handlers.clear()
+    uvicorn_error.addHandler(file_handler)
+    uvicorn_error.addHandler(console_handler)
+    uvicorn_error.setLevel(logging.INFO)
+    uvicorn_error.propagate = False
+    
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     
