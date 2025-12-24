@@ -61,3 +61,6 @@ asyncpg>=0.2
 ### testing dependencies
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+
+### structured logging dependencies
+structlog>=24.1.0

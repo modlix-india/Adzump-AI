@@ -10,17 +10,14 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=INFO
     volumes:
       - '/var/log/apps/:/logs'
     depends_on:
       postgres:
         condition: service_healthy
-    # For heavy pages with Playwright/Chromium you can increase shared memory:
-    # shm_size: 1gb
-    # If you ever must run Chromium without sandbox (not recommended):
-    # user: "0:0"
-    # environment:
-    #   - CHROMIUM_FLAGS=--no-sandbox
   postgres:
     build: ./docker/postgres
     container_name: postgres_container
