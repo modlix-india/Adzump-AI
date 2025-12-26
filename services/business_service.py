@@ -1,4 +1,4 @@
-import logging
+from structlog import get_logger    #type: ignore
 import json
 from typing import List
 from exceptions.custom_exceptions import (
@@ -20,9 +20,7 @@ from services.openai_client import chat_completion
 from oserver.services.storage_service import StorageService
 from utils.helpers import normalize_url
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 class BusinessService:
     OPENAI_MODEL = "gpt-4o-mini"

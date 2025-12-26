@@ -1,7 +1,7 @@
 
 import json
 from pydantic import  ValidationError
-import logging
+from structlog import get_logger    #type: ignore
 
 from services.openai_client import chat_completion
 from models.campaign_data_model import CampaignData
@@ -9,7 +9,7 @@ from utils.helpers import validate_domain_exists
 from typing import Tuple , Optional
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # --- ADD THESE HELPERS (NEAR OTHER HELPERS) ---
 

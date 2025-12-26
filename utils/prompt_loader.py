@@ -1,9 +1,9 @@
 import os
 from utils.text_utils import safe_truncate_to_sentence
-import logging
+from structlog import get_logger    #type: ignore
 from typing import Any,Dict
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def load_prompt(prompt_name: str) -> str:
     # Get the root directory (Adzump-AI) regardless of where this file is

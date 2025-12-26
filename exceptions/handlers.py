@@ -1,12 +1,12 @@
-import logging
 from fastapi import Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 from exceptions.custom_exceptions import BaseAppException
 from utils.response_helpers import error_response
+from structlog import get_logger    #type: ignore
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def setup_exception_handlers(app):
 
