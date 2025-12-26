@@ -2,10 +2,9 @@ from typing import Optional
 import httpx
 from oserver.services.base_api_service import BaseAPIService
 from oserver.models.storage_response_model import StorageResponse
-import logging
+from structlog import get_logger    #type: ignore
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 class StorageFileService:
     def __init__(

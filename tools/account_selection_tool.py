@@ -1,4 +1,4 @@
-import logging
+from structlog import get_logger    #type: ignore
 from typing import List, Dict, Any, Optional
 
 from third_party.google.services.google_customers_accounts import (
@@ -7,7 +7,7 @@ from third_party.google.services.google_customers_accounts import (
     flatten_mcc_response,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_formatted_accounts_string(items: List[Dict[str, Any]], title: str, name_key: str = "name", id_key: str = "id") -> str:

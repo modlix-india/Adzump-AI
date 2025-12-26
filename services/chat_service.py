@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime, timezone
 from fastapi.responses import JSONResponse
-import logging
 
 from services.openai_client import chat_completion
 from services.session_manager import sessions, SESSION_TIMEOUT
@@ -19,9 +18,10 @@ from tools.tool_exe import (
     CONFIRM_CAMPAIGN_TOOL_SCHEMA,
     safe_args
 )
+from structlog import get_logger    #type: ignore
 
 TODAY = datetime.now().strftime("%Y-%m-%d")
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Helpers — schema & progress
 def get_required_fields():

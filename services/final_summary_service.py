@@ -1,4 +1,4 @@
-import logging
+from structlog import get_logger    #type: ignore
 from http.client import HTTPException
 from oserver.models.storage_request_model import StorageFilter, StorageReadRequest, StorageUpdateWithPayload
 from oserver.services.storage_service import StorageService
@@ -6,7 +6,7 @@ from utils import prompt_loader
 from services.openai_client import chat_completion
 from utils.helpers import normalize_url
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def generate_final_summary(
     business_url: str,

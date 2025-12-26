@@ -1,5 +1,5 @@
 import json
-import logging
+from structlog import get_logger    #type: ignore
 from fastapi import HTTPException
 from models.business_model import WebsiteSummaryResponse
 from services.business_service import BusinessService
@@ -13,8 +13,7 @@ from oserver.models.storage_request_model import (
 from oserver.services.storage_service import StorageService
 from services.final_summary_service import generate_final_summary
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 async def process_external_link(
     external_url: str,

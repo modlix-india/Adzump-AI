@@ -1,4 +1,4 @@
-import logging
+from structlog import get_logger    #type: ignore
 from typing import Optional
 from fastapi import HTTPException
 from playwright.async_api import async_playwright
@@ -15,8 +15,7 @@ from oserver.models.storage_request_model import (
     StorageRequestWithPayload
 )
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 class ScreenshotService:
 

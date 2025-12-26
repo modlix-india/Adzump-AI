@@ -1,5 +1,5 @@
 import re
-import logging
+from structlog import get_logger    #type: ignore
 import json
 from typing import List,Dict,Set
 from utils.text_utils import normalize_text
@@ -8,7 +8,7 @@ from models.keyword_model import (
     NegativeKeyword,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 WORD_PATTERN = re.compile(r"\w+")
 
 class KeywordUtils:

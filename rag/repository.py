@@ -1,4 +1,4 @@
-import logging
+from structlog import get_logger    #type: ignore
 import hashlib
 import json
 from typing import List, Dict, Any, Optional, Sequence
@@ -7,8 +7,7 @@ from sqlalchemy import text, Row
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 class RAGRepository:
     def __init__(self, session: AsyncSession):

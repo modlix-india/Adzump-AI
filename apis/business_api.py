@@ -1,6 +1,5 @@
 import os
 import tempfile
-import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header, Body
 from dependencies.header_dependencies import CommonHeaders, get_common_headers
@@ -12,9 +11,10 @@ from services.pdf_service import process_pdf_from_path
 from services.screenshot_service import ScreenshotService
 from services.final_summary_service import generate_final_summary
 from utils.response_helpers import error_response, success_response
+from structlog import get_logger    #type: ignore
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @router.post("/screenshot")

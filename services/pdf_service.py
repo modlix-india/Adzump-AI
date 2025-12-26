@@ -1,6 +1,6 @@
 import os
 import pytesseract
-import logging
+from structlog import get_logger    #type: ignore
 from PyPDF2 import PdfReader
 from pdf2image import convert_from_path
 from fastapi import HTTPException
@@ -15,7 +15,7 @@ from oserver.models.storage_request_model import (
 from oserver.services.storage_service import StorageService
 from services.final_summary_service import generate_final_summary
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # -------------------------------------------------------------
 # OCR / Poppler Setup

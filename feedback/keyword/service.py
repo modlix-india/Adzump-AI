@@ -1,4 +1,4 @@
-import logging
+
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import text
@@ -8,9 +8,9 @@ from db import get_engine
 from .models import KeywordFeedback, RejectedKeyword
 from ..common.models import FeedbackAction
 from rag import EmbeddingService
+from structlog import get_logger    #type: ignore
 
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 class KeywordFeedbackService:
     REJECTION_COLLECTION = "keyword_rejections"
