@@ -1,14 +1,12 @@
 import os
 import httpx
-import logging
+from structlog import get_logger    #type: ignore
 from oserver.services.connection import fetch_google_api_token_simple
 import utils.date_utils as date_utils
 from third_party.google.models.keyword_model import Keyword
 
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
+logger = get_logger(__name__)
 
 async def fetch_keywords(
     client_code: str,

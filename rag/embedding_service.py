@@ -1,4 +1,4 @@
-import logging
+from structlog import get_logger    #type: ignore
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
@@ -9,7 +9,7 @@ from rag.models import RAGChunk
 from rag.repository import RAGRepository
 from services import openai_client
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class EmbeddingService:
     

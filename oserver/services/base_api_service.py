@@ -1,10 +1,10 @@
 import httpx
 import asyncio
-import logging
 from exceptions.custom_exceptions import StorageException
 from oserver.utils.helpers import get_base_url
 
-logger = logging.getLogger(__name__)
+from structlog import get_logger    #type: ignore
+logger = get_logger(__name__)
 
 class BaseAPIService:
     DEFAULT_TIMEOUT = 30.0

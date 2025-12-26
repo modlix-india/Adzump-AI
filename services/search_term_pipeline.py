@@ -1,6 +1,6 @@
 import os
 import json
-import logging
+from structlog import get_logger    #type: ignore
 import requests
 from third_party.google.services import ads_service, keywords_service
 from services.search_term_analyzer import analyze_search_term_performance
@@ -9,8 +9,7 @@ import utils.date_utils as date_utils
 from oserver.services.connection import fetch_google_api_token_simple
 import asyncio
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = get_logger(__name__)
 
 def load_search_term_prompt(file_name: str) -> str:
     """

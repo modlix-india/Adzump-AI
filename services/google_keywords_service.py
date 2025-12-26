@@ -1,5 +1,5 @@
 import os
-import logging
+from structlog import get_logger    #type: ignore
 import time
 import asyncio
 import json
@@ -29,9 +29,7 @@ from models.keyword_model import (
     CompetitionLevel,
 )
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 class GoogleKeywordService:
 

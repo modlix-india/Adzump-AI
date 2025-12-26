@@ -1,14 +1,12 @@
 import os
 import httpx
-import logging
+from structlog import get_logger    #type: ignore
 
 from oserver.models.storage_request_model import StorageFilter, StorageReadRequest
 from oserver.services.connection import fetch_google_api_token_simple
 from oserver.services.storage_service import StorageService
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-
+logger = get_logger(__name__)
 
 async def fetch_ads(
     client_code: str,
