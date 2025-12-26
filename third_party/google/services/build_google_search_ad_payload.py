@@ -234,11 +234,25 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
         {"type": "AGE_RANGE_65_UP", "min": 65, "max": 99},
     ]
 
-    def pick_age_types(range_list: List[int]) -> List[str]:
-        if not range_list or len(range_list) != 2:
+    def pick_age_types(age_ranges: List[str]) -> List[str]:
+        if not age_ranges or len(age_ranges) != 2:
             return []
-        min_val, max_val = map(int, range_list)
-        return [b["type"] for b in AGE_BUCKETS if b["min"] <= max_val and b["max"] >= min_val]
+        parsed_ranges = []
+
+        for r in age_ranges:
+            try:
+                min_val, max_val = map(int, r.split("-"))
+                parsed_ranges.append((min_val, max_val))
+            except ValueError:
+                continue
+        return [
+        b["type"]
+        for b in AGE_BUCKETS
+        if any(
+            b["min"] <= max_val and b["max"] >= min_val
+            for min_val, max_val in parsed_ranges
+        )
+        ]
 
     def gender_type(g: str):
         g = str(g or "").lower()
@@ -356,5 +370,4 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
         })
     
     # Return final payload
-
     return {"mutateOperations": mutate_ops}
