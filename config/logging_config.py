@@ -1,6 +1,6 @@
 import os
 import logging
-import structlog    #type: ignore
+import structlog  # type: ignore
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -15,9 +15,20 @@ def setup_logging():
     log_path = Path(log_file).parent
     log_path.mkdir(parents=True, exist_ok=True)
     
-    # Shared processors for both structlog and standard logging
-    shared_processors = [
+    # Processors for structlog loggers
+    structlog_processors = [
         structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+    ]
+    
+    # Processors for foreign (non-structlog) loggers - no filter_by_level
+    foreign_processors = [
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         structlog.stdlib.PositionalArgumentsFormatter(),
@@ -29,7 +40,7 @@ def setup_logging():
     
     # Configure structlog for stdlib integration
     structlog.configure(
-        processors=shared_processors + [
+        processors=structlog_processors + [
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         context_class=dict,
@@ -59,7 +70,7 @@ def setup_logging():
     # ProcessorFormatter applies JSONRenderer as final step
     json_formatter = structlog.stdlib.ProcessorFormatter(
         processor=structlog.processors.JSONRenderer(),
-        foreign_pre_chain=shared_processors,
+        foreign_pre_chain=foreign_processors,
     )
     file_handler.setFormatter(json_formatter)
     console_handler.setFormatter(json_formatter)
