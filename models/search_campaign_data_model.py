@@ -2,7 +2,7 @@ from typing import List,Dict,Any,Optional
 from pydantic import BaseModel
 
 class GenerateCampaignRequest(BaseModel):
-    customer_id: str
+    customerId: str
     loginCustomerId: str
     businessName: str
     budget: float
