@@ -1,4 +1,4 @@
-import logging
+from structlog import get_logger    #type: ignore
 import json
 from typing import List
 from exceptions.custom_exceptions import (
@@ -20,9 +20,7 @@ from services.openai_client import chat_completion
 from oserver.services.storage_service import StorageService
 from utils.helpers import normalize_url
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = get_logger(__name__)
 
 class BusinessService:
     OPENAI_MODEL = "gpt-4o-mini"
@@ -124,106 +122,134 @@ class BusinessService:
         return product_data
 
 
-async def process_website_data(
-    website_url: str,
-    access_token: str,
-    client_code: str,
-    x_forwarded_host: str,
-    x_forwarded_port: str,
-    rescrape: bool = False,
-):
-    try:
-        logger.info(f"Checking if {website_url} already exists in storage")
 
-        # Normalize incoming URL
-        website_url = normalize_url(website_url)
-        logger.info(f"Normalized URL: {website_url}")
+    async def process_website_data(
+        self,
+        website_url: str,
+        access_token: str,
+        client_code: str,
+        x_forwarded_host: str,
+        x_forwarded_port: str,
+        rescrape: bool = False,
+    ):
+        try:
+            logger.info(f"Checking if {website_url} already exists in storage")
 
-        storage_service = StorageService(
-            access_token=access_token,
-            client_code=client_code,
-            x_forwarded_host=x_forwarded_host,
-            x_forwarded_port=x_forwarded_port,
-        )
-        # STEP 1: READ EXISTING RECORD
-        read_request = StorageReadRequest(
-            storageName="AISuggestedData",
-            appCode="marketingai",
-            clientCode=client_code,
-            filter=StorageFilter(field="businessUrl", value=website_url),
-        )
-        existing_data_response = await storage_service.read_page_storage(read_request)
+            # Normalize incoming URL
+            website_url = normalize_url(website_url)
+            logger.info(f"Normalized URL: {website_url}")
 
-        existing_record = None
-        existing_id = None
-        existing_summary = None
-        existing_businessType = None
-        existing_finalSummary = None
+            storage_service = StorageService(
+                access_token=access_token,
+                client_code=client_code,
+                x_forwarded_host=x_forwarded_host,
+                x_forwarded_port=x_forwarded_port,
+            )
+            # STEP 1: READ EXISTING RECORD
+            read_request = StorageReadRequest(
+                storageName="AISuggestedData",
+                appCode="marketingai",
+                clientCode=client_code,
+                filter=StorageFilter(field="businessUrl", value=website_url),
+            )
+            existing_data_response = await storage_service.read_page_storage(read_request)
 
-        if existing_data_response.success:
-            try:
-                records = (
-                    existing_data_response.result[0]
-                    .get("result", {})
-                    .get("result", {})
-                    .get("content", [])
+            existing_record = None
+            existing_id = None
+            existing_summary = None
+            existing_businessType = None
+            existing_finalSummary = None
+
+            if existing_data_response.success:
+                try:
+                    records = (
+                        existing_data_response.result[0]
+                        .get("result", {})
+                        .get("result", {})
+                        .get("content", [])
+                    )
+
+                    if records:
+                        existing_record = records[-1]
+                        existing_id = existing_record.get("_id")
+                        existing_businessType = existing_record.get("businessType", "")
+                        existing_summary = existing_record.get("summary", "")
+                        existing_finalSummary = existing_record.get("finalSummary", "")
+                except Exception as e:
+                    logger.warning(f"Error parsing existing storage data: {e}")
+
+            # STEP 2: DEFAULT BEHAVIOR IF SUMMARY EXISTS & rescrape=False
+            if (
+                existing_id
+                and existing_summary
+                and existing_summary.strip()
+                and not rescrape
+            ):
+
+                return WebsiteSummaryResponse(
+                    storage_id=existing_id,
+                    business_url=website_url,
+                    business_type=existing_businessType,
+                    summary=existing_summary,
+                    final_summary=existing_finalSummary,
                 )
 
-                if records:
-                    existing_record = records[-1]
-                    existing_id = existing_record.get("_id")
-                    existing_businessType = existing_record.get("businessType", "")
-                    existing_summary = existing_record.get("summary", "")
-                    existing_finalSummary = existing_record.get("finalSummary", "")
-            except Exception as e:
-                logger.warning(f"Error parsing existing storage data: {e}")
+            # STEP 3: SCRAPE WEBSITE
+            logger.info(f"Scraping website: {website_url}")
+            scraped_data = await scrape_website(website_url)
 
-        # STEP 2: DEFAULT BEHAVIOR IF SUMMARY EXISTS & rescrape=False
-        if (
-            existing_id
-            and existing_summary
-            and existing_summary.strip()
-            and not rescrape
-        ):
+            if not scraped_data:
+                raise HTTPException(status_code=500, detail="Failed to scrape website")
 
-            return WebsiteSummaryResponse(
-                storage_id=existing_id,
-                business_url=website_url,
-                business_type=existing_businessType,
-                summary=existing_summary,
-                final_summary=existing_finalSummary,
-            )
+            # STEP 4: GENERATE SUMMARY USING LLM
+            logger.info(f"Generating summary for {website_url}")
+            summary_raw = await self.generate_website_summary(scraped_data)
 
-        # STEP 3: SCRAPE WEBSITE
-        logger.info(f"Scraping website: {website_url}")
-        scraped_data = await scrape_website(website_url)
+            try:
+                parsed = json.loads(summary_raw)
+            except:
+                parsed = json.loads(summary_raw.replace("'", '"'))
 
-        if not scraped_data:
-            raise HTTPException(status_code=500, detail="Failed to scrape website")
+            summary_text = parsed.get("summary", "")
+            businessType = parsed.get("businessType", "")
 
-        # STEP 4: GENERATE SUMMARY USING LLM
-        logger.info(f"Generating summary for {website_url}")
-        summary_raw = await generate_website_summary(scraped_data)
+            # STEP 5: DECIDE UPDATE OR CREATE
+            # Case A: UPDATE EXISTING RECORD
+            if existing_id:
+                logger.info(f"Updating existing record: {existing_id}")
 
-        try:
-            parsed = json.loads(summary_raw)
-        except:
-            parsed = json.loads(summary_raw.replace("'", '"'))
+                update_payload = StorageUpdateWithPayload(
+                    storageName="AISuggestedData",
+                    clientCode=client_code,
+                    appCode="",
+                    dataObjectId=existing_id,
+                    dataObject={
+                        "summary": summary_text,
+                        "businessType": businessType,
+                        "finalSummary": summary_text,
+                        "siteLinks": scraped_data.get("links", []),
+                    },
+                )
 
-        summary_text = parsed.get("summary", "")
-        businessType = parsed.get("businessType", "")
+                await storage_service.update_storage(update_payload)
+                logger.info("Storage is updated successfully")
+                return WebsiteSummaryResponse(
+                    storage_id=existing_id,
+                    business_url=website_url,
+                    business_type=businessType,
+                    summary=summary_text,
+                    final_summary=summary_text,
+                )
 
-        # STEP 5: DECIDE UPDATE OR CREATE
-        # Case A: UPDATE EXISTING RECORD
-        if existing_id:
-            logger.info(f"Updating existing record: {existing_id}")
+            # Case B: CREATE NEW RECORD
+            logger.info("No existing record found → creating new")
 
-            update_payload = StorageUpdateWithPayload(
+            create_payload = StorageRequestWithPayload(
                 storageName="AISuggestedData",
                 clientCode=client_code,
                 appCode="",
-                dataObjectId=existing_id,
                 dataObject={
+                    "businessUrl": website_url,
                     "summary": summary_text,
                     "businessType": businessType,
                     "finalSummary": summary_text,
@@ -231,95 +257,69 @@ async def process_website_data(
                 },
             )
 
-            await storage_service.update_storage(update_payload)
-            logger.info("Storage is updated successfully")
+            create_response = await storage_service.write_storage(create_payload)
+
+            # Extract _id from NCLC response structure
+            new_storage_id = None
+            result_block = create_response.result
+
+            if isinstance(result_block, dict):
+                new_storage_id = result_block.get("dataObjectId") or result_block.get(
+                    "result", {}
+                ).get("result", {}).get("_id")
+
+            elif isinstance(result_block, list) and len(result_block) > 0:
+                item = result_block[0]
+                if "dataObjectId" in item:
+                    new_storage_id = item["dataObjectId"]
+                elif (
+                    isinstance(item, dict)
+                    and "result" in item
+                    and isinstance(item["result"], dict)
+                    and "result" in item["result"]
+                ):
+                    new_storage_id = item["result"]["result"].get("_id")
+
+            logger.info(f"Extracted Storage ID: {new_storage_id}")
+
             return WebsiteSummaryResponse(
-                storage_id=existing_id,
+                storage_id=new_storage_id,
                 business_url=website_url,
                 business_type=businessType,
                 summary=summary_text,
                 final_summary=summary_text,
             )
 
-        # Case B: CREATE NEW RECORD
-        logger.info("No existing record found → creating new")
+        except HTTPException:
+            raise
 
-        create_payload = StorageRequestWithPayload(
-            storageName="AISuggestedData",
-            clientCode=client_code,
-            appCode="",
-            dataObject={
-                "businessUrl": website_url,
-                "summary": summary_text,
-                "businessType": businessType,
-                "finalSummary": summary_text,
-                "siteLinks": scraped_data.get("links", []),
-            },
-        )
+        except Exception as e:
+            logger.exception(f"Unexpected error in process_website_data: {e}")
+            raise HTTPException(
+                status_code=500, detail="Internal server error during website processing"
+            )
 
-        create_response = await storage_service.write_storage(create_payload)
+    async def generate_website_summary(self, scraped_data: dict) -> str:
+        if not scraped_data:
+            raise BusinessValidationException(
+                "Scraped data is required for summary generation"
+            )
 
-        # Extract _id from NCLC response structure
-        new_storage_id = None
-        result_block = create_response.result
+        try:
+            prompt = prompt_loader.format_prompt(
+                "business/website_summary_prompt.txt", scraped_data=scraped_data
+            )
+            response = await chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                model=self.OPENAI_MODEL,
+                max_tokens=500,
+                temperature=0.2,
+            )
+            logger.info("Summary generated successfully")
+            logger.debug(f"Summary response: {response}")
+            return response.choices[0].message.content.strip()
 
-        if isinstance(result_block, dict):
-            new_storage_id = result_block.get("dataObjectId") or result_block.get(
-                "result", {}
-            ).get("result", {}).get("_id")
+        except Exception as e:
+            logger.error(f"Error generating summary: {e}")
+            raise AIProcessingException("Failed to generate summary")
 
-        elif isinstance(result_block, list) and len(result_block) > 0:
-            item = result_block[0]
-            if "dataObjectId" in item:
-                new_storage_id = item["dataObjectId"]
-            elif (
-                isinstance(item, dict)
-                and "result" in item
-                and isinstance(item["result"], dict)
-                and "result" in item["result"]
-            ):
-                new_storage_id = item["result"]["result"].get("_id")
-
-        logger.info(f"Extracted Storage ID: {new_storage_id}")
-
-        return WebsiteSummaryResponse(
-            storage_id=new_storage_id,
-            business_url=website_url,
-            business_type=businessType,
-            summary=summary_text,
-            final_summary=summary_text,
-        )
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        logger.exception(f"Unexpected error in process_website_data: {e}")
-        raise HTTPException(
-            status_code=500, detail="Internal server error during website processing"
-        )
-
-
-async def generate_website_summary(scraped_data: dict) -> str:
-    if not scraped_data:
-        raise BusinessValidationException(
-            "Scraped data is required for summary generation"
-        )
-
-    try:
-        prompt = prompt_loader.format_prompt(
-            "business/website_summary_prompt.txt", scraped_data=scraped_data
-        )
-        response = await chat_completion(
-            messages=[{"role": "user", "content": prompt}],
-            model="gpt-4o-mini",
-            max_tokens=500,
-            temperature=0.2,
-        )
-        logger.info("Summary generated successfully")
-        logger.debug(f"Summary response: {response}")
-        return response.choices[0].message.content.strip()
-
-    except Exception as e:
-        logger.error(f"Error generating summary: {e}")
-        raise AIProcessingException("Failed to generate summary")

@@ -1,20 +1,20 @@
 import os
 import tempfile
-import logging
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header, Body
 from dependencies.header_dependencies import CommonHeaders, get_common_headers
 from exceptions.custom_exceptions import BaseAppException
 from models.business_model import  ScreenshotRequest, WebsiteSummaryRequest
-from services.business_service import process_website_data
+from services.business_service import BusinessService
 from services.external_link_summary_service import process_external_link
 from services.pdf_service import process_pdf_from_path
 from services.screenshot_service import ScreenshotService
 from services.final_summary_service import generate_final_summary
 from utils.response_helpers import error_response, success_response
+from structlog import get_logger    #type: ignore
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @router.post("/screenshot")
@@ -47,7 +47,8 @@ async def analyze_website(
     headers: CommonHeaders = Depends(get_common_headers)
 ):
     try:
-        result = await process_website_data(
+        service = BusinessService()
+        result = await service.process_website_data(
             website_url=payload.business_url,
             rescrape=payload.rescrape,
             access_token=headers.access_token,

@@ -106,8 +106,6 @@ async def generate_budget_recommendation(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ------------------ Router ------------------
 @router.post("/generate-campaign")
 async def generate_campaign(
     request: GenerateCampaignRequest,

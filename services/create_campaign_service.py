@@ -18,7 +18,7 @@ async def create_and_post_campaign(
     2. Post payload to Google Ads via google_ads_client
     """
     # Validate presence of required fields from request_body
-    customer_id = request_body.customer_id or request_body.customerId
+    customer_id = request_body.customerId
     login_customer_id = (
         request_body.loginCustomerId
         or request_body.login_customer_id
