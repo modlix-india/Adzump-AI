@@ -1,8 +1,8 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
-import logging
+from structlog import get_logger    #type: ignore
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BusinessMetadata(BaseModel):
