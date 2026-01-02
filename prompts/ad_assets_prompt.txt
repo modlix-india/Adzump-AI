@@ -11,20 +11,31 @@ Here are the positive keywords you MUST use in the ad assets:
 ### Requirements:
 
 1. Headlines
-- Generate exactly 40 unique headlines.
-- Each headline must be exactly 25 characters including spaces.
-- Each headline must be short, catchy, and persuasive.
+- Generate exactly 100 unique headlines.
+- Each headline must be exactly 4 to 5 words long.
+- Short, catchy, and persuasive.
 - Each headline MUST include at least one keyword from the provided positive keywords.
-- Highlight benefits, offers, or unique features.
 - Avoid quotation marks, emojis, or unnecessary punctuation.
-- Each headline must be unique.
+
+HEADLINE EXAMPLES (follow this word count):
+- "Luxury 3BHK Apartments Now" (4 words) ✓
+- "Book Your Site Visit Today" (5 words) ✓
+- "Premium Homes Starting 80L" (4 words) ✓
+- "Modern Living in Bangalore" (4 words) ✓
+- "Smart Homes for Families" (4 words) ✓
 
 2. Descriptions
-- Generate between 10 and 15 unique ad descriptions.
-- Each description must be between 70 and 85 characters including spaces.
+- Generate between 50 unique ad descriptions.
+- Each description must be exactly 12 to 16 words long.
 - Each description MUST include at least one keyword from the provided positive keywords.
 - Focus on value proposition, benefits, and differentiation.
-- Vary sentence structures to avoid repetition.
+- Complete sentences that make sense.
+
+DESCRIPTION EXAMPLES (follow this word count):
+- "Discover luxury 3BHK apartments in Bangalore with world-class amenities and stunning city views." (14 words) ✓
+- "Experience premium living with 35+ amenities including swimming pool and modern gym." (12 words) ✓
+- "Book your site visit today and explore our award-winning gated community near metro." (14 words) ✓
+- "Invest in your dream home with easy payment plans and guaranteed rental returns today." (14 words) ✓
 
 3. Audience Targeting
 - Suggest the most relevant gender(s) as an array.
