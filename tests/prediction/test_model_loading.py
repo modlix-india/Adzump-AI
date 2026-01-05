@@ -2,7 +2,7 @@ import os
 import pytest
 import structlog
 from dotenv import load_dotenv
-from mlops.ad_performance_predictor import AdPerformancePredictor
+from mlops.performance import AdPerformancePredictor
 from oserver.utils.helpers import get_base_url
 
 logger = structlog.get_logger()

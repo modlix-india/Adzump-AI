@@ -1,4 +1,4 @@
 # MLOps module for ad performance prediction
-from .ad_performance_predictor import AdPerformancePredictor
+from mlops.performance import AdPerformancePredictor
 
 __all__ = ["AdPerformancePredictor"]

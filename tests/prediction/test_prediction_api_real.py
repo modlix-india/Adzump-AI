@@ -3,8 +3,8 @@ import pytest
 
 # The URL of your running server
 BASE_URL = "http://127.0.0.1:8000"
-ENDPOINT = f"{BASE_URL}/api/ds/prediction/forecast"
-HEALTH_ENDPOINT = f"{BASE_URL}/api/ds/prediction/health"
+ENDPOINT = f"{BASE_URL}/api/ds/prediction/performance/forecast"
+HEALTH_ENDPOINT = f"{BASE_URL}/api/ds/prediction/performance/health"
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_live_prediction_endpoint():
             {"keyword": "buy house in india", "match_type": "Broad match"},
         ],
         "total_budget": 50000,
-        "strategy": "Maximize Conversions",
+        "bid_strategy": "Maximize Conversions",
         "period": "Monthly",
     }
 
@@ -46,7 +46,7 @@ async def test_api_validation_empty_keyword():
     payload = {
         "keyword_data": [{"keyword": "", "match_type": "Exact match"}],
         "total_budget": 1000,
-        "strategy": "Maximize Clicks",
+        "bid_strategy": "Maximize Clicks",
     }
 
     async with httpx.AsyncClient() as client:
@@ -60,7 +60,11 @@ async def test_api_validation_empty_keyword():
 @pytest.mark.asyncio
 async def test_api_validation_empty_list():
     """Verify that Pydantic blocks empty lists automatically."""
-    payload = {"keyword_data": [], "total_budget": 1000, "strategy": "Maximize Clicks"}
+    payload = {
+        "keyword_data": [],
+        "total_budget": 1000,
+        "bid_strategy": "Maximize Clicks",
+    }
 
     async with httpx.AsyncClient() as client:
         response = await client.post(ENDPOINT, json=payload)

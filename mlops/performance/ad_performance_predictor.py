@@ -88,11 +88,11 @@ class AdPerformancePredictor:
         self,
         keyword_data: List[Dict[str, str]],
         total_budget: float,
-        strategy: str,
+        bid_strategy: str,
         period: str = "Monthly",
     ) -> Dict[str, str]:
         """
-        Predict performance ranges for keywords.
+        Predict performance ranges for keywords using batch processing.
 
         Dict containing predicted ranges for impressions, clicks, conversions.
         """
@@ -106,68 +106,70 @@ class AdPerformancePredictor:
         if period not in ["Weekly", "Monthly"]:
             raise ValueError("period must be 'Weekly' or 'Monthly'")
 
-        # Distribute budget equally among keywords
+        # Prepare batch inputs
+        keywords = [item["keyword"] for item in keyword_data]
+        match_types = [item["match_type"] for item in keyword_data]
         budget_per_kw = total_budget / len(keyword_data)
 
-        # Initialize aggregated ranges
+        # Batch encode embeddings (Eliminates the loop for encoding)
+        embeddings = self.sentence_model.encode(keywords)
+
+        # Vectorized feature engineering
+        now = datetime.now()
+        base_features = {
+            "Year": now.year,
+            "Month": now.month,
+            "Week_of_Year": now.isocalendar()[1],
+            "Cost": budget_per_kw,
+        }
+
+        # Create DataFrame from base features for all keywords
+        X_batch = pd.DataFrame([base_features] * len(keyword_data))
+
+        # Add embeddings (vectorized)
+        emb_cols = [f"Keyword_Embedding_{i}" for i in range(embeddings.shape[1])]
+        emb_df = pd.DataFrame(embeddings, columns=emb_cols)
+        X_batch = pd.concat([X_batch, emb_df], axis=1)
+
+        # Add one-hot encoded strategy and match types (vectorized)
+        X_batch[f"Ad_Group_Bid_Strategy_Type_{bid_strategy}"] = 1
+        for m_type in set(match_types):
+            X_batch.loc[
+                [i for i, mt in enumerate(match_types) if mt == m_type],
+                f"Search_Terms_Match_Type_{m_type}",
+            ] = 1
+
+        # Align with model columns once for the whole batch
+        ref_columns = (
+            self.reference_columns["monthly_columns"]
+            if period == "Monthly"
+            else self.reference_columns["weekly_columns"]
+        )
+        X_batch = X_batch.reindex(columns=ref_columns, fill_value=0)
+
+        # Batch Predictions and Aggregation
         aggregated_ranges = {
             "Impressions": [0.0, 0.0],
             "Clicks": [0.0, 0.0],
             "Conversions": [0.0, 0.0],
         }
 
-        # Get reference columns for the period
-        ref_columns = (
-            self.reference_columns["monthly_columns"]
-            if period == "Monthly"
-            else self.reference_columns["weekly_columns"]
-        )
+        for target in ["Impressions", "Clicks", "Conversions"]:
+            model_key = f"{period}_{target}_Model"
+            if model_key in self.models:
+                # Predict for all keywords in one call
+                preds_log = self.models[model_key].predict(X_batch)
+                sigma = self.uncertainty_sigmas[model_key]
 
-        # Process each keyword
-        for item in keyword_data:
-            kw = item["keyword"]
-            m_type = item["match_type"]
+                # Calculate ranges in log-space and convert back (vectorized)
+                lows = np.expm1(preds_log - sigma)
+                highs = np.expm1(preds_log + sigma)
 
-            # Generate keyword embedding
-            embedding = self.sentence_model.encode([kw])[0]
-            emb_dict = {
-                f"Keyword_Embedding_{i}": val for i, val in enumerate(embedding)
-            }
+                # Aggregate (Sum)
+                aggregated_ranges[target][0] = float(np.sum(lows))
+                aggregated_ranges[target][1] = float(np.sum(highs))
 
-            # Build feature row with current date
-            now = datetime.now()
-            row_data = {
-                "Year": now.year,
-                "Month": now.month,
-                "Week_of_Year": now.isocalendar()[1],  # ISO week number
-                "Cost": budget_per_kw,
-                **emb_dict,
-            }
-
-            # Create DataFrame and add one-hot encoded columns
-            X_row = pd.DataFrame([row_data])
-            X_row[f"Ad_Group_Bid_Strategy_Type_{strategy}"] = 1
-            X_row[f"Search_Terms_Match_Type_{m_type}"] = 1
-
-            # Align with training columns (adds missing as 0)
-            X_row = X_row.reindex(columns=ref_columns, fill_value=0)
-
-            # Predict for each target
-            for target in ["Impressions", "Clicks", "Conversions"]:
-                model_key = f"{period}_{target}_Model"
-                if model_key in self.models:
-                    # Predict in log-space
-                    pred_log = self.models[model_key].predict(X_row)[0]
-                    sigma = self.uncertainty_sigmas[model_key]
-
-                    # Calculate range using sigma
-                    low = np.expm1(pred_log - sigma)
-                    high = np.expm1(pred_log + sigma)
-
-                    aggregated_ranges[target][0] += low
-                    aggregated_ranges[target][1] += high
-
-        # Format the response
+        # Format response
         return {
             "timeframe": period,
             "budget_allocated": f"₹{total_budget:,.0f}",

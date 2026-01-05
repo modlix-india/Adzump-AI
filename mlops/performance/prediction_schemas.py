@@ -2,18 +2,10 @@ from typing import List, Literal
 from pydantic import BaseModel, Field, ConfigDict
 
 
-class KeywordInput(BaseModel):
-    """Single keyword with match type for prediction."""
-
-    keyword: str = Field(
-        ..., min_length=1, description="The keyword text to predict performance for"
-    )
-    match_type: Literal["Exact match", "Phrase match", "Broad match"] = Field(
-        ..., description="Google Ads match type for the keyword"
-    )
+from models.keyword_model import KeywordInput
 
 
-class PredictionRequest(BaseModel):
+class PerformancePredictionReq(BaseModel):
     """Request body for ad performance prediction."""
 
     keyword_data: List[KeywordInput] = Field(
@@ -22,7 +14,7 @@ class PredictionRequest(BaseModel):
     total_budget: float = Field(
         ..., gt=0, description="Total campaign budget to distribute among keywords"
     )
-    strategy: str = Field(
+    bid_strategy: str = Field(
         ...,
         min_length=1,
         description="Bid strategy type, e.g., 'Maximize Conversions', 'Maximize Clicks'",
@@ -40,14 +32,14 @@ class PredictionRequest(BaseModel):
                     {"keyword": "buy house near me", "match_type": "Broad match"},
                 ],
                 "total_budget": 50000,
-                "strategy": "Maximize Conversions",
+                "bid_strategy": "Maximize Conversions",
                 "period": "Monthly",
             }
         }
     )
 
 
-class PredictionResponse(BaseModel):
+class PerformancePredictionData(BaseModel):
     """Response body with predicted performance ranges."""
 
     timeframe: str = Field(..., description="Prediction period (Weekly/Monthly)")

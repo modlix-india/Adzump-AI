@@ -2,8 +2,11 @@ import os
 import structlog
 from fastapi import APIRouter, HTTPException, FastAPI
 from contextlib import asynccontextmanager
-from mlops.prediction_schemas import PredictionRequest, PredictionResponse
-from mlops.ad_performance_predictor import AdPerformancePredictor
+from mlops.performance import (
+    PerformancePredictionReq,
+    PerformancePredictionData,
+    AdPerformancePredictor,
+)
 from oserver.utils import helpers
 
 # Configure logger
@@ -68,11 +71,15 @@ async def lifespan(app: FastAPI):
     logger.info("prediction_service_shutdown")
 
 
-router = APIRouter(prefix="/api/ds/prediction", tags=["prediction"], lifespan=lifespan)
+router = APIRouter(
+    prefix="/api/ds/prediction/performance", tags=["performance"], lifespan=lifespan
+)
 
 
-@router.post("/forecast", response_model=PredictionResponse)
-async def forecast_performance(request: PredictionRequest) -> PredictionResponse:
+@router.post("/forecast", response_model=PerformancePredictionData)
+async def forecast_performance(
+    request: PerformancePredictionReq,
+) -> PerformancePredictionData:
     """
     Predict ad performance metrics (impressions, clicks, conversions).
 
@@ -91,11 +98,11 @@ async def forecast_performance(request: PredictionRequest) -> PredictionResponse
         result = current_predictor.predict(
             keyword_data=keyword_data,
             total_budget=request.total_budget,
-            strategy=request.strategy,
+            bid_strategy=request.bid_strategy,
             period=request.period,
         )
 
-        return PredictionResponse(**result)
+        return PerformancePredictionData(**result)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
