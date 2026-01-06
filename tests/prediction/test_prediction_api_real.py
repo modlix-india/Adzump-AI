@@ -1,5 +1,8 @@
 import httpx
 import pytest
+import structlog
+
+logger = structlog.get_logger()
 
 # The URL of your running server
 BASE_URL = "http://127.0.0.1:8000"
@@ -33,11 +36,28 @@ async def test_live_prediction_endpoint():
         )
 
         data = response.json()
+        logger.info("prediction_api_response", response_data=data)
         assert data["timeframe"] == "Monthly"
         assert "budget_allocated" in data
         assert "₹" in data["budget_allocated"]  # Verify formatting
-        assert "impressions" in data
-        assert " - " in data["impressions"]  # Verify range formatting
+
+        # Verify metrics (now single values, not ranges)
+        for field in ["impressions", "clicks", "conversions"]:
+            assert field in data
+            assert " - " not in data[field]  # Verify range is removed
+
+        # Verify derived metrics
+        assert "ctr" in data
+        assert "%" in data["ctr"]
+        assert " - " not in data["ctr"]
+
+        assert "cpa" in data
+        assert "₹" in data["cpa"]
+        assert " - " not in data["cpa"]
+
+        assert "conversion_rate" in data
+        assert "%" in data["conversion_rate"]
+        assert " - " not in data["conversion_rate"]
 
 
 @pytest.mark.asyncio
