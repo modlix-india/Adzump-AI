@@ -1,5 +1,6 @@
 import os
 import pickle
+import math
 import structlog
 import requests
 import io
@@ -148,10 +149,10 @@ class AdPerformancePredictor:
         X_batch = X_batch.reindex(columns=ref_columns, fill_value=0)
 
         # Batch Predictions and Aggregation
-        aggregated_ranges = {
-            "Impressions": [0.0, 0.0],
-            "Clicks": [0.0, 0.0],
-            "Conversions": [0.0, 0.0],
+        aggregated_metrics = {
+            "Impressions": 0.0,
+            "Clicks": 0.0,
+            "Conversions": 0.0,
         }
 
         for target in ["Impressions", "Clicks", "Conversions"]:
@@ -161,22 +162,69 @@ class AdPerformancePredictor:
                 preds_log = self.models[model_key].predict(X_batch)
                 sigma = self.uncertainty_sigmas[model_key]
 
-                # Calculate ranges in log-space and convert back (vectorized)
+                # Calculate range bounds and take their average as the point estimate
+                # This provides a more intuitive "middle" than the raw median.
                 lows = np.expm1(preds_log - sigma)
                 highs = np.expm1(preds_log + sigma)
+                mid_estimates = (lows + highs) / 2
 
-                # Aggregate (Sum)
-                aggregated_ranges[target][0] = float(np.sum(lows))
-                aggregated_ranges[target][1] = float(np.sum(highs))
+                aggregated_metrics[target] = float(np.sum(mid_estimates))
 
-        # Format response
+        return self._format_prediction_response(
+            aggregated_metrics, total_budget, period
+        )
+
+    def _format_prediction_response(
+        self,
+        aggregated_metrics: Dict[str, float],
+        total_budget: float,
+        period: str,
+    ) -> Dict[str, str]:
+        """
+        Calculates derived metrics and formats the final response dictionary using single point estimates.
+        Uses math.ceil for base metrics to ensure consistent UI math and optimistic reporting.
+        """
+        # 1. Extract values and apply "Ceil" rounding for higher values / UI consistency
+        impressions = math.ceil(max(0, aggregated_metrics["Impressions"]))
+        clicks = math.ceil(max(0, aggregated_metrics["Clicks"]))
+        conversions = math.ceil(max(0, aggregated_metrics["Conversions"]))
+
+        # 2. Calculate Derived Metrics (Averages)
+        # CTR = (Clicks / Impressions) * 100
+        ctr = (clicks / impressions * 100) if impressions > 0 else 0
+
+        # CPA = Total Budget / Conversions
+        cpa = (total_budget / conversions) if conversions > 0 else 0
+
+        # Conv Rate = (Conversions / Clicks) * 100
+        cv_rate = (conversions / clicks * 100) if clicks > 0 else 0
+
+        # 3. Construct response
         return {
             "timeframe": period,
             "budget_allocated": f"₹{total_budget:,.0f}",
-            "impressions": f"{round(max(0, aggregated_ranges['Impressions'][0])):,} - {round(aggregated_ranges['Impressions'][1]):,}",
-            "clicks": f"{round(max(0, aggregated_ranges['Clicks'][0])):,} - {round(aggregated_ranges['Clicks'][1]):,}",
-            "conversions": f"{round(max(0, aggregated_ranges['Conversions'][0])):,} - {round(aggregated_ranges['Conversions'][1]):,}",
+            "impressions": self._format_metric(impressions),
+            "clicks": self._format_metric(clicks),
+            "conversions": self._format_metric(conversions),
+            "ctr": self._format_metric(ctr, is_percent=True),
+            "cpa": self._format_metric(cpa, is_currency=True),
+            "conversion_rate": self._format_metric(cv_rate, is_percent=True),
         }
+
+    def _format_metric(
+        self,
+        val: float,
+        is_percent: bool = False,
+        is_currency: bool = False,
+    ) -> str:
+        """Helper for formatting single metric values with symbols."""
+        prefix = "₹" if is_currency else ""
+        suffix = "%" if is_percent else ""
+
+        if is_percent:
+            return f"{val:.2f}{suffix}"
+
+        return f"{prefix}{round(val):,}{suffix}"
 
     def is_ready(self) -> bool:
         """Check if predictor is loaded."""
