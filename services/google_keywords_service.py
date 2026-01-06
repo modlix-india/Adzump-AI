@@ -279,7 +279,7 @@ class GoogleKeywordService:
         resp = await chat_completion(
             messages=[{"role": "user", "content": prompt}],
             model=self.OPENAI_MODEL,
-            max_tokens=3000,
+            max_tokens=6000,
             temperature=0.1,
             response_format={"type": "json_object"}
         )

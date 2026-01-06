@@ -11,11 +11,15 @@ Here are the positive keywords you MUST use in the ad assets:
 ### Requirements:
 
 1. Headlines
-- Generate exactly 100 unique headlines.
-- Each headline must be exactly 4 to 5 words long.
+- Generate exactly 50 unique headlines. Each headline must be COMPLETELY DIFFERENT from all others.
+- No two headlines should share the same structure, word pattern, or meaning.
+- Each headline must be exactly 3 to 4 words long.
 - Short, catchy, and persuasive.
 - Each headline MUST include at least one keyword from the provided positive keywords.
+- Use a VARIETY of headline styles: questions, statements, calls-to-action, benefit-focused, urgency-driven.
+- Do NOT start more than 3 headlines with the same word.
 - Avoid quotation marks, emojis, or unnecessary punctuation.
+- Before finalizing, review all headlines and replace any that are semantically similar.
 
 HEADLINE EXAMPLES (follow this word count):
 - "Luxury 3BHK Apartments Now" (4 words) ✓
@@ -25,7 +29,7 @@ HEADLINE EXAMPLES (follow this word count):
 - "Smart Homes for Families" (4 words) ✓
 
 2. Descriptions
-- Generate between 50 unique ad descriptions.
+- Generate 50 unique ad descriptions.
 - Each description must be exactly 12 to 16 words long.
 - Each description MUST include at least one keyword from the provided positive keywords.
 - Focus on value proposition, benefits, and differentiation.
