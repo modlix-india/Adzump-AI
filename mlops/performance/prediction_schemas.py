@@ -40,22 +40,28 @@ class PerformancePredictionReq(BaseModel):
 
 
 class PerformancePredictionData(BaseModel):
-    """Response body with predicted performance ranges."""
+    """Response body with predicted performance estimates."""
 
     timeframe: str = Field(..., description="Prediction period (Weekly/Monthly)")
     budget_allocated: str = Field(..., description="Formatted budget amount")
-    impressions: str = Field(..., description="Predicted impressions range")
-    clicks: str = Field(..., description="Predicted clicks range")
-    conversions: str = Field(..., description="Predicted conversions range")
+    impressions: str = Field(..., description="Predicted total impressions")
+    clicks: str = Field(..., description="Predicted total clicks")
+    conversions: str = Field(..., description="Predicted total conversions")
+    ctr: str = Field(..., description="Predicted Click-Through Rate (%)")
+    cpa: str = Field(..., description="Predicted Cost Per Conversion")
+    conversion_rate: str = Field(..., description="Predicted Conversion Rate (%)")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "timeframe": "Monthly",
-                "budget_allocated": "₹50,000",
-                "impressions": "10,000 - 25,000",
-                "clicks": "500 - 1,200",
-                "conversions": "20 - 50",
+                "budget_allocated": "₹15,000",
+                "impressions": "1,333",
+                "clicks": "211",
+                "conversions": "11",
+                "ctr": "15.83%",
+                "cpa": "₹1,363",
+                "conversion_rate": "5.21%",
             }
         }
     )
