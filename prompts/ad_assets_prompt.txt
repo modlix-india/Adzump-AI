@@ -10,56 +10,63 @@ Here are the positive keywords you MUST use in the ad assets:
 
 ### Requirements:
 
-1. Headlines
-- Generate exactly 50 unique headlines. Each headline must be COMPLETELY DIFFERENT from all others.
-- No two headlines should share the same structure, word pattern, or meaning.
-- Each headline must be exactly 3 to 4 words long.
-- Short, catchy, and persuasive.
-- Each headline MUST include at least one keyword from the provided positive keywords.
-- Use a VARIETY of headline styles: questions, statements, calls-to-action, benefit-focused, urgency-driven.
-- Do NOT start more than 3 headlines with the same word.
-- Avoid quotation marks, emojis, or unnecessary punctuation.
-- Before finalizing, review all headlines and replace any that are semantically similar.
+1. Headlines (KEYWORD REQUIRED IN EACH)
 
-HEADLINE EXAMPLES (follow this word count):
-- "Luxury 3BHK Apartments Now" (4 words) ✓
-- "Book Your Site Visit Today" (5 words) ✓
-- "Premium Homes Starting 80L" (4 words) ✓
-- "Modern Living in Bangalore" (4 words) ✓
-- "Smart Homes for Families" (4 words) ✓
+For EACH headline, follow this process:
+Step 1: Pick one keyword from the positive keywords list above
+Step 2: Build a short, catchy headline that naturally contains that keyword
+Step 3: Verify the keyword appears in the headline before adding it
 
-2. Descriptions
-- Generate 50 unique ad descriptions.
-- Each description must be exactly 12 to 16 words long.
-- Each description MUST include at least one keyword from the provided positive keywords.
-- Focus on value proposition, benefits, and differentiation.
-- Complete sentences that make sense.
+Rules:
+- Generate exactly 60 unique headlines
+- Each headline must be 3 to 4 words long
+- Each headline MUST contain at least one keyword from the list (this is mandatory)
+- Each headline must be completely different from others
+- Use variety: statements, calls-to-action
+- Avoid quotation marks, emojis, or special characters
 
-DESCRIPTION EXAMPLES (follow this word count):
-- "Discover luxury 3BHK apartments in Bangalore with world-class amenities and stunning city views." (14 words) ✓
-- "Experience premium living with 35+ amenities including swimming pool and modern gym." (12 words) ✓
-- "Book your site visit today and explore our award-winning gated community near metro." (14 words) ✓
-- "Invest in your dream home with easy payment plans and guaranteed rental returns today." (14 words) ✓
+CORRECT EXAMPLES (keyword is part of headline):
+- "Luxury Apartments Available Now" → contains keyword "apartments"
+- "Premium 3BHK Villa Ready" → contains keyword "3BHK"
+- "Bangalore Dream Homes" → contains keyword "Bangalore"
+- "Book Site Visit Today" → contains keyword "site visit"
+
+WRONG EXAMPLES (no keyword):
+- "Best Deals Available" → missing keyword ❌
+- "Call Us Today" → missing keyword ❌
+
+2. Descriptions (KEYWORD REQUIRED IN EACH)
+
+For EACH description, include at least one keyword from the positive keywords list.
+
+Rules:
+- Generate exactly 15 unique descriptions
+- Each description must be 12 to 16 words long
+- Each description MUST contain at least one keyword from the list
+- Focus on value proposition and benefits
+- Complete, grammatically correct sentences
+
+EXAMPLES:
+- "Discover luxury 3BHK apartments in Bangalore with world-class amenities and stunning city views."
+- "Experience premium living with 35+ amenities including swimming pool and modern gym."
+- "Book your site visit today and explore our award-winning gated community near metro."
 
 3. Audience Targeting
-- Suggest the most relevant gender(s) as an array.
-- Select the most relevant age ranges ONLY from the allowed list below.
-- Do NOT invent new age ranges.
-- Return only clearly relevant age ranges (maximum 3).
-
-Allowed age ranges:
-["18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
+- Suggest the most relevant gender(s) as an array
+- Select age ranges ONLY from: ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
+- Return maximum 3 age ranges
 
 ### Output format:
 Return strictly as a valid JSON object:
 
 {{
-  "headlines": ["Headline 1", "Headline 2", "..."],
-  "descriptions": ["Description 1", "Description 2", "..."],
+  "headlines": ["Headline 1", "Headline 2", ...],
+  "descriptions": ["Description 1", "Description 2", ...],
   "audience": {{
     "gender": ["Male", "Female"],
     "age_range": ["25-34", "35-44"]
   }}
 }}
 
-Do not include explanations, comments, or extra text outside the JSON object.
+REMINDER: Every headline and description must contain at least one keyword from the provided list.
+Do not include explanations or text outside the JSON.
