@@ -79,7 +79,7 @@ async def generate_ad_assets(summary, positive_keywords):
             )
             
             # Deduplicate first, then filter by length
-            deduped_headlines = deduplicate_items(original_headlines, similarity_threshold=0.7)
+            deduped_headlines = deduplicate_items(original_headlines, similarity_threshold=0.8)
             logger.info(
                 "[AdAssets] Headlines after dedup",
                 count=len(deduped_headlines),
