@@ -23,7 +23,7 @@ Each object must follow this exact structure:
  "Insurance coverage",
  "Models",
  "Neighborhoods",
- "Services",
+ "Service catalog",
  "Shows",
  "Styles",
  "Types"]
@@ -36,7 +36,7 @@ Each object must follow this exact structure:
 - Do NOT invent or modify headers.
 
 ### Value Rules:
-- Each "values" list must contain between 3 and 7 items (NEVER fewer than 3).
+- Each "values" list must contain a minimum of 3 items and a maximum of 7 items (never fewer than 3).
 - Values must be relevant to the Business Summary AND the selected header.
 - Each value must be 25 characters or fewer.
 - No prices, promotional language, punctuation marks, emojis, URLs, or contact details.
