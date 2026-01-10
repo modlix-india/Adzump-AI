@@ -1,14 +1,50 @@
-Merge all PDF partial summaries below into one coherent document.
-You MUST preserve ALL factual details exactly as provided.
+You are merging multiple partial business summaries into ONE cohesive marketing summary.
 
-Do NOT:
-- Remove facts
-- Compress or shorten information
-- Skip any section
-- Combine or average numbers
-- Simplify technical details
+CONTEXT: This merged summary will be used to generate Google Ads keywords, headlines, and descriptions. Include ALL business-relevant details.
 
-Ensure the final content is readable, well-structured, and combined logically.
-
-PARTIAL SUMMARIES:
+INPUT - PARTIAL SUMMARIES:
 {summaries}
+
+TASK:
+Combine all partial summaries into a comprehensive marketing summary in 2-4 paragraphs.
+Include ALL useful details from every chunk - do not filter out information just because 
+it only appears once.
+
+MUST INCLUDE (if present):
+• Property/product types, configurations, sizes (e.g., 2BHK, 3BHK, sq.ft.)
+• Floor plans, layouts, specifications
+• Pricing and payment details
+• Project name, developer/company name
+• Location, address, landmarks, nearby places
+• Amenities and features
+• Contact information (phone, email)
+• USPs and differentiators
+
+EXCLUDE ONLY:
+• Page numbers, headers, footers
+• Copyright notices, legal disclaimers
+• Duplicate information (keep one instance)
+• OCR artifacts or garbled text
+
+CONTENT STRUCTURE:
+PARAGRAPH 1: Project/business overview, property types, configurations, sizes
+PARAGRAPH 2: Location, nearby places, landmarks, connectivity
+PARAGRAPH 3: Amenities, features, USPs
+PARAGRAPH 4 (if needed): Pricing, contact details, additional info
+
+STRICT RULES:
+• Output 2-4 paragraphs
+• PRESERVE all specific numbers, measurements, prices
+• PRESERVE all location names and landmarks
+• Use professional, marketing-ready language
+• DO NOT include URLs
+• DO NOT use bullet points or markdown
+• Replace internal double quotes with single quotes
+• Ensure valid JSON output
+
+OUTPUT FORMAT (return ONLY this JSON):
+{{
+  "mergedSummary": "<comprehensive_summary_with_all_details>"
+}}
+
+

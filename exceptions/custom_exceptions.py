@@ -19,8 +19,13 @@ class AIProcessingException(BaseAppException):
 
 class ScraperException(BaseAppException):
     """Website scraping failed."""
-    def __init__(self, message: str = "Failed to scrape website content"):
-        super().__init__(message, status.HTTP_502_BAD_GATEWAY)
+    def __init__(
+        self, 
+        message: str = "Failed to scrape website content",
+        details: dict = None
+    ):
+        super().__init__(message, status.HTTP_400_BAD_REQUEST)
+        self.details = details or {}
 
 class StorageException(BaseAppException):
     """Storage read/write failed."""

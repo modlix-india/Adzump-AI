@@ -3,7 +3,7 @@ import tempfile
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header, Body
 from dependencies.header_dependencies import CommonHeaders, get_common_headers
-from exceptions.custom_exceptions import BaseAppException
+from exceptions.custom_exceptions import BaseAppException, ScraperException
 from models.business_model import  ScreenshotRequest, WebsiteSummaryRequest
 from services.business_service import BusinessService
 from services.external_link_summary_service import process_external_link
@@ -57,8 +57,14 @@ async def analyze_website(
             x_forwarded_port=headers.x_forwarded_port,
         )
         return success_response(result.model_dump())
+    except ScraperException as e:
+        logger.warning(f"[AnalyzeController] Scraping blocked: {e.message}")
+        return error_response(e.message, details=e.details, status_code=e.status_code)
+    except HTTPException as e:
+        logger.warning(f"[AnalyzeController] HTTP error: {e.detail}")
+        return error_response(e.detail, status_code=e.status_code)
     except BaseAppException as e:
-        return error_response(e.message, e.status_code)
+        return error_response(e.message, status_code=e.status_code)
     except Exception as e:
         logger.exception(f"[AnalyzeController] Unexpected error: {e}")
         return error_response("Unexpected error while analyzing website")
@@ -80,8 +86,14 @@ async def generate_external_summary(
             x_forwarded_port=headers.x_forwarded_port,
         )
         return success_response(result.model_dump())
+    except ScraperException as e:
+        logger.warning(f"[ExternalSummaryController] Scraping blocked: {e.message}")
+        return error_response(e.message, details=e.details, status_code=e.status_code)
+    except HTTPException as e:
+        logger.warning(f"[ExternalSummaryController] HTTP error: {e.detail}")
+        return error_response(e.detail, status_code=e.status_code)
     except BaseAppException as e:
-        return error_response(e.message, e.status_code)
+        return error_response(e.message, status_code=e.status_code)
     except Exception as e:
         logger.exception(f"[ExternalSummaryController] Unexpected error: {e}")
         return error_response("Unexpected error while generating external summary")

@@ -81,6 +81,10 @@ class WebsiteSummaryRequest(BaseModel):
     external_url: Optional[str] = None
     rescrape: bool = False
 
+class LocationInfo(BaseModel):
+    parent_location: Optional[str] = None
+    locations: Optional[List[str]] = None
+
 class WebsiteSummaryResponse(BaseModel):
     business_url: str
     storage_id: Optional[str] = None
@@ -88,3 +92,4 @@ class WebsiteSummaryResponse(BaseModel):
     business_type: Optional[str] = None
     summary: Optional[str] = None
     final_summary: Optional[str] = None
+    location: Optional[LocationInfo] = None

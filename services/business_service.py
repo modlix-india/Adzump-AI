@@ -4,10 +4,12 @@ from typing import List
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
+    ScraperException,
 )
 from services.scraper_service import scrape_website
+from models.scrape_permission_model import ScrapeResult
 from utils import prompt_loader
-from models.business_model import BusinessMetadata, WebsiteSummaryResponse
+from models.business_model import BusinessMetadata, WebsiteSummaryResponse, LocationInfo
 from fastapi import HTTPException
 from oserver.models.storage_request_model import (
     StorageFilter,
@@ -159,6 +161,7 @@ class BusinessService:
             existing_summary = None
             existing_businessType = None
             existing_finalSummary = None
+            existing_location = None
 
             if existing_data_response.success:
                 try:
@@ -175,6 +178,12 @@ class BusinessService:
                         existing_businessType = existing_record.get("businessType", "")
                         existing_summary = existing_record.get("summary", "")
                         existing_finalSummary = existing_record.get("finalSummary", "")
+                        existing_location_data = existing_record.get("location", {})
+                        if existing_location_data:
+                            existing_location = LocationInfo(
+                                parent_location=existing_location_data.get("parentLocation"),
+                                locations=existing_location_data.get("locations", [])
+                            )
                 except Exception as e:
                     logger.warning(f"Error parsing existing storage data: {e}")
 
@@ -192,14 +201,32 @@ class BusinessService:
                     business_type=existing_businessType,
                     summary=existing_summary,
                     final_summary=existing_finalSummary,
+                    location=existing_location,
                 )
 
             # STEP 3: SCRAPE WEBSITE
             logger.info(f"Scraping website: {website_url}")
-            scraped_data = await scrape_website(website_url)
+            scrape_result: ScrapeResult = await scrape_website(website_url)
 
-            if not scraped_data:
-                raise HTTPException(status_code=500, detail="Failed to scrape website")
+            if not scrape_result.success:
+                error_msg = scrape_result.error.message if scrape_result.error else "Failed to scrape website"
+                logger.warning(f"Scraping blocked: {error_msg}")
+                error_details = {
+                    "block_reason": scrape_result.error.type.value if scrape_result.error else "unknown",
+                    "url": website_url,
+                    "warnings": [
+                        {"type": w.type.value, "message": w.message} 
+                        for w in scrape_result.warnings
+                    ]
+                }
+                raise ScraperException(message=error_msg, details=error_details)
+
+            scraped_data = scrape_result.data
+
+            # Log any warnings from the scraper
+            if scrape_result.warnings:
+                for warning in scrape_result.warnings:
+                    logger.warning(f"Scrape warning: {warning.message}")
 
             # STEP 4: GENERATE SUMMARY USING LLM
             logger.info(f"Generating summary for {website_url}")
@@ -212,6 +239,11 @@ class BusinessService:
 
             summary_text = parsed.get("summary", "")
             businessType = parsed.get("businessType", "")
+            location_data = parsed.get("location", {})
+            location_info = LocationInfo(
+                parent_location=location_data.get("parentLocation"),
+                locations=location_data.get("locations", [])
+            ) if location_data else None
 
             # STEP 5: DECIDE UPDATE OR CREATE
             # Case A: UPDATE EXISTING RECORD
@@ -228,6 +260,10 @@ class BusinessService:
                         "businessType": businessType,
                         "finalSummary": summary_text,
                         "siteLinks": scraped_data.get("links", []),
+                        "location": {
+                            "parentLocation": location_info.parent_location if location_info else None,
+                            "locations": location_info.locations if location_info else []
+                        },
                     },
                 )
 
@@ -239,6 +275,7 @@ class BusinessService:
                     business_type=businessType,
                     summary=summary_text,
                     final_summary=summary_text,
+                    location=location_info,
                 )
 
             # Case B: CREATE NEW RECORD
@@ -254,6 +291,10 @@ class BusinessService:
                     "businessType": businessType,
                     "finalSummary": summary_text,
                     "siteLinks": scraped_data.get("links", []),
+                    "location": {
+                        "parentLocation": location_info.parent_location if location_info else None,
+                        "locations": location_info.locations if location_info else []
+                    },
                 },
             )
 
@@ -288,9 +329,13 @@ class BusinessService:
                 business_type=businessType,
                 summary=summary_text,
                 final_summary=summary_text,
+                location=location_info,
             )
 
         except HTTPException:
+            raise
+        
+        except ScraperException:
             raise
 
         except Exception as e:
@@ -312,8 +357,8 @@ class BusinessService:
             response = await chat_completion(
                 messages=[{"role": "user", "content": prompt}],
                 model=self.OPENAI_MODEL,
-                max_tokens=500,
                 temperature=0.2,
+                response_format={"type": "json_object"},
             )
             logger.info("Summary generated successfully")
             logger.debug(f"Summary response: {response}")

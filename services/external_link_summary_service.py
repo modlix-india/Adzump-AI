@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from models.business_model import WebsiteSummaryResponse
 from services.business_service import BusinessService
 from services.scraper_service import scrape_website
+from models.scrape_permission_model import ScrapeResult
 from utils.helpers import normalize_url
 from oserver.models.storage_request_model import (
     StorageFilter,
@@ -77,7 +78,8 @@ async def process_external_link(
             business_url=business_url,
             external_url=external_url,
             summary=existing_summary,
-            final_summary=record.get("finalSummary", "")
+            final_summary=record.get("finalSummary", ""),
+            locations=record.get("locations", []),
         )
         # CASE A2 — Summary missing OR rescrape=True → regenerate
         logger.info(
@@ -87,11 +89,32 @@ async def process_external_link(
         # CASE B — External link does NOT exist → scrape and add new
         logger.info("[ExternalLink] New external URL → creating new summary entry")
     # STEP 4: SCRAPE the external URL
-    scraped_data = await scrape_website(url=external_url)
-    logger.info(f"[ExternalLink] Scraped Data: {bool(scraped_data)}")
-    # Robust validate scraped data
-    if not scraped_data or ("content" in scraped_data and not scraped_data["content"]):
-        raise HTTPException(500, "Scraper returned empty content for external website")
+    scrape_result: ScrapeResult = await scrape_website(url=external_url)
+    logger.info(f"[ExternalLink] Scrape success: {scrape_result.success}")
+
+    # Handle blocked scrapes
+    if not scrape_result.success:
+        error_msg = scrape_result.error.message if scrape_result.error else "Scraper blocked"
+        logger.warning(f"[ExternalLink] Scraping blocked: {error_msg}")
+        error_details = {
+            "block_reason": scrape_result.error.type.value if scrape_result.error else "unknown",
+            "url": external_url,
+            "warnings": [
+                {"type": w.type.value, "message": w.message} 
+                for w in scrape_result.warnings
+            ]
+        }
+        
+        from exceptions.custom_exceptions import ScraperException
+        raise ScraperException(message=error_msg, details=error_details)
+
+    scraped_data = scrape_result.data
+
+    # Log any warnings from the scraper
+    if scrape_result.warnings:
+        for warning in scrape_result.warnings:
+            logger.warning(f"[ExternalLink] Scrape warning: {warning.message}")
+
     # STEP 5: LLM SUMMARY GENERATION
     logger.info(f"[ExternalLink] Generating summary for {external_url}")
     business_service = BusinessService()
@@ -101,6 +124,7 @@ async def process_external_link(
     except:
         parsed = json.loads(summary_raw.replace("'", '"'))
     summary_text = parsed.get("summary", "")
+    locations = parsed.get("locations", [])
     # STEP 6: UPDATE OR APPEND external link summary
     updated_links = existing_links.copy()
     if existing_external_item:
@@ -148,4 +172,5 @@ async def process_external_link(
             external_url=external_url,
             summary=summary_text,
             final_summary=merged_final_summary,
+            locations=locations,
         )

@@ -6,13 +6,27 @@ from pydantic import BaseModel
 from typing import List
 
 from services.maps.place_resolver import resolve_place_to_id
+from services.geo_target_service import GeoTargetService
+from models.geo_target_model import GeoTargetRequest, GeoTargetResponse
 
 router = APIRouter(prefix="/api/ds/maps", tags=["Maps"])
 
+geo_service = GeoTargetService()
 
 class MapRequest(BaseModel):
     places: List[str]
+  
+@router.post("/resolve", response_model=GeoTargetResponse)
+async def resolve_geo_targets(req: GeoTargetRequest):
+    if not req.locations:
+        raise HTTPException(status_code=400, detail="No locations provided")
 
+    result = await geo_service.resolve_locations_batch(
+        req.locations, 
+        parent_location=req.parent_location
+    )
+
+    return result
 
 @router.post("/render")
 async def render_map_url(req: MapRequest):
