@@ -14,7 +14,7 @@ services:
       - ENVIRONMENT=dev
       - LOG_LEVEL=INFO
     volumes:
-      - '/var/log/apps/:/logs:z'
+      - './logs:/logs'
     depends_on:
       postgres:
         condition: service_healthy

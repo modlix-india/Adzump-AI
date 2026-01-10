@@ -143,7 +143,7 @@ class ScreenshotService:
             )
             create_response = await self.storage.write_storage(req)
             storage_id = None
-            logger.info(f"[ScreenshotService] New record created with ID: {create_response.result[0]["result"]["result"]["_id"]}")
+            logger.info(f"[ScreenshotService] New record created with ID: {create_response.result[0]['result']['result']['_id']}")
             if create_response.success:
                 storage_id = create_response.result[0]["result"]["result"]["_id"]
             return ScreenshotResponse(
