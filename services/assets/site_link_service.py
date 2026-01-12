@@ -1,11 +1,11 @@
 from fastapi import HTTPException
 from urllib.parse import urlparse
 import json
-from utils.text_utils import is_internal_link
+from utils.text_utils import is_internal_link, is_valid_length
 from services.assets.base_asset_service import BaseAssetService
 from services.business_service import BusinessService
 
-
+    
 class SitelinksService(BaseAssetService):
     
     @staticmethod
@@ -38,13 +38,60 @@ class SitelinksService(BaseAssetService):
             {"summary": summary, "base_url": base_url, "links_json": json.dumps(valid_links, indent=2)}
         )
 
+        def enforce_absolute_url(href: str, base_url: str) -> str | None:
+            if not href:
+                return None
+
+            href = href.strip()
+
+            if href.startswith(("javascript", "tel:", "#")):
+                return None
+
+            if href.startswith(("http://", "https://")):
+                return href
+
+            if href.startswith("/"):
+                return f"{base_url.rstrip('/')}/{href.lstrip('/')}"
+
+            return None
+
+
         formatted = []
+        seen_urls = set()
+
         for s in sitelinks:
+            final_url = enforce_absolute_url(
+                s.get("final_url", ""),
+                base_url
+            )
+
+            if not final_url:
+                continue
+
+            sitelink_text = s.get("sitelink_text", "").strip()
+            description_1 = s.get("description_1", "").strip()
+            description_2 = s.get("description_2", "").strip()
+
+            if not is_valid_length(sitelink_text, MAX_SITELINK_TEXT):
+                continue
+            if not is_valid_length(description_1, MAX_DESCRIPTION):
+                continue
+            if not is_valid_length(description_2, MAX_DESCRIPTION):
+                continue
+
+            if final_url in seen_urls:
+                continue
+
+            seen_urls.add(final_url)
+
             formatted.append({
-                "sitelink_text": s.get("sitelink_text", "")[:25],
-                "description_1": s.get("description_1", "")[:35],
-                "description_2": s.get("description_2", "")[:35],
-                "final_url": s.get("final_url", "")
+                "sitelink_text": sitelink_text,
+                "description_1": description_1,
+                "description_2": description_2,
+                "final_url": final_url,
             })
+            if len(formatted) == 15:
+                break
 
         return formatted
+
