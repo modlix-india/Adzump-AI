@@ -1,0 +1,16 @@
+meta {
+  name: End Chat Session
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://127.0.0.1:8000/api/ds/chat/end-session/test_session_1
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

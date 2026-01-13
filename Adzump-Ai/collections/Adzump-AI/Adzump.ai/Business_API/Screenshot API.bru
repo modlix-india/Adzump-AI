@@ -1,0 +1,32 @@
+meta {
+  name: Screenshot API
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://127.0.0.1:8000/api/ds/business/screenshot
+  body: json
+  auth: inherit
+}
+
+headers {
+  access-token: dummy_token
+  clientCode: test_client
+  x-forwarded-host: localhost
+  x-forwarded-port: 8000
+}
+
+body:json {
+  {
+    "business_url": "https://example.com",
+    "external_url": null,
+    "retake": false
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

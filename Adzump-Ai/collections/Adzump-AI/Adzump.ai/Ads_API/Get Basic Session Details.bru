@@ -1,0 +1,16 @@
+meta {
+  name: Get Basic Session Details
+  type: http
+  seq: 7
+}
+
+get {
+  url: http://127.0.0.1:8000/api/ds/ads/get-basic-details/test_session
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

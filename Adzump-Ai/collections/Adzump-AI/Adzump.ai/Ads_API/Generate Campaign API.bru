@@ -1,0 +1,56 @@
+meta {
+  name: Generate Campaign API
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://127.0.0.1:8000/api/ds/ads/generate-campaign
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+  clientCode: test_client
+}
+
+body:json {
+  {
+    "campaign_name": "Fitness Campaign",
+    "customerId": "222222",
+    "loginCustomerId": "111111",
+    "businessName": "FitLife Gym",
+    "country": "IN",
+    "category": "Fitness",
+    "budget": 500,
+    "startDate": "15/01/2026",
+    "endDate": "15/02/2026",
+    "goal": "LEADS",
+    "websiteURL": "https://fitlifegym.com",
+  
+    "geoTargetTypeSetting": {
+      "type": "PRESENCE"
+    },
+  
+    "locations": [
+      {
+        "locationId": "1023191",
+        "locationName": "India"
+      }
+    ],
+  
+    "targeting": [
+      {
+        "gender": ["MALE", "FEMALE"],
+        "ageRange": ["25-34", "35-44"]
+      }
+    ]
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
