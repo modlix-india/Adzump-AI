@@ -9,6 +9,8 @@ from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service ,chat_service
+from services.create_meta_campaign_service import create_meta_campaign
+from models.meta_campaign_request import GenerateMetaCampaignRequest
 
 
 
@@ -163,3 +165,22 @@ async def analyze_search_terms_route(
 @router.get("/get-basic-details/{session_id}")
 async def get_session(session_id: str):
     return await chat_service.get_basic_details(session_id)
+
+
+# Generate Meta Campaigns
+
+@router.post("/generate-meta-campaign")
+async def generate_meta_campaign(request: GenerateMetaCampaignRequest):
+
+    result = await create_meta_campaign(
+        business_name=request.businessName,
+        website_url=request.websiteURL,
+        budget=request.budget,
+        duration_days=request.durationDays,
+        goal=request.goal
+    )
+
+    return {
+        "status": "success",
+        "data": result
+    }
