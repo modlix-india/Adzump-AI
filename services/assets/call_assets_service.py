@@ -11,28 +11,21 @@ class CallAssetsService:
         if not text:
             return []
 
-        pattern = re.compile(
-            r"(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,5}\)?[-.\s]?)?\d{3,5}[-.\s]?\d{4,6}"
-        )
+        pattern = re.compile(r"(?:\+91|91)?[6-9]\d{9}")
         matches = re.findall(pattern, text)
         return [m.strip() for m in matches if m]
 
     @staticmethod
     def clean_phone_numbers(numbers: List[str]) -> List[str]:
         valid_numbers = set()
-        allowed_starts = {"6", "7", "8", "9"}
 
         for num in numbers:
             digits = re.sub(r"\D", "", num)
 
-            if len(digits) == 10 and digits[0] in allowed_starts:
+            if len(digits) == 10:
                 valid_numbers.add("+91" + digits)
 
-            elif (
-                len(digits) == 12
-                and digits.startswith("91")
-                and digits[2] in allowed_starts
-            ):
+            elif len(digits) == 12 and digits.startswith("91"):
                 valid_numbers.add("+" + digits)
 
             else:
