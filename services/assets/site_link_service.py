@@ -5,7 +5,9 @@ from utils.text_utils import is_internal_link, is_valid_length
 from services.assets.base_asset_service import BaseAssetService
 from services.business_service import BusinessService
 
-    
+MAX_SITELINK_TEXT = 25
+MAX_DESCRIPTION = 35
+
 class SitelinksService(BaseAssetService):
     
     @staticmethod
@@ -90,7 +92,7 @@ class SitelinksService(BaseAssetService):
                 "description_2": description_2,
                 "final_url": final_url,
             })
-            if len(formatted) == 15:
+            if len(formatted) == 6:
                 break
 
         return formatted

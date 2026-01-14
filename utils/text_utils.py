@@ -71,9 +71,7 @@ def is_internal_link(href: str, base_domain: str) -> bool:
     href_domain = parsed.netloc.replace("www.", "").lower()
     return base_domain in href_domain
 
-MAX_SITELINK_TEXT = 25
-MAX_DESCRIPTION = 35
 
 def is_valid_length(text: str, max_len: int) -> bool:
     """Validate text length"""
-    return bool(text) and len(text.strip()) <= max_lens
+    return bool(text) and len(text.strip()) <= max_len
