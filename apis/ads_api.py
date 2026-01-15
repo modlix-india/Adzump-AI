@@ -10,7 +10,11 @@ from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service ,chat_service
 from services.create_meta_campaign_service import create_meta_campaign
-from models.meta_campaign_request import GenerateMetaCampaignRequest
+from models.meta.meta_campaign_request import GenerateMetaCampaignRequest
+from services.meta.meta_campaign_service import MetaCampaignService
+from models.meta.meta_create_campaign_request import CreateMetaCampaignRequest
+from services.meta.meta_campaign_create_service import MetaCampaignCreateService
+
 
 
 
@@ -169,18 +173,44 @@ async def get_session(session_id: str):
 
 # Generate Meta Campaigns
 
-@router.post("/generate-meta-campaign")
-async def generate_meta_campaign(request: GenerateMetaCampaignRequest):
-
-    result = await create_meta_campaign(
+@router.post("/meta-campaign/service")
+async def meta_campaign_service(
+    request: GenerateMetaCampaignRequest,
+    authorization: str = Header(...),
+    x_forwarded_host: str = Header(None),
+    x_forwarded_port: str = Header(None),
+    client_code: str = Header(..., alias="clientCode"),
+):
+    result = await MetaCampaignService.generate_campaign(
+        data_object_id=request.dataObjectId,
+        access_token=authorization,
+        client_code=client_code,
         business_name=request.businessName,
-        website_url=request.websiteURL,
-        budget=request.budget,
-        duration_days=request.durationDays,
-        goal=request.goal
+        goal=request.goal,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port,
     )
 
     return {
         "status": "success",
         "data": result
     }
+
+@router.post("/meta-campaign/create")
+async def create_meta_campaign(
+    request: CreateMetaCampaignRequest,
+    authorization: str = Header(...),
+):
+    result = await MetaCampaignCreateService.create_campaign(
+        ad_account_id=request.adAccountId,
+        access_token=authorization,
+        campaign_payload=request.campaignPayload
+    )
+
+    return {
+        "status": "success",
+        "data": {
+            "campaignId": result.get("id")
+        }
+    }
+
