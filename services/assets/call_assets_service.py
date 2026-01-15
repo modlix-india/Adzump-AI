@@ -1,37 +1,27 @@
 from fastapi import HTTPException
-from typing import List
-import re
 import json
+from typing import List
+from services.assets.base_asset_service import BaseAssetService
 from services.business_service import BusinessService
+import re
 
 
-class CallAssetsService:
+class CallAssetsService(BaseAssetService):
     @staticmethod
-    def extract_phone_numbers(text: str) -> List[str]:
+    def extract_possible_numbers(text: str) -> List[str]:
         if not text:
             return []
-
-        pattern = re.compile(r"(?:\+91|91)?[6-9]\d{9}")
-        matches = re.findall(pattern, text)
-        return [m.strip() for m in matches if m]
+        pattern = re.compile(r"\+?\d[\d\-\s().]{6,20}")
+        return [m.strip() for m in re.findall(pattern, text)]
 
     @staticmethod
-    def clean_phone_numbers(numbers: List[str]) -> List[str]:
-        valid_numbers = set()
-
-        for num in numbers:
-            digits = re.sub(r"\D", "", num)
-
-            if len(digits) == 10:
-                valid_numbers.add("+91" + digits)
-
-            elif len(digits) == 12 and digits.startswith("91"):
-                valid_numbers.add("+" + digits)
-
-            else:
-                continue
-
-        return list(valid_numbers)[:3]
+    def normalize_number(num: str) -> str:
+        if not num:
+            return ""
+        num = num.strip()
+        if num.startswith("+"):
+            return "+" + re.sub(r"\D", "", num[1:])
+        return re.sub(r"\D", "", num)
 
     @staticmethod
     async def generate(
@@ -55,31 +45,37 @@ class CallAssetsService:
         summary = product_data.get("summary", "")
         links = product_data.get("siteLinks", [])
 
-        # Extract numbers from tel: links
+        # 1. tel: links
         tel_numbers = [
             link.get("href", "").replace("tel:", "").strip()
             for link in links
             if link.get("href", "").startswith("tel:")
         ]
 
-        # Extract numbers from links JSON
-        link_text_data = json.dumps(links)
-        link_numbers = CallAssetsService.extract_phone_numbers(link_text_data)
+        # 2. extract numbers
+        link_numbers = CallAssetsService.extract_possible_numbers(json.dumps(links))
+        summary_numbers = CallAssetsService.extract_possible_numbers(summary)
 
-        # Extract numbers from summary as fallback
-        summary_numbers = CallAssetsService.extract_phone_numbers(summary)
+        # 3. Normalize + Deduplicate
+        raw_numbers = list(
+            {
+                CallAssetsService.normalize_number(n)
+                for n in (tel_numbers + link_numbers + summary_numbers)
+                if n
+            }
+        )
+        print("raw_numbers:", raw_numbers)
 
-        # Combine all sources
-        all_numbers = tel_numbers + link_numbers + summary_numbers
-
-        # Clean + validate + deduplicate + limit
-        cleaned_numbers = CallAssetsService.clean_phone_numbers(all_numbers)
-
-        if not cleaned_numbers:
+        if not raw_numbers:
             return []
 
-        structured_numbers = [
-            {"phoneNumber": num, "countryCode": "IN"} for num in cleaned_numbers
-        ]
+        # 4. LLM validation (country-aware)
+        call_assets = await BaseAssetService.generate_from_prompt(
+            "callasset_prompt.txt", {"raw_numbers": raw_numbers}
+        )
+        print("call_assets:", call_assets)
 
-        return structured_numbers
+        if not call_assets:
+            return []
+
+        return call_assets[:3]
