@@ -2,18 +2,17 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
-class GeoTargetRequest(BaseModel):
-    locations: List[str]
-    parent_location: Optional[str] = None
+class MapRequest(BaseModel):
+    places: List[str]
 
-
-class GeoTargetLocation(BaseModel):
+class TargetPlaceLocation(BaseModel):
     name: str                           
     resource_name: str                  
     canonical_name: Optional[str] = None 
     target_type: Optional[str] = None   
 
 
-class GeoTargetResponse(BaseModel):
-    locations: List[GeoTargetLocation]
+class TargetPlaceResponse(BaseModel):
+    locations: List[TargetPlaceLocation]
     unresolved: List[str] = []
+    product_location: Optional[str] = None

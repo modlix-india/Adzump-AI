@@ -30,7 +30,7 @@ EXCLUDE (if present):
 RULES:
 • Write in clear, professional language
 • Preserve specific names and numbers exactly
-• If the chunk contains no business-relevant content, return: "NO_RELEVANT_CONTENT"
+• If the chunk contains no business-relevant content, return: ""
 • DO NOT add information not in the text
 • DO NOT include URLs
 

@@ -4,13 +4,12 @@ from typing import List
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
+    InternalServerException,
     ScraperException,
 )
-from services.scraper_service import scrape_website
-from models.scrape_permission_model import ScrapeResult
+from services.scraper_service import ScraperService
 from utils import prompt_loader
-from models.business_model import BusinessMetadata, WebsiteSummaryResponse, LocationInfo
-from fastapi import HTTPException
+from models.business_model import BusinessMetadata, WebsiteSummaryResponse, LocationInfo, ScrapeResult
 from oserver.models.storage_request_model import (
     StorageFilter,
     StorageReadRequest,
@@ -20,6 +19,7 @@ from oserver.models.storage_request_model import (
 )
 from services.openai_client import chat_completion
 from oserver.services.storage_service import StorageService
+from services.geo_target_service import GeoTargetService
 from utils.helpers import normalize_url
 
 logger = get_logger(__name__)
@@ -181,8 +181,9 @@ class BusinessService:
                         existing_location_data = existing_record.get("location", {})
                         if existing_location_data:
                             existing_location = LocationInfo(
-                                parent_location=existing_location_data.get("parentLocation"),
-                                locations=existing_location_data.get("locations", [])
+                                area_location=existing_location_data.get("area_location"),
+                                product_location=existing_location_data.get("product_location", ""),
+                                interested_locations=existing_location_data.get("interested_locations", [])
                             )
                 except Exception as e:
                     logger.warning(f"Error parsing existing storage data: {e}")
@@ -206,7 +207,8 @@ class BusinessService:
 
             # STEP 3: SCRAPE WEBSITE
             logger.info(f"Scraping website: {website_url}")
-            scrape_result: ScrapeResult = await scrape_website(website_url)
+            scraper = ScraperService()
+            scrape_result: ScrapeResult = await scraper.scrape(website_url)
 
             if not scrape_result.success:
                 error_msg = scrape_result.error.message if scrape_result.error else "Failed to scrape website"
@@ -234,18 +236,50 @@ class BusinessService:
 
             try:
                 parsed = json.loads(summary_raw)
-            except:
+            except json.JSONDecodeError:
                 parsed = json.loads(summary_raw.replace("'", '"'))
 
             summary_text = parsed.get("summary", "")
             businessType = parsed.get("businessType", "")
             location_data = parsed.get("location", {})
             location_info = LocationInfo(
-                parent_location=location_data.get("parentLocation"),
-                locations=location_data.get("locations", [])
+                area_location=location_data.get("area_location"),
+                product_location=location_data.get("product_location", ""),
+                interested_locations=location_data.get("interested_locations", [])
             ) if location_data else None
 
-            # STEP 5: DECIDE UPDATE OR CREATE
+            # STEP 5: SUGGEST GEO TARGETS
+            logger.info("Suggesting geo targets from coordinates and locations")
+            geo_service = GeoTargetService()
+            
+            # Extract coordinates from first map embed
+            coordinates = None
+            map_embeds = scraped_data.get("map_embeds", [])
+            if map_embeds and map_embeds[0].get("coordinates"):
+                coordinates = map_embeds[0]["coordinates"]
+            
+            geo_result = await geo_service.suggest_geo_targets(
+                coordinates=coordinates,
+                interested_locations=location_info.interested_locations if location_info else [],
+                area_location=location_info.area_location if location_info else None
+            )
+            
+            # Update product_location from reverse geocoding if available
+            if geo_result.product_location and location_info:
+                location_info.product_location = geo_result.product_location
+            
+            # Convert geo targets to storable format
+            suggested_geo_targets = [
+                {
+                    "name": loc.name,
+                    "resourceName": loc.resource_name,
+                    "canonicalName": loc.canonical_name,
+                    "targetType": loc.target_type
+                }
+                for loc in geo_result.locations
+            ]
+
+            # STEP 6: DECIDE UPDATE OR CREATE
             # Case A: UPDATE EXISTING RECORD
             if existing_id:
                 logger.info(f"Updating existing record: {existing_id}")
@@ -260,10 +294,13 @@ class BusinessService:
                         "businessType": businessType,
                         "finalSummary": summary_text,
                         "siteLinks": scraped_data.get("links", []),
+                        "mapEmbeds": scraped_data.get("map_embeds", []),
                         "location": {
-                            "parentLocation": location_info.parent_location if location_info else None,
-                            "locations": location_info.locations if location_info else []
+                            "area_location": location_info.area_location if location_info else None,
+                            "product_location": location_info.product_location if location_info else "",
+                            "interested_locations": location_info.interested_locations if location_info else []
                         },
+                        "suggestedGeoTargets": suggested_geo_targets,
                     },
                 )
 
@@ -276,6 +313,8 @@ class BusinessService:
                     summary=summary_text,
                     final_summary=summary_text,
                     location=location_info,
+                    suggested_geo_targets=suggested_geo_targets,
+                    unresolved_locations=geo_result.unresolved,
                 )
 
             # Case B: CREATE NEW RECORD
@@ -291,10 +330,13 @@ class BusinessService:
                     "businessType": businessType,
                     "finalSummary": summary_text,
                     "siteLinks": scraped_data.get("links", []),
+                    "mapEmbeds": scraped_data.get("map_embeds", []),
                     "location": {
-                        "parentLocation": location_info.parent_location if location_info else None,
-                        "locations": location_info.locations if location_info else []
+                        "area_location": location_info.area_location if location_info else None,
+                        "product_location": location_info.product_location if location_info else "",
+                        "interested_locations": location_info.interested_locations if location_info else []
                     },
+                    "suggestedGeoTargets": suggested_geo_targets,
                 },
             )
 
@@ -330,19 +372,16 @@ class BusinessService:
                 summary=summary_text,
                 final_summary=summary_text,
                 location=location_info,
+                suggested_geo_targets=suggested_geo_targets,
+                unresolved_locations=geo_result.unresolved,
             )
 
-        except HTTPException:
-            raise
-        
         except ScraperException:
             raise
 
         except Exception as e:
             logger.exception(f"Unexpected error in process_website_data: {e}")
-            raise HTTPException(
-                status_code=500, detail="Internal server error during website processing"
-            )
+            raise InternalServerException("Internal server error during website processing")
 
     async def generate_website_summary(self, scraped_data: dict) -> str:
         if not scraped_data:

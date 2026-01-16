@@ -1,6 +1,6 @@
 You are an expert business analyst extracting COMPREHENSIVE marketing summaries from website data.
 
-CONTEXT: This summary is the PRIMARY SOURCE for generating Google Ads keywords, headlines, and descriptions. The more detailed and specific your summary, the better the ads will be. Extract EVERY piece of useful marketing information.
+CONTEXT: This summary is the PRIMARY SOURCE for generating marketing content across multiple advertising platforms. The more detailed and specific your summary, the better the ads will be. Extract EVERY piece of useful marketing information.
 
 INPUT:
 {scraped_data}
@@ -13,23 +13,18 @@ TASKS:
    "B2B SaaS Company", "Hospital", "Design Studio"
 
 2. LOCATIONS
-   Extract geographic locations from ALL sources in the data:
-   
-   SOURCES TO CHECK:
-   - Text content (paragraphs, headings, meta descriptions)
-   - Google Maps embed URLs in "map_embeds" field - these contain location hints:
-     * URLs with "/place/Whitefield,+Bengaluru" contain place names
-     * URLs with "q=12.9716,77.5946" contain coordinates (look for nearby text for names)
-     * URLs with encoded text like "!2sBangalore" contain location names
-   
-   a) parentLocation: The SINGLE broadest geographic region (state, province, or major metro area)
-      that encompasses all specific locations. This is used for geo-targeting context.
+   Extract geographic locations from different sources:
+
+   a) area_location: The SINGLE broadest geographic region (state, province, or major metro area)
+      that encompasses all specific locations. Used for geo-targeting context.
       Examples: "Karnataka", "Maharashtra", "California", "Greater London"
-   
-   b) locations: Array of ALL specific locations (cities, towns, neighborhoods, areas).
-      Examples: ["Bangalore", "Whitefield", "Sarjapur", "Electronic City"]
-   
-   If no locations found, return parentLocation as null and locations as empty array.
+      Return "" (empty string) if no clear region found.
+
+   c) interested_locations: Array of ALL locations mentioned in TEXT content and map embeds.
+      Sources: paragraphs, headings, meta descriptions, lists.
+      These are areas the business SERVES or markets to.
+      Examples: ["Sarjapur", "Electronic City", "HSR Layout", "Koramangala"]
+      Return empty array if no locations found.
 
 3. MARKETING SUMMARY
    Write a DETAILED, COMPREHENSIVE summary that extracts ALL marketing-relevant 
@@ -78,8 +73,8 @@ OUTPUT FORMAT (return ONLY this JSON):
 {{
   "businessType": "<specific_business_type>",
   "location": {{
-    "parentLocation": "<state_or_major_region_or_null>",
-    "locations": ["<location1>", "<location2>", "..."]
+    "area_location": "<state_or_major_region_or_null>",
+    "interested_locations": ["<location1>", "<location2>", "..."]
   }},
   "summary": "<detailed_comprehensive_summary>"
 }}

@@ -1,6 +1,6 @@
 You are an expert business content strategist creating a MARKETING-READY final summary.
 
-CONTEXT: This summary will be used to generate Google Ads keywords, headlines, and descriptions. Focus on SELLABLE, SEARCHABLE information.
+CONTEXT: This summary will be used to generate marketing content across multiple advertising platforms and campaigns. Focus on SELLABLE, SEARCHABLE information that works universally.
 
 INPUTS:
 1. Website Summary: {website_summary}

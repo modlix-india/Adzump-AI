@@ -1,10 +1,9 @@
 import json
 from structlog import get_logger    #type: ignore
 from fastapi import HTTPException
-from models.business_model import WebsiteSummaryResponse
+from models.business_model import WebsiteSummaryResponse, ScrapeResult
 from services.business_service import BusinessService
-from services.scraper_service import scrape_website
-from models.scrape_permission_model import ScrapeResult
+from services.scraper_service import ScraperService
 from utils.helpers import normalize_url
 from oserver.models.storage_request_model import (
     StorageFilter,
@@ -89,7 +88,8 @@ async def process_external_link(
         # CASE B — External link does NOT exist → scrape and add new
         logger.info("[ExternalLink] New external URL → creating new summary entry")
     # STEP 4: SCRAPE the external URL
-    scrape_result: ScrapeResult = await scrape_website(url=external_url)
+    scraper = ScraperService()
+    scrape_result: ScrapeResult = await scraper.scrape(external_url)
     logger.info(f"[ExternalLink] Scrape success: {scrape_result.success}")
 
     # Handle blocked scrapes
