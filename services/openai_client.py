@@ -16,3 +16,11 @@ async def chat_completion(messages: list, model: str = "gpt-4.1", **kwargs):
         **kwargs
     )
     return response
+
+async def get_embeddings(input_text: list[str], model: str = "text-embedding-3-small"):
+    client = get_client()
+    response = await client.embeddings.create(
+        input=input_text,
+        model=model
+    )
+    return response

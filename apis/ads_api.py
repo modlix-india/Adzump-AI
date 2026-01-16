@@ -4,12 +4,14 @@ from fastapi import APIRouter, HTTPException, Header,status, Body, Query
 from fastapi.responses import JSONResponse
 from services.search_term_pipeline import SearchTermPipeline
 from services.google_keywords_service import GoogleKeywordService
+from services.google_kw_update_service.google_keywords_update_service import GoogleAdsKeywordUpdateService
 from services.ads_service import generate_ad_assets
 from services.budget_recommendation_service import generate_budget_recommendations
 from services.create_campaign_service import CampaignServiceError
-from models.keyword_model import (
+from third_party.google.models.keyword_model import (
     KeywordResearchRequest,
-    GoogleNegativeKwReq
+    GoogleNegativeKwReq,
+    UpdateKeywordsStrategyRequest,
 )
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
@@ -77,6 +79,28 @@ async def gks_negative(google_keyword_request: GoogleNegativeKwReq,
                 "total_negatives":len(negatives)
             }
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+googleKeywordUpdater = GoogleAdsKeywordUpdateService()
+
+@router.post("gks/update-strategy")
+async def update_keywords_strategy(
+    keyword_update_request: UpdateKeywordsStrategyRequest,
+    client_code: str = Header(..., alias="clientCode"),
+    access_token: str = Header(..., alias="access-token")
+):
+
+    try:
+        result = await googleKeywordUpdater.analyze_and_update_campaign_keywords(
+            keyword_update_request=keyword_update_request,
+            client_code=client_code,
+            access_token=access_token,
+        )
+        
+        return {"status": "success", "data": result}
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
