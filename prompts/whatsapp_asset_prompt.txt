@@ -22,6 +22,22 @@ Using **ONLY** the information from the summary, you must:
 
 ---
 
+## LENGTH CONSTRAINTS (STRICT – NON-NEGOTIABLE)
+
+- **Starter message**
+  - MUST be **140 characters or fewer**
+  - Must be a complete, natural sentence
+  - Do NOT exceed the limit under any circumstance
+
+- **Call-to-action description**
+  - MUST be **30 characters or fewer**
+  - Must remain meaningful and context-aware
+  - Do NOT pad or truncate unnaturally
+
+If a message exceeds these limits, it is considered **INVALID**.
+
+---
+
 ## ALLOWED CALL TO ACTION ENUMS (STRICT)
 
 You MUST select **one and only one** value from this list:
@@ -65,14 +81,16 @@ If intent is ambiguous, default to **LEARN_MORE**.
 - The message MUST sound like a real customer inquiry
 - The wording MUST be specific to the business described
 
-### Forbidden generic phrases:
+### Forbidden generic phrases
+
 - "How can we help you?"
 - "How can we assist you today?"
 - "Feel free to ask"
 - "Our products and services"
 - Any vague or chatbot-style greeting
 
-### Domain relevance requirements:
+### Domain relevance requirements
+
 - Services → mention the specific service
 - Products → mention the product or product category
 - Organizations → mention the purpose or offering
@@ -83,6 +101,7 @@ If intent is ambiguous, default to **LEARN_MORE**.
 
 - Must be uniquely written for the selected CTA
 - Must clearly reflect the business context
+- Must fit within **30 characters**
 - Generic descriptions are NOT allowed
 - Do NOT mention products unless products exist in the summary
 
@@ -90,7 +109,7 @@ If intent is ambiguous, default to **LEARN_MORE**.
 "Discover more about what we offer"
 
 **Good example:**  
-"Learn more about our service offerings, process, and key benefits"
+"Learn about services and process"
 
 ---
 
@@ -104,6 +123,7 @@ If intent is ambiguous, default to **LEARN_MORE**.
   - `call_to_action_description`
 
 Do NOT include:
+
 - Phone numbers
 - Email addresses
 - URLs
@@ -114,8 +134,7 @@ Do NOT include:
 ---
 
 ## OUTPUT FORMAT EXAMPLE (REFERENCE ONLY)
-
-```json
+json
 [
   {{
     "starter_message": "Hi, I’d like to learn more about your services.",

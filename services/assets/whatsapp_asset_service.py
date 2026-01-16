@@ -2,9 +2,12 @@ from fastapi import HTTPException
 import re
 from urllib.parse import urlparse, parse_qs
 from typing import List, Dict
+import logging
 
 from services.assets.base_asset_service import BaseAssetService
 from services.business_service import BusinessService
+
+logger = logging.getLogger(__name__)
 
 
 class WhatsAppAssetsService(BaseAssetService):
@@ -58,29 +61,28 @@ class WhatsAppAssetsService(BaseAssetService):
         summary = product_data.get("summary", "")
         links = product_data.get("siteLinks", [])
 
-        print("Product summary:", summary)
-        print("Product links:", links)
+        logger.info("Product summary:", summary)
+        logger.info("Product links:", links)
 
         if not summary:
             raise HTTPException(
                 status_code=400, detail="Missing or empty 'summary' in product data"
             )
 
-        # -------- Extract WhatsApp number (STRICT) --------
+        # -------- Extract WhatsApp number (STRICT) -------
         phone_number = WhatsAppAssetsService.extract_whatsapp_number_from_links(links)
 
         if not phone_number:
-            print("No WhatsApp number found in WhatsApp links; setting empty")
+            logger.info("No WhatsApp number found in WhatsApp links; setting empty")
             phone_number = ""
 
-        print("WhatsApp number:", phone_number)
+        logger.info("WhatsApp number:", phone_number)
 
         # -------- Call LLM --------
         llm_result = await BaseAssetService.generate_from_prompt(
             "whatsapp_asset_prompt.txt", {"summary": summary}
         )
-        print("Raw LLM result:", llm_result)
-
+        logger.info("Raw LLM result:", llm_result)
         if (
             not isinstance(llm_result, list)
             or len(llm_result) == 0
@@ -92,21 +94,14 @@ class WhatsAppAssetsService(BaseAssetService):
             )
 
         asset = llm_result[0]
-
-        # -------- Use LLM values AS-IS --------
-        starter_message = asset.get("starter_message")
-        cta_selection = asset.get("call_to_action_selection")
-        cta_description = asset.get("call_to_action_description")
-
-        # -------- Return single object inside array --------
         result = [
             {
-                "starter_message": starter_message,
-                "call_to_action_selection": cta_selection,
-                "call_to_action_description": cta_description,
+                "starter_message": asset.get("starter_message"),
+                "call_to_action_selection": asset.get("call_to_action_selection"),
+                "call_to_action_description": asset.get("call_to_action_description"),
                 "phone_number": phone_number,
             }
         ]
 
-        print("Final WhatsApp asset prepared:", result)
+        logger.info("Final WhatsApp asset prepared:", result)
         return result
