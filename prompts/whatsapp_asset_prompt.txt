@@ -13,28 +13,45 @@ Your task is to generate **exactly one WhatsApp starter message and one CTA**, s
 
 Using **ONLY** the information from the summary, you must:
 
-1. Infer the **business domain** and **customer intent**
-2. Generate a **realistic WhatsApp starter message** that a real customer would naturally send
-3. Select **exactly ONE** CTA from the allowed enum list
+1. Infer the **business domain** and **customer intent**  
+2. Generate a **realistic WhatsApp starter message** that a real customer would naturally send  
+3. Select **exactly ONE** CTA from the allowed enum list  
 4. Write a **CTA description** that aligns with:
-   - the selected CTA enum
-   - the business context from the summary
+   - the selected CTA enum  
+   - the business context from the summary  
 
 ---
 
 ## LENGTH CONSTRAINTS (STRICT – NON-NEGOTIABLE)
 
 - **Starter message**
-  - MUST be **140 characters or fewer**
-  - Must be a complete, natural sentence
-  - Do NOT exceed the limit under any circumstance
+  - MUST be **≤ 140 characters**  
+  - Must be a complete, natural sentence  
+  - Do NOT exceed the limit under any circumstance  
 
 - **Call-to-action description**
-  - MUST be **30 characters or fewer**
-  - Must remain meaningful and context-aware
-  - Do NOT pad or truncate unnaturally
+  - MUST be **≤ 30 characters**  
+  - Must remain meaningful and context-aware  
+  - Do NOT pad, truncate, or cut words unnaturally  
 
-If a message exceeds these limits, it is considered **INVALID**.
+Any output exceeding these limits is **INVALID** and must be rewritten.
+
+---
+
+## 🔒 INTERNAL SELF-VALIDATION (MANDATORY)
+
+Before producing the final output, you MUST internally perform the following checks:
+
+1. Count the characters of `starter_message`  
+2. Count the characters of `call_to_action_description`  
+
+If **either** exceeds its limit, you MUST:  
+- Rewrite the text to be shorter  
+- Preserve meaning and intent  
+- Re-check the character count  
+- Repeat until both limits are satisfied  
+
+You are NOT allowed to output a response that violates these limits.
 
 ---
 
@@ -64,12 +81,12 @@ Do NOT change spelling or casing
 
 Infer intent **only from the summary**:
 
-- If the intent is unclear or exploratory → **LEARN_MORE**
-- If the summary implies booking, appointments, demos, or visits → **BOOK_NOW**
-- If the summary involves pricing, fees, or quotations → **GET_QUOTE**
-- If the summary involves purchasing or ordering → **BUY_NOW / SHOP_NOW / ORDER_NOW**
-- If the summary involves applications or sign-ups → **APPLY_NOW**
-- If the summary involves donations or fundraising → **DONATE_NOW**
+- If the intent is unclear or exploratory → **LEARN_MORE**  
+- If the summary implies booking, appointments, demos, or visits → **BOOK_NOW**  
+- If the summary involves pricing, fees, or quotations → **GET_QUOTE**  
+- If the summary involves purchasing or ordering → **BUY_NOW / SHOP_NOW / ORDER_NOW**  
+- If the summary involves applications or sign-ups → **APPLY_NOW**  
+- If the summary involves donations or fundraising → **DONATE_NOW**  
 
 If intent is ambiguous, default to **LEARN_MORE**.
 
@@ -77,70 +94,70 @@ If intent is ambiguous, default to **LEARN_MORE**.
 
 ## DOMAIN ANCHORING RULES (NON-NEGOTIABLE)
 
-- The starter message MUST clearly reference the inferred business domain
-- The message MUST sound like a real customer inquiry
-- The wording MUST be specific to the business described
+- The starter message MUST clearly reference the inferred business domain  
+- The message MUST sound like a real customer inquiry  
+- The wording MUST be specific to the business described  
 
 ### Forbidden generic phrases
 
-- "How can we help you?"
-- "How can we assist you today?"
-- "Feel free to ask"
-- "Our products and services"
-- Any vague or chatbot-style greeting
+- "How can we help you?"  
+- "How can we assist you today?"  
+- "Feel free to ask"  
+- "Our products and services"  
+- Any vague or chatbot-style greeting  
 
 ### Domain relevance requirements
 
-- Services → mention the specific service
-- Products → mention the product or product category
-- Organizations → mention the purpose or offering
+- Services → mention the specific service  
+- Products → mention the product or product category  
+- Organizations → mention the purpose or offering  
 
 ---
 
 ## CALL-TO-ACTION DESCRIPTION RULES
 
-- Must be uniquely written for the selected CTA
-- Must clearly reflect the business context
-- Must fit within **30 characters**
-- Generic descriptions are NOT allowed
-- Do NOT mention products unless products exist in the summary
+- Must be uniquely written for the selected CTA  
+- Must clearly reflect the business context  
+- Must fit within **30 characters**  
+- Generic descriptions are NOT allowed  
+- Do NOT mention products unless products exist in the summary  
 
 **Bad example:**  
-"Discover more about what we offer"
+"Discover more about what we offer"  
 
 **Good example:**  
-"Learn about services and process"
+"Learn about admission process"  
 
 ---
 
 ## STRICT OUTPUT FORMAT (MANDATORY)
 
-- Output MUST be **valid JSON**
-- Output MUST be an **array with exactly ONE object**
+- Output MUST be **valid JSON**  
+- Output MUST be an **array with exactly ONE object**  
 - The object MUST contain **ONLY** these keys:
-  - `starter_message`
-  - `call_to_action_selection`
-  - `call_to_action_description`
+  - `starter_message`  
+  - `call_to_action_selection`  
+  - `call_to_action_description`  
 
-Do NOT include:
-
-- Phone numbers
-- Email addresses
-- URLs
-- Explanations
-- Markdown
-- Empty arrays
+Do NOT include:  
+- Phone numbers  
+- Email addresses  
+- URLs  
+- Explanations  
+- Markdown  
+- Empty arrays  
 
 ---
 
 ## OUTPUT FORMAT EXAMPLE (REFERENCE ONLY)
-json
+
+```json
 [
   {{
     "starter_message": "Hi, I’d like to learn more about your services.",
     "call_to_action_selection": "LEARN_MORE",
-    "call_to_action_description": "Learn more about our offerings and how the process works"
+    "call_to_action_description": "Learn about services"
   }}
 ]
-
+```
 {summary}

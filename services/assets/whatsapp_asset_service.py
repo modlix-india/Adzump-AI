@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 class WhatsAppAssetsService(BaseAssetService):
     MAX_STARTER_MESSAGE_LENGTH = 140
     MAX_CTA_DESCRIPTION_LENGTH = 30
+    MAX_LLM_RETRIES = 3
 
     # WhatsApp number extraction
     @staticmethod
@@ -59,16 +60,10 @@ class WhatsAppAssetsService(BaseAssetService):
             {"summary": summary},
         )
 
-        logger.info(
-            "LLM response received",
-            llm_result=llm_result,
-        )
+        logger.info("LLM response received", llm_result=llm_result)
 
         if not WhatsAppAssetsService._is_valid_llm_response(llm_result):
-            logger.error(
-                "Invalid LLM response format",
-                llm_result=llm_result,
-            )
+            logger.error("Invalid LLM response format", llm_result=llm_result)
             raise HTTPException(
                 status_code=500,
                 detail="LLM did not return a valid WhatsApp asset array",
@@ -76,7 +71,42 @@ class WhatsAppAssetsService(BaseAssetService):
 
         return llm_result[0]
 
-    # Main public method
+    # Validation logic (single source of truth)
+    @staticmethod
+    def _is_valid_asset(asset: Dict) -> bool:
+        starter_message = asset.get("starter_message", "")
+        cta_description = asset.get("call_to_action_description", "")
+
+        return (
+            len(starter_message) <= WhatsAppAssetsService.MAX_STARTER_MESSAGE_LENGTH
+            and len(cta_description) <= WhatsAppAssetsService.MAX_CTA_DESCRIPTION_LENGTH
+        )
+
+    # Core retry logic (single LLM call per attempt)
+    @staticmethod
+    async def _generate_valid_asset(summary: str) -> Dict:
+        for attempt in range(WhatsAppAssetsService.MAX_LLM_RETRIES):
+            asset = await WhatsAppAssetsService._generate_llm_asset(summary)
+
+            if WhatsAppAssetsService._is_valid_asset(asset):
+                logger.info(
+                    "Valid WhatsApp asset generated",
+                    attempt=attempt + 1,
+                )
+                return asset
+
+            logger.info(
+                "WhatsApp asset validation failed, retrying",
+                attempt=attempt + 1,
+                starter_length=len(asset.get("starter_message", "")),
+                cta_length=len(asset.get("call_to_action_description", "")),
+            )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate valid WhatsApp asset within limits",
+        )
+
     @staticmethod
     async def generate(
         data_object_id: str,
@@ -106,45 +136,19 @@ class WhatsAppAssetsService(BaseAssetService):
         # -------- Extract WhatsApp number --------
         phone_number = WhatsAppAssetsService.extract_whatsapp_number_from_links(links)
 
-        # -------- Initial LLM generation --------
-        asset = await WhatsAppAssetsService._generate_llm_asset(summary)
+        # -------- Generate validated asset --------
+        asset = await WhatsAppAssetsService._generate_valid_asset(summary)
 
-        starter_message = asset.get("starter_message", "")
-        call_to_action_selection = asset.get("call_to_action_selection", "")
-        call_to_action_description = asset.get("call_to_action_description", "")
-
-        # -------- Re-generate only if constraints fail --------
-        if len(starter_message) > WhatsAppAssetsService.MAX_STARTER_MESSAGE_LENGTH:
-            logger.info(
-                "Starter message exceeds limit, regenerating",
-                length=len(starter_message),
-            )
-            asset = await WhatsAppAssetsService._generate_llm_asset(summary)
-            starter_message = asset.get("starter_message", "")
-
-        if (
-            len(call_to_action_description)
-            > WhatsAppAssetsService.MAX_CTA_DESCRIPTION_LENGTH
-        ):
-            logger.info(
-                "CTA description exceeds limit, regenerating",
-                length=len(call_to_action_description),
-            )
-            asset = await WhatsAppAssetsService._generate_llm_asset(summary)
-            call_to_action_description = asset.get("call_to_action_description", "")
-
-        # -------- Final result --------
         result = [
             {
-                "starter_message": starter_message,
-                "call_to_action_selection": call_to_action_selection,
-                "call_to_action_description": call_to_action_description,
+                "starter_message": asset.get("starter_message", ""),
+                "call_to_action_selection": asset.get("call_to_action_selection", ""),
+                "call_to_action_description": asset.get(
+                    "call_to_action_description", ""
+                ),
                 "phone_number": phone_number,
             }
         ]
 
-        logger.info(
-            "Final WhatsApp asset prepared",
-            result=result,
-        )
+        logger.info("Final WhatsApp asset prepared", result=result)
         return result
