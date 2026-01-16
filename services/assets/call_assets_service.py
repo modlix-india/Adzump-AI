@@ -64,7 +64,6 @@ class CallAssetsService(BaseAssetService):
                 if n
             }
         )
-        print("raw_numbers:", raw_numbers)
 
         if not raw_numbers:
             return []
@@ -73,7 +72,6 @@ class CallAssetsService(BaseAssetService):
         call_assets = await BaseAssetService.generate_from_prompt(
             "callasset_prompt.txt", {"raw_numbers": raw_numbers}
         )
-        print("call_assets:", call_assets)
 
         if not call_assets:
             return []
