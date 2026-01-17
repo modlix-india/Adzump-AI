@@ -16,7 +16,7 @@ ASSET_SERVICE_MAP = {
     "SITE_LINKS": SitelinksService.generate,
     "STRUCTURED_SNIPPETS": StructuredSnippetsService.generate,
     "CALL_ASSETS": CallAssetsService.generate,
-    "WHATSAPP_ASSETS": WhatsAppAssetsService.generate,
+    "WHATSAPP_ASSETS": WhatsAppAssetsService().generate,
 }
 
 
