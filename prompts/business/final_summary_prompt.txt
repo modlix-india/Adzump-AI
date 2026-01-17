@@ -1,46 +1,58 @@
-You are an expert business content strategist.
+You are an expert business content strategist creating a MARKETING-READY final summary.
 
-Your task is to produce one unified, polished final narrative using ALL the information provided below:
+CONTEXT: This summary will be used to generate marketing content across multiple advertising platforms and campaigns. Focus on SELLABLE, SEARCHABLE information that works universally.
+
+INPUTS:
 1. Website Summary: {website_summary}
-2. External Sources Summary: {external_summary}
-3. Asset Summary: {assets_summary}
+2. External Sources: {external_summary}
+3. Asset Summaries: {assets_summary}
 
-Some inputs may be empty — ignore empty ones without mentioning them.
+(Ignore any empty inputs without mentioning them)
 
+TASK:
+Merge all inputs into ONE cohesive marketing summary in 3-4 paragraphs.
 
-MANDATORY RULES — DO NOT VIOLATE
-You MUST retain EVERY factual detail from EVERY input source.
-Do NOT omit, shorten, simplify, compress, generalize, or exclude any information.
+CONTENT PRIORITY (in order of importance):
 
-This includes (but is not limited to):
-• All product details, specifications, features, configurations, capacities, measurements, or variants
-• All business/company information, history, mission, achievements, recognitions, certifications, or brand messaging
-• All numbers, statistics, dimensions, quantities, dates, percentages, pricing, timeframes, unit counts, or performance data
-• All amenities, services, operational details, and functional descriptions
-• All locations, micro-locations, addresses, regions, zones, or coverage areas
-• All connectivity, accessibility, and landmark references
-• All contact information including names, emails, phone numbers
-• All technical and descriptive statements
-• All unique selling points and differentiators
-• All external-source or asset-based factual details
+PARAGRAPH 1 - CORE BUSINESS:
+• Business name and type
+• Main products/services with specific names
+• Target audience
 
-***Do NOT drop even a single fact.***
+PARAGRAPH 2 - LOCATIONS & REACH:
+• All cities, areas, regions served
+• Contact information (phone, email)
+• Service coverage
 
-WRITING REQUIREMENTS
-• Rewrite the content into a single, coherent, polished narrative in fresh, natural, professional language.
-• The final narrative must include ALL content, re-organized logically for flow.
-• You may reorder information, but you must keep every detail.
-• Remove duplicate information when merging the sources.
-• Do NOT reference the original input format or mention that multiple sources were used.
-• Do NOT add new information.
-• Do NOT remove any factual detail or list item.
-• Do NOT mention URLs.
-• Write in a clean, high-quality business/marketing tone.
-• Keep the output structured and readable.
+PARAGRAPH 3 - DIFFERENTIATORS:
+• Unique selling points
+• Awards, certifications, experience
+• Customer testimonials or ratings
 
-OUTPUT
-Produce ONE unified final narrative that:
-• Contains 100% of the factual details from ALL inputs
-• Is rewritten clearly and cohesively
-• Is professional, flowing, structured, and ready for business use
-• Contains no missing information, no added facts, and no references to input blocks
+PARAGRAPH 4 (if needed) - ADDITIONAL DETAILS:
+• Pricing information
+• Technical specifications (only if selling point)
+• Other relevant details
+
+FILTERING RULES:
+• PRIORITIZE information that appears in multiple sources
+• INCLUDE all product/service names, locations, and contact info
+• EXCLUDE purely technical details unless they are selling points
+• EXCLUDE internal process information not relevant to customers
+• REMOVE duplicate information when merging
+
+STRICT RULES:
+• Output 3-4 paragraphs
+• Use professional, marketing-ready language
+• DO NOT include URLs
+• DO NOT use bullet points or markdown
+• DO NOT reference input sources
+• DO NOT add information not in inputs
+• Replace internal double quotes with single quotes
+• Ensure valid JSON output
+
+OUTPUT FORMAT (return ONLY this JSON):
+{{
+  "finalSummary": "<paragraph_1>\\n\\n<paragraph_2>\\n\\n<paragraph_3>\\n\\n<paragraph_4_if_needed>"
+}}
+
