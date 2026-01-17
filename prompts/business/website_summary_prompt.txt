@@ -1,40 +1,80 @@
-You are given scraped website data in JSON format:
+You are an expert business analyst extracting COMPREHENSIVE marketing summaries from website data.
+
+CONTEXT: This summary is the PRIMARY SOURCE for generating marketing content across multiple advertising platforms. The more detailed and specific your summary, the better the ads will be. Extract EVERY piece of useful marketing information.
+
+INPUT:
 {scraped_data}
 
-Your tasks:
+TASKS:
 
-1. DETERMINE THE BUSINESS TYPE
-Analyze the scraped data and identify the accurate business type.
-Examples: "Real Estate Developer", "Restaurant", "Tech Company",
-"Hospital", "E-Commerce Store", "Interior Designer", etc.
-Return only the single best matching business type.
+1. BUSINESS TYPE
+   Return the single most specific business category.
+   Examples: "Real Estate", "Restaurants", 
+   "B2B SaaS Company", "Hospital", "Design Studio"
 
-2. WRITE A DETAILED BUSINESS SUMMARY (400–500 words)
-Write a professional, detailed, cohesive SINGLE PARAGRAPH of 400–500 words.
-Based ONLY on the scraped data, include:
-• Business purpose, mission, industry
-• Products / services
-• Locations, addresses, operating areas
-• History, background
-• Contact details
-• Target audience
-• Strengths, special features
-• Certifications / trust indicators
+2. LOCATIONS
+   Extract geographic locations from different sources:
+
+   a) area_location: The SINGLE broadest geographic region (state, province, or major metro area)
+      that encompasses all specific locations. Used for geo-targeting context.
+      Examples: "Karnataka", "Maharashtra", "California", "Greater London"
+      Return "" (empty string) if no clear region found.
+
+   c) interested_locations: Array of ALL locations mentioned in TEXT content and map embeds.
+      Sources: paragraphs, headings, meta descriptions, lists.
+      These are areas the business SERVES or markets to.
+      Examples: ["Sarjapur", "Electronic City", "HSR Layout", "Koramangala"]
+      Return empty array if no locations found.
+
+3. MARKETING SUMMARY
+   Write a DETAILED, COMPREHENSIVE summary that extracts ALL marketing-relevant 
+   information from the data. This summary must be rich enough to generate 
+   50+ keywords and 15+ ad headlines.
+
+   MUST INCLUDE (if present in data):
+
+   PRODUCTS & SERVICES:
+   - List ALL products/services mentioned with specific names
+   - Include pricing, packages, or tiers if available
+   - Mention any specializations or flagship offerings
+
+   AUDIENCE & LOCATIONS:
+   - Target customers/audience segments
+   - All cities, areas, or regions served
+   - Any delivery/service radius information
+
+   DIFFERENTIATORS & TRUST:
+   - Unique selling points (what makes them different)
+   - Years of experience, number of clients/projects
+   - Awards, certifications, partnerships
+   - Customer testimonials or ratings mentioned
+   - Guarantees or warranties offered
+
+   CONTACT & ACTION:
+   - Phone numbers, email addresses
+   - Business hours if mentioned
+   - Call-to-action phrases used on the site
+
+   Write in 2-4 paragraphs. Be EXHAUSTIVE - include every detail that could 
+   become a keyword or headline. Separate paragraphs with \\n\\n.
 
 STRICT RULES:
-• Only one paragraph
-• DO NOT invent details
+• Extract ALL available information - do not summarize too briefly
+• Only use information present in the scraped data
+• If data is missing for a category, skip it - do not mention its absence
+• Use action-oriented, benefit-focused language
 • DO NOT include URLs
-• DO NOT reference the prompt
-• DO NOT output bullet points
-• DO NOT use unescaped double quotes inside the summary
-  Instead, replace any internal double quotes with single quotes
-• Ensure the output is valid JSON that can be parsed by json.loads
+• DO NOT use bullet points or markdown
+• DO NOT reference this prompt
+• Replace internal double quotes with single quotes
+• Ensure valid JSON output
 
-3. OUTPUT FORMAT (MANDATORY)
-Return ONLY this exact JSON format:
-
+OUTPUT FORMAT (return ONLY this JSON):
 {{
-  "businessType": "<business_type>",
-  "summary": "<summary_text>"
+  "businessType": "<specific_business_type>",
+  "location": {{
+    "area_location": "<state_or_major_region_or_null>",
+    "interested_locations": ["<location1>", "<location2>", "..."]
+  }},
+  "summary": "<detailed_comprehensive_summary>"
 }}
