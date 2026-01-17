@@ -9,8 +9,8 @@ def get_today_end_date_with_duration(duration_days):
     start_date = datetime.now().date()
     end_date = start_date + timedelta(days=duration_days)
     return {
-        "startDate": start_date.strftime("%Y-%m-%d"),
-        "endDate": end_date.strftime("%Y-%m-%d")
+        "startDate": start_date.strftime("%d/%m/%Y"),
+        "endDate": end_date.strftime("%d/%m/%Y")
     }
 
 async def validate_domain_exists(url:str)-> Tuple[bool,str]:
