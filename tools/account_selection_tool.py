@@ -1,5 +1,6 @@
 from structlog import get_logger    #type: ignore
 from typing import List, Dict, Any, Optional
+from models.campaign_data_model import CampaignData
 
 from third_party.google.services.google_customers_accounts import (
     list_manager_customers as fetch_login_customers_accounts,
@@ -7,19 +8,12 @@ from third_party.google.services.google_customers_accounts import (
     flatten_mcc_response,
 )
 
+def all_required_campaign_fields_collected(campaign_data: dict) -> bool:
+    required_fields = CampaignData.model_fields.keys()
+    return all(field in campaign_data for field in required_fields)
+
+
 logger = get_logger(__name__)
-
-
-def get_formatted_accounts_string(items: List[Dict[str, Any]], title: str, name_key: str = "name", id_key: str = "id") -> str:
-    
-    lines = [title]
-    for index, item in enumerate(items, start=1):
-        display_name = item.get(name_key) or "Unnamed"
-        display_id = item.get(id_key) or ""
-        lines.append(f"{index}. {display_name} ({display_id})")
-    return "\n".join(lines)
-
-
 
 HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA = {
     "name": "handle_account_selection",
@@ -32,9 +26,6 @@ HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA = {
             "action": {
                 "type": "string",
                 "enum": ["mcc", "customer", "both"],
-            },
-            "login_customer_id": {
-                "type": "string",
             },
             "retry": {
                 "type": "integer",
@@ -56,7 +47,7 @@ async def execute_list_accessible_customers(session: dict,client_code: str) -> D
             session["mcc_options"] = []
             session["status"] = "in_progress"
             return {
-                "text": (
+                "message": (
                     "I couldn't find any Google Ads manager (MCC) accounts for this client code. "
                     "Please check your connection or try a different code."
                 ),
@@ -86,30 +77,23 @@ async def execute_list_accessible_customers(session: dict,client_code: str) -> D
             customer_result = await execute_fetch_customer_accounts(session, login_customer_id, client_code)
 
             return {
-                "text": f"{info_msg}\n\n{customer_result['text']}",
+                "message": info_msg,
                 "options": customer_result.get("options"),
                 "selection_type": customer_result.get("selection_type"),
-                "message": info_msg
             }
 
         session["status"] = "selecting_mcc"
 
-        formatted_text = get_formatted_accounts_string(
-            mccs,
-            "Here are your available Google Ads manager accounts:",
-        )
-
         return {
-            "text": f"{formatted_text}\n\nPlease select one by number or name.",
+            "message": "Here are your available Google Ads manager accounts:",
             "options": mccs,
-            "message": "Here are your available Google Ads manager accounts:",              
-            "selection_type": "mcc",      
+            "selection_type": "mcc",
         }
 
     except Exception:
         logger.exception("Error in list_accessible_customers")
         return {
-            "text": (
+            "message": (
                 "Hmm, I couldn’t fetch your manager accounts right now. "
                 "Please check your connection or try again in a moment."
             ),
@@ -127,7 +111,7 @@ async def execute_fetch_customer_accounts(session: dict, login_customer_id: str,
             session["customer_options"] = []
             session["status"] = "selecting_mcc"
             return {
-                "text": (
+                "message": (
                     "No customer accounts were found under this manager account. "
                     "Please select a different manager from the list above or try again later."
                 ),
@@ -137,7 +121,6 @@ async def execute_fetch_customer_accounts(session: dict, login_customer_id: str,
 
         session["customer_options"] = customer_accounts
 
-        # Auto-select single customer (UNCHANGED)
         if len(customer_accounts) == 1:
             customer = customer_accounts[0]
             customer_id = customer.get("id")
@@ -148,7 +131,7 @@ async def execute_fetch_customer_accounts(session: dict, login_customer_id: str,
             session["status"] = "in_progress"
 
             return {
-                "text": (
+                "message": (
                     "I found only one customer account under the selected manager:\n"
                     f"- {customer_name} ({customer_id})\n\n"
                     "I've selected this customer automatically and will proceed with the setup."
@@ -159,23 +142,19 @@ async def execute_fetch_customer_accounts(session: dict, login_customer_id: str,
 
         session["status"] = "selecting_customer"
 
-        formatted_options_text = get_formatted_accounts_string(
-            customer_accounts,
-            f"Here are the customer accounts under Manager account (MCC) {login_customer_id}:",
-        )
-
         return {
-            "text": f"{formatted_options_text}\n\nPlease select one by number or name.",
+            "message": (
+                f"Here are the customer accounts under Manager account (MCC) {login_customer_id}:"
+            ),
             "options": customer_accounts,
-            "message": f"Here are the customer accounts under Manager account (MCC) {login_customer_id}:",           
-            "selection_type": "customer", 
+            "selection_type": "customer",
         }
 
     except Exception:
         logger.exception("Error fetching customer accounts")
         session["status"] = "selecting_mcc"
         return {
-            "text": (
+            "message": (
                 "Sorry, there was an issue fetching customer accounts. "
                 "This may happen if the selected manager lacks permissions. "
                 "Please try another manager account."
@@ -213,7 +192,7 @@ async def execute_handle_account_selection(
 
     if missing_fields:
         return {
-            "text": (
+            "message": (
                 "Required campaign details missing or invalid: "
                 f"{', '.join(missing_fields)}. Please provide them before listing accounts."
             ),
@@ -238,7 +217,7 @@ async def execute_handle_account_selection(
                 return last_result
 
         return last_result or {
-            "text": "No manager accounts were found for your profile.",
+            "message": "No manager accounts were found for your profile.",
             "options": None,
             "selection_type": None,
         }
@@ -247,7 +226,7 @@ async def execute_handle_account_selection(
         login_customer_id = login_customer_id or campaign_data.get("loginCustomerId")
         if not login_customer_id:
             return {
-                "text": (
+                "message": (
                     "There is no confirmed manager account yet. "
                     "Please select a manager account first."
                 ),
@@ -265,7 +244,84 @@ async def execute_handle_account_selection(
         )
 
     return {
-        "text": "I didn’t understand which account you want to change.",
+        "message": "I didn’t understand which account you want to change.",
         "options": None,
         "selection_type": None,
+    }
+async def handle_account_selection_by_status(
+    session: dict,
+    message: str,
+    client_code: str,
+) -> dict:
+
+
+    selected_id = message.strip()
+
+    if session["status"] == "selecting_mcc":
+        mcc_options = session.get("mcc_options", [])
+        valid_mcc_ids = {str(mcc["id"]) for mcc in mcc_options}
+
+        if selected_id not in valid_mcc_ids:
+            return {
+                "next_status": "selecting_mcc",
+                "message": "Invalid selection. Please choose a manager account from the list below.",
+                "selection": {
+                    "type": "mcc",
+                    "options": mcc_options,
+                },
+            }
+
+        session["campaign_data"]["loginCustomerId"] = selected_id
+
+        result = await execute_fetch_customer_accounts(
+            session=session,
+            login_customer_id=selected_id,
+            client_code=client_code,
+        )
+
+        selection = None
+        if result.get("options"):
+            selection = {
+                "type": result.get("selection_type"),
+                "options": result.get("options"),
+            }
+
+        return {
+            "next_status": session["status"],  # set by execute_fetch_customer_accounts
+            "message": result.get("message"),
+            "selection": selection,
+        }
+
+    if session["status"] == "selecting_customer":
+        customer_options = session.get("customer_options", [])
+        valid_customer_ids = {str(c["id"]) for c in customer_options}
+
+        if selected_id not in valid_customer_ids:
+            return {
+                "next_status": "selecting_customer",
+                "message": "Invalid selection. Please choose a customer account from the list below.",
+                "selection": {
+                    "type": "customer",
+                    "options": customer_options,
+                },
+            }
+
+        session["campaign_data"]["customerId"] = selected_id
+
+        if all_required_campaign_fields_collected(session["campaign_data"]):
+            return {
+                "next_status": "awaiting_confirmation",
+                "message": "",  # chat_service will build summary
+                "requires_summary": True,
+            }
+
+        return {
+            "next_status": session["status"],
+            "message": "Customer account selected successfully.",
+        }
+
+    return {
+        "next_status": session["status"],
+        "message": "Account selection is not expected in the current state.",
+        "error": True,
     }
