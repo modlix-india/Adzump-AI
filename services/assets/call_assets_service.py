@@ -70,7 +70,7 @@ class CallAssetsService(BaseAssetService):
 
         # 4. LLM validation (country-aware)
         call_assets = await BaseAssetService.generate_from_prompt(
-            "callasset_prompt.txt", {"raw_numbers": raw_numbers}
+            "callAsset_prompt.txt", {"raw_numbers": raw_numbers}
         )
 
         if not call_assets:
