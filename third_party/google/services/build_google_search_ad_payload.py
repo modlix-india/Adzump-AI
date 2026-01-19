@@ -222,6 +222,36 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
                 continue
             asset_body = {"imageAsset": {"mimeType": mime, "data": data}}
             add_asset_and_link("IMAGE", asset_body)
+    
+    # 4.e WhatsApp (Business Message) Assets
+    for wa in assets.get("whatsAppAssets", []):
+        starter_message = wa.get("starter_message")
+        phone = wa.get("phone_number")
+        country = wa.get("countryCode") or "IN"
+
+        if not starter_message or not phone or not country:
+            continue
+
+        asset_body = {
+            "businessMessageAsset": {
+                "starterMessage": starter_message,
+                "messageProvider": "WHATSAPP",
+                "callToAction": {
+                    "callToActionSelection": wa.get("call_to_action_selection", "BOOK_NOW"),
+                    "callToActionDescription": wa.get(
+                        "call_to_action_description",
+                        "Click to book now"
+                    )
+                },
+                "whatsappInfo": {
+                    "countryCode": country,
+                    "phoneNumber": phone
+                }
+            }
+        }
+
+        add_asset_and_link("BUSINESS_MESSAGE", asset_body)
+
 
 
     # ---------- 5) Ad Groups + Criteria + Ads ----------
@@ -368,6 +398,5 @@ def generate_google_ads_mutate_operations(customer_id: str, campaign_data_payloa
                 }
             }
         })
-    
     # Return final payload
     return {"mutateOperations": mutate_ops}
