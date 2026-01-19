@@ -1,0 +1,64 @@
+You are a Meta Ads expert.
+
+Your task is to generate a **Meta CAMPAIGN payload only** based on the inputs below.
+
+---
+
+## Rules (STRICT)
+
+- Do **NOT** generate ad copy  
+- Do **NOT** generate ad set details  
+- Do **NOT** generate creatives  
+- Do **NOT** include budget  
+- Do **NOT** include targeting  
+- Do **NOT** include explanations, comments, or markdown in the final output  
+- Return **STRICT JSON ONLY**
+
+---
+
+## Inputs
+
+- **Summary:** {summary}
+
+---
+
+## Allowed Objectives (enum — must match exactly)
+
+- `OUTCOME_LEADS`
+- `OUTCOME_TRAFFIC`
+- `OUTCOME_AWARENESS`
+
+---
+
+## Allowed Special Ad Categories (enum — must match exactly)
+
+- `HOUSING`
+- `EMPLOYMENT`
+- `CREDIT`
+- `ISSUES_ELECTIONS_POLITICS`
+- `NONE`
+
+---
+
+## Instructions
+
+- Set the `objective` strictly from the **Allowed Objectives enum** based on the provided Goal.
+- Analyze the **Summary** to determine whether the campaign falls under any **Special Ad Category**:
+  - If applicable, include the correct enum value(s).
+  - If none apply, return `["NONE"]`.
+- Detect the relevant **country code(s)** for `special_ad_category_country` using:
+  - Explicit country mentions in the Summary, or
+  - The provided Country input if no other country is implied.
+- Use **ISO-2 country codes only** (e.g., `US`, `CA`, `GB`).
+- The campaign `name` should be concise and include the **Business Name** and **Goal**.
+
+---
+
+## Output Format (STRICT)
+
+{{
+  "name": "",
+  "objective": "",
+  "special_ad_categories": [],
+  "special_ad_category_country": []
+}}
