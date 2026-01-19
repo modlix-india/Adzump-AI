@@ -12,8 +12,8 @@ Here are the positive keywords you MUST use in the ad assets:
 
 1. Headlines (KEYWORD REQUIRED IN EACH)
 
-IMPORTANT - Handling Long Keywords (5+ words):
-If a keyword has 5 or more words, you MUST extract meaningful sub-parts from it.
+IMPORTANT - Handling Long Keywords (4+ words):
+If a keyword has 4 or more words, you MUST extract meaningful sub-parts from it.
 Split into: location terms, feature terms (like 3BHK, apartments, villa), and brand names.
 
 EXAMPLE of splitting long keywords:
@@ -25,7 +25,7 @@ Extract and use these parts:
 - "Bangalore homes" (location)
 
 For EACH headline, follow this process:
-Step 1: Pick one keyword (or extracted sub-part if keyword is 5+ words)
+Step 1: Pick one keyword (or extracted sub-part if keyword is 4+ words)
 Step 2: Build a short, catchy headline that naturally contains that keyword/sub-part
 Step 3: Verify the keyword/sub-part appears in the headline before adding it
 
