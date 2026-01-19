@@ -1,10 +1,11 @@
 import os
 import structlog
-from fastapi import APIRouter, HTTPException, FastAPI
+from fastapi import APIRouter, FastAPI
 from contextlib import asynccontextmanager
 from mlops.performance import (
     PerformancePredictionReq,
     PerformancePredictionData,
+    PerformanceAPIResponse,
     AdPerformancePredictor,
 )
 from oserver.utils import helpers
@@ -76,19 +77,19 @@ router = APIRouter(
 )
 
 
-@router.post("/forecast", response_model=PerformancePredictionData)
+@router.post("/forecast", response_model=PerformanceAPIResponse)
 async def forecast_performance(
     request: PerformancePredictionReq,
-) -> PerformancePredictionData:
+) -> PerformanceAPIResponse:
     """
     Predict ad performance metrics (impressions, clicks, conversions).
 
     """
     current_predictor = get_initialized_predictor()
     if not current_predictor.is_ready():
-        raise HTTPException(
-            status_code=503,
-            detail="Prediction models not loaded. Please ensure model files are available.",
+        return PerformanceAPIResponse(
+            status="error",
+            error="Prediction models not loaded. Please ensure model files are available.",
         )
 
     try:
@@ -102,13 +103,17 @@ async def forecast_performance(
             period=request.period,
         )
 
-        return PerformancePredictionData(**result)
+        return PerformanceAPIResponse(
+            status="success", data=PerformancePredictionData(**result)
+        )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return PerformanceAPIResponse(status="error", error=str(e))
     except Exception as e:
         logger.error("prediction_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+        return PerformanceAPIResponse(
+            status="error", error=f"Prediction failed: {str(e)}"
+        )
 
 
 @router.get("/health")

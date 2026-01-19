@@ -37,27 +37,35 @@ async def test_live_prediction_endpoint():
 
         data = response.json()
         logger.info("prediction_api_response", response_data=data)
-        assert data["timeframe"] == "Monthly"
-        assert "budget_allocated" in data
-        assert "₹" in data["budget_allocated"]  # Verify formatting
+
+        # Verify structure
+        assert "status" in data
+        assert data["status"] == "success"
+        assert "data" in data
+
+        result_data = data["data"]
+
+        assert result_data["timeframe"] == "Monthly"
+        assert "budget_allocated" in result_data
+        assert "₹" in result_data["budget_allocated"]  # Verify formatting
 
         # Verify metrics (now single values, not ranges)
         for field in ["impressions", "clicks", "conversions"]:
-            assert field in data
-            assert " - " not in data[field]  # Verify range is removed
+            assert field in result_data
+            assert " - " not in result_data[field]  # Verify range is removed
 
         # Verify derived metrics
-        assert "ctr" in data
-        assert "%" in data["ctr"]
-        assert " - " not in data["ctr"]
+        assert "ctr" in result_data
+        assert "%" in result_data["ctr"]
+        assert " - " not in result_data["ctr"]
 
-        assert "cpa" in data
-        assert "₹" in data["cpa"]
-        assert " - " not in data["cpa"]
+        assert "cpa" in result_data
+        assert "₹" in result_data["cpa"]
+        assert " - " not in result_data["cpa"]
 
-        assert "conversion_rate" in data
-        assert "%" in data["conversion_rate"]
-        assert " - " not in data["conversion_rate"]
+        assert "conversion_rate" in result_data
+        assert "%" in result_data["conversion_rate"]
+        assert " - " not in result_data["conversion_rate"]
 
 
 @pytest.mark.asyncio
@@ -73,6 +81,8 @@ async def test_api_validation_empty_keyword():
         response = await client.post(ENDPOINT, json=payload)
 
         # Should be 422 (Validation Error) because of min_length=1
+        # Should be 422 (Validation Error) - FastAPI returns standard validation error structure for this
+        # Our custom structure handles 500s/logic errors, but 422s are usually standard unless overridden
         assert response.status_code == 422
         assert "min_length" in response.text
 
