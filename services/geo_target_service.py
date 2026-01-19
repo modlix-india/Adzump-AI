@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 from structlog import get_logger  # type: ignore
 import urllib.parse
 from models.maps_model import TargetPlaceLocation, TargetPlaceResponse
+from oserver.services.connection import fetch_google_api_token_simple
 
 logger = get_logger(__name__)
 
@@ -27,11 +28,11 @@ class GeoTargetService:
         "administrative_area_level_1",  # State
     ]
 
-    def __init__(self):
-        """Initialize service with cached credentials."""
+    def __init__(self, client_code: str):
         self._google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         self._developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self._access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+        # self._access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+        self._access_token = fetch_google_api_token_simple(client_code)
 
     _client: Optional[httpx.AsyncClient] = None
 
