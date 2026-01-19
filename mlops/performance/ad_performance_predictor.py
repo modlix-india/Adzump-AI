@@ -40,7 +40,12 @@ class AdPerformancePredictor:
         """
         try:
             if path.startswith("http://") or path.startswith("https://"):
-                logger.info("downloading_artifact", description=description, url=path)
+                logger.info(
+                    "performance_model_downloading_artifact",
+                    description=description,
+                    url=path,
+                    model="performance_prediction",
+                )
                 response = requests.get(path, timeout=30)
                 response.raise_for_status()
                 return pickle.load(io.BytesIO(response.content))
@@ -51,7 +56,11 @@ class AdPerformancePredictor:
                     return pickle.load(f)
         except Exception as e:
             logger.error(
-                "artifact_load_failed", description=description, path=path, error=str(e)
+                "performance_model_artifact_load_failed",
+                description=description,
+                path=path,
+                error=str(e),
+                model="performance_prediction",
             )
             raise
 
@@ -82,7 +91,11 @@ class AdPerformancePredictor:
         try:
             self.sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
         except Exception as e:
-            logger.error("sentence_transformer_load_failed", error=str(e))
+            logger.error(
+                "performance_model_sentence_transformer_load_failed",
+                error=str(e),
+                model="performance_prediction",
+            )
             raise
 
     def predict(
@@ -98,7 +111,10 @@ class AdPerformancePredictor:
         Dict containing predicted ranges for impressions, clicks, conversions.
         """
         if not self._is_loaded:
-            logger.error("Predict called but models not loaded")
+            logger.error(
+                "performance_predict_called_models_not_loaded",
+                model="performance_prediction",
+            )
             raise RuntimeError("Models not loaded. Call load_models() first.")
 
         if not keyword_data:

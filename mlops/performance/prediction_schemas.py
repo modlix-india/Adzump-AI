@@ -1,4 +1,4 @@
-from typing import List, Literal
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -62,6 +62,33 @@ class PerformancePredictionData(BaseModel):
                 "ctr": "15.83%",
                 "cpa": "₹1,363",
                 "conversion_rate": "5.21%",
+            }
+        }
+    )
+
+
+class PerformanceAPIResponse(BaseModel):
+    status: Literal["success", "error"] = Field(..., description="Response status")
+    data: Optional[PerformancePredictionData] = Field(
+        None, description="Prediction data if success"
+    )
+    error: Optional[str] = Field(None, description="Error message if failed")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "success",
+                "data": {
+                    "timeframe": "Monthly",
+                    "budget_allocated": "₹15,000",
+                    "impressions": "1,333",
+                    "clicks": "211",
+                    "conversions": "11",
+                    "ctr": "15.83%",
+                    "cpa": "₹1,363",
+                    "conversion_rate": "5.21%",
+                },
+                "error": None,
             }
         }
     )
