@@ -6,6 +6,8 @@ from services.assets.call_assets_service import CallAssetsService
 from services.assets.call_out_service import CalloutsService
 from services.assets.site_link_service import SitelinksService
 from services.assets.structured_snippet_service import StructuredSnippetsService
+from services.assets.whatsapp_asset_service import WhatsAppAssetsService
+
 
 router = APIRouter(prefix="/api/ds/ads/assets", tags=["Assets"])
 
@@ -14,6 +16,7 @@ ASSET_SERVICE_MAP = {
     "SITE_LINKS": SitelinksService.generate,
     "STRUCTURED_SNIPPETS": StructuredSnippetsService.generate,
     "CALL_ASSETS": CallAssetsService.generate,
+    "WHATSAPP_ASSETS": WhatsAppAssetsService().generate,
 }
 
 
@@ -33,8 +36,13 @@ async def generate_asset(
         )
     try:
         tasks = [
-            ASSET_SERVICE_MAP[asset](request.data_object_id, access_token, clientCode,x_forwarded_host,
-            x_forwarded_port)
+            ASSET_SERVICE_MAP[asset](
+                request.data_object_id,
+                access_token,
+                clientCode,
+                x_forwarded_host,
+                x_forwarded_port,
+            )
             for asset in request.asset_type
         ]
         responses = await asyncio.gather(*tasks, return_exceptions=True)
