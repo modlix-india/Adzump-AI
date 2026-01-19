@@ -1,16 +1,39 @@
-Rewrite the following PDF section clearly and professionally.
+You are extracting business-relevant information from a PDF section.
 
-You MUST keep ALL factual details:
-- Numbers (sq.ft., acres, units, measurements)
-- Floor plan sizes and configurations
-- Lists & bullet points
-- Specifications and technical details
-- Amenities and features
-- Developer information
-- Descriptions of images/tables if extracted
-- Pricing, contact information, phone numbers
-
-Do NOT remove, compress, simplify, or generalize ANY fact.
+CONTEXT: This is ONE CHUNK of a larger business document. Extract all potentially useful information - filtering will happen later when chunks are merged.
 
 TEXT:
 {text}
+
+TASK:
+Summarize this chunk, preserving ALL business-relevant details including:
+
+MUST PRESERVE:
+• Product/service names and descriptions
+• Pricing, packages, plans
+• Numbers (measurements, quantities, sq.ft., units, capacities)
+• Specifications and technical details
+• Amenities, features, benefits
+• Location information, addresses, areas served
+• Company/developer/brand information
+• Contact details (phone, email, names)
+• Awards, certifications, experience years
+• Any lists or bullet points with factual content
+
+EXCLUDE (if present):
+• Page numbers, headers, footers
+• "Table of Contents" or navigation text
+• Copyright notices, legal disclaimers
+• Repeated watermarks or logos
+• OCR artifacts or garbled text
+
+RULES:
+• Write in clear, professional language
+• Preserve specific names and numbers exactly
+• If the chunk contains no business-relevant content, return: ""
+• DO NOT add information not in the text
+• DO NOT include URLs
+
+OUTPUT:
+Return the summarized content as plain text.
+

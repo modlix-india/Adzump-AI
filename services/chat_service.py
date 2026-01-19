@@ -1,3 +1,4 @@
+
 import uuid
 from datetime import datetime, timezone
 from fastapi.responses import JSONResponse
@@ -10,6 +11,7 @@ from models.campaign_data_model import CampaignData
 from tools.account_selection_tool import (
     HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA,  
     execute_handle_account_selection,
+    handle_account_selection_by_status
 )
 from tools.tool_exe import (
     process_tool_call,
@@ -48,6 +50,12 @@ def all_fields_collected(collected_data):
     """Check if all required fields are collected."""
     required = get_required_fields()
     return all(field in collected_data for field in required)
+
+def all_business_fields_collected(collected_data):
+    return all(
+        field in collected_data
+        for field in ["businessName", "websiteURL", "budget", "durationDays"]
+    )
 
 
 def build_summary(collected_data , session):
@@ -94,8 +102,6 @@ def build_summary(collected_data , session):
     lines.append("Please confirm if everything is correct.")
     return "\n".join(lines)
 
-    
-
 
 def build_response(status: str, session: dict, ai_message: str, account_selection=None)-> JSONResponse:
     """Build standardized JSON response with mask during collection and values at confirm."""
@@ -134,6 +140,19 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
     ]
 
     try:
+        # Inject authoritative system state
+        session["chat_history"] = [
+            msg for msg in session["chat_history"]
+            if not msg["content"].startswith("SYSTEM STATE")
+        ]
+        session["chat_history"].insert(
+            1,
+            {
+                "role": "system",
+                "content": f"SYSTEM STATE (AUTHORITATIVE): campaign_status = {session['status']}",
+            },
+        )
+
         response = await chat_completion(session["chat_history"], tools=tools, tool_choice="auto")
     except Exception as e:
         return JSONResponse(
@@ -155,13 +174,14 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
                 session["status"] = "completed"
                 dates = get_today_end_date_with_duration(int(session["campaign_data"]["durationDays"]))
                 session["campaign_data"].update(dates)
+                session["campaign_data"]["budget"] = int(session["campaign_data"]["budget"])
                 response_data = dict(session["campaign_data"])
-
                 if "durationDays" in response_data:
                     duration = int(response_data["durationDays"])
                     response_data["durationDays"] = (
-                        "1 day" if duration == 1 else f"{duration} days"
+                        "1 Day" if duration == 1 else f"{duration} Days"
                     )
+                    session["campaign_data"]["durationDays"] = response_data["durationDays"]
                 # Manager (MCC)
                 mcc_name = None
                 if "loginCustomerId" in response_data:
@@ -215,25 +235,15 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
             elif name == HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA["name"]:
                 args = safe_args(tool_call.function.arguments)
                 action = args.get("action") or ""
-                login_customer_id = args.get("login_customer_id")
                 retry = int(args.get("retry", 1))
                 client_code = session.get("client_code") or ""
 
-                # If model asked to list customers for a login_customer_id, we may want to persist loginCustomerId
-                # only if the model explicitly passed login_customer_id and action == "customer"
-                if action == "customer" and login_customer_id:
-                    # persist the confirmed MCC so collected_data reflects it
-                    session["campaign_data"]["loginCustomerId"] = login_customer_id
                 tool_result = await execute_handle_account_selection(
                     session,
                     action,
                     client_code,
-                    login_customer_id=login_customer_id,
                     retry=retry,
                 )
-
-                ai_text = tool_result["text"]
-                session["chat_history"].append({"role": "assistant", "content": ai_text})
 
                 account_selection = None
                 if tool_result.get("options"):
@@ -245,13 +255,15 @@ async def handle_confirmation_state(session: dict) -> JSONResponse:
                 return build_response(
                     session["status"],
                     session,
-                    tool_result.get("message","") if tool_result.get("message","") else ai_text,
+                    tool_result.get("message","") ,
                     account_selection=account_selection,
                 )
 
     ai_message = ai_message or "What would you like to change?"
     session["chat_history"].append({"role": "assistant", "content": ai_message})
-    return build_response("in_progress", session, ai_message)
+    # return build_response("in_progress", session, ai_message)
+    return build_response("awaiting_confirmation", session, ai_message)
+
 
 #Data-collection state handler
 async def handle_data_collection_state(session: dict, client_code: str) -> JSONResponse:
@@ -261,6 +273,19 @@ async def handle_data_collection_state(session: dict, client_code: str) -> JSONR
     ]
 
     try:
+        # Inject authoritative system state
+        session["chat_history"] = [
+            msg for msg in session["chat_history"]
+            if not msg["content"].startswith("SYSTEM STATE")
+        ]
+        session["chat_history"].insert(
+            1,
+            {
+                "role": "system",
+                "content": f"SYSTEM STATE (AUTHORITATIVE): campaign_status = {session['status']}",
+            },
+        )
+
         response = await chat_completion(session["chat_history"], tools=tools, tool_choice="auto")
     except Exception as e:
         return JSONResponse(
@@ -281,24 +306,30 @@ async def handle_data_collection_state(session: dict, client_code: str) -> JSONR
             if fname == SAVE_CAMPAIGN_TOOL_SCHEMA["name"]:
                 # Business fields extraction/validation
                 ai_message, _ = await process_tool_call(session, tool_call, response_message)
+                if all_business_fields_collected(session["campaign_data"]):
+                    session["status"] = "selecting_mcc"
+                    tool_result = await execute_handle_account_selection(
+                        session=session,
+                        action="mcc",
+                        client_code=client_code,
+                    )
+                    return build_response(
+                        session["status"],
+                        session,
+                        tool_result.get("message",""),
+                        account_selection={
+                            "type": tool_result.get("selection_type"),
+                            "options": tool_result.get("options"),
+                    } if tool_result.get("options") else None,
+                )
 
             elif fname == HANDLE_ACCOUNT_SELECTION_TOOL_SCHEMA["name"]:
                 args = safe_args(tool_call.function.arguments)
                 action = args.get("action") or ""
-                login_customer_id = args.get("login_customer_id")
                 retry = int(args.get("retry", 1))
 
-                
-                
-                if action == "customer" and login_customer_id:
-                    # persist the confirmed MCC so collected_data reflects it
-                    session["campaign_data"]["loginCustomerId"] = login_customer_id
-
-                tool_result = await execute_handle_account_selection(session, action, client_code, login_customer_id=login_customer_id, retry=retry)
+                tool_result = await execute_handle_account_selection(session, action, client_code, retry=retry)
                 logger.info(tool_result)
-                ai_text = tool_result["text"]
-                
-                session["chat_history"].append({"role": "assistant", "content": ai_text})
 
                 account_selection = None
                 if tool_result.get("options"):
@@ -307,7 +338,7 @@ async def handle_data_collection_state(session: dict, client_code: str) -> JSONR
                         "options": tool_result.get("options"),
                     }
                 
-                message = tool_result.get("message", "") if tool_result.get("message", "") else ai_text
+                message = tool_result.get("message", "")
                 return build_response(
                     session["status"],
                     session,
@@ -368,6 +399,38 @@ async def process_chat(session_id: str, message: str, client_code: str):
     # Update activity timestamp and chat history
     session["last_activity"] = current_time
     session["client_code"] = client_code
+
+    if session.get("status") == "completed":
+        return JSONResponse(
+            content={
+                "status": "completed",
+                "reply": "Your campaign has already been completed. If you want to create a new campaign, please start a new session.",
+                "collected_data": session.get("campaign_data", {}),
+            "progress": calculate_progress(session.get("campaign_data", {})),
+            "account_selection": None,
+        }
+    )
+
+    if session["status"] in ("selecting_mcc", "selecting_customer"):
+        result = await handle_account_selection_by_status(
+            session=session,
+            message=message,
+            client_code=client_code,
+        )
+
+        session["status"] = result["next_status"]
+
+        if result.get("requires_summary"):
+            ai_message = build_summary(session["campaign_data"], session)
+        else:
+            ai_message = result.get("message", "")
+
+        return build_response(
+            status=session["status"],
+            session=session,
+            ai_message=ai_message,
+            account_selection=result.get("selection"),
+        )
     session["chat_history"].append({"role": "user", "content": message})
 
     if session["status"] == "awaiting_confirmation":
