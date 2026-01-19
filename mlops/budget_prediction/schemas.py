@@ -23,10 +23,10 @@ class BudgetPredictionReq(BaseModel):
 
 
 class BudgetPredictionData(BaseModel):
-    suggested_budget: float = Field(
+    suggested_budget: int = Field(
         ..., description="Recommended budget including buffer"
     )
-    base_cost_prediction: float = Field(
+    base_cost_prediction: int = Field(
         ..., description="Raw cost prediction before buffer"
     )
     currency: str = Field("INR", description="Currency code")
@@ -34,8 +34,8 @@ class BudgetPredictionData(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "suggested_budget": 12000.0,
-                "base_cost_prediction": 10000.0,
+                "suggested_budget": 12000,
+                "base_cost_prediction": 10000,
                 "currency": "INR",
             }
         }
@@ -54,8 +54,8 @@ class BudgetAPIResponse(BaseModel):
             "example": {
                 "status": "success",
                 "data": {
-                    "suggested_budget": 12000.0,
-                    "base_cost_prediction": 10000.0,
+                    "suggested_budget": 12000,
+                    "base_cost_prediction": 10000,
                     "currency": "INR",
                 },
                 "error": None,

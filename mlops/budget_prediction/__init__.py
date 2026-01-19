@@ -1,5 +1,5 @@
-from mlops.budget.budget_predictor import BudgetPredictor
-from mlops.budget.budget_schemas import (
+from mlops.budget_prediction.predictor import BudgetPredictor
+from mlops.budget_prediction.schemas import (
     BudgetPredictionReq,
     BudgetPredictionData,
     BudgetAPIResponse,

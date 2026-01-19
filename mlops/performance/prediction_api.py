@@ -23,7 +23,7 @@ def get_initialized_predictor() -> AdPerformancePredictor:
     if predictor is None:
         # Get base URL for model paths
         base_url = helpers.get_base_url()
-        logger.info("using_base_url_for_models", base_url=base_url)
+        logger.info("performance_model_using_base_url", base_url=base_url)
 
         # Get relative paths from env (Lazy loading after load_dotenv)
         lgbm_rel = os.getenv("AD_PREDICTOR_LGBM_PATH")
@@ -32,7 +32,8 @@ def get_initialized_predictor() -> AdPerformancePredictor:
 
         if not all([lgbm_rel, sigmas_rel, columns_rel]):
             logger.warning(
-                "One or more model paths are missing in environment variables."
+                "performance_model_paths_missing",
+                message="One or more model paths are missing in environment variables.",
             )
 
         # Construct full URLs
@@ -58,14 +59,14 @@ async def lifespan(app: FastAPI):
     current_predictor = get_initialized_predictor()
     try:
         current_predictor.load_models()
-        logger.info("models_loaded_successfully")
+        logger.info("performance_models_loaded_successfully")
     except FileNotFoundError as e:
-        logger.warning("models_load_file_not_found", error=str(e))
+        logger.warning("performance_models_load_file_not_found", error=str(e))
         logger.warning(
             "Service starting without models. Prediction endpoint will return errors."
         )
     except Exception as e:
-        logger.warning("models_load_failed", error=str(e))
+        logger.warning("performance_models_load_failed", error=str(e))
 
     yield
     # Shutdown logic
@@ -110,7 +111,7 @@ async def forecast_performance(
     except ValueError as e:
         return PerformanceAPIResponse(status="error", error=str(e))
     except Exception as e:
-        logger.error("prediction_failed", error=str(e))
+        logger.error("performance_prediction_failed", error=str(e))
         return PerformanceAPIResponse(
             status="error", error=f"Prediction failed: {str(e)}"
         )

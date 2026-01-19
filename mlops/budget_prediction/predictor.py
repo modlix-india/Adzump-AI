@@ -1,4 +1,5 @@
 import os
+import math
 import pickle
 import io
 import requests
@@ -6,6 +7,7 @@ import structlog
 import numpy as np
 import pandas as pd
 from typing import Any
+
 
 logger = structlog.get_logger()
 
@@ -21,7 +23,12 @@ class BudgetPredictor:
     def _load_artifact(self, path: str, description: str) -> Any:
         try:
             if path.startswith("http://") or path.startswith("https://"):
-                logger.info("downloading_artifact", description=description, url=path)
+                logger.info(
+                    "budget_model_downloading_artifact",
+                    description=description,
+                    url=path,
+                    model="budget_prediction",
+                )
                 response = requests.get(path, timeout=30)
                 response.raise_for_status()
                 return pickle.load(io.BytesIO(response.content))
@@ -32,7 +39,11 @@ class BudgetPredictor:
                     return pickle.load(f)
         except Exception as e:
             logger.error(
-                "artifact_load_failed", description=description, path=path, error=str(e)
+                "budget_model_artifact_load_failed",
+                description=description,
+                path=path,
+                error=str(e),
+                model="budget_prediction",
             )
             raise
 
@@ -55,7 +66,9 @@ class BudgetPredictor:
         Predicts expected Cost using the linear model and applies a buffer.
         """
         if not self._is_loaded:
-            logger.error("Predict called but model not loaded")
+            logger.error(
+                "budget_predict_called_model_not_loaded", model="budget_prediction"
+            )
             raise RuntimeError("Model not loaded. Call load_model() first.")
 
         input_df = pd.DataFrame(
@@ -73,11 +86,13 @@ class BudgetPredictor:
             buffered_cost_lin = cost_lin * (1.0 + buffer_percent)
 
             return {
-                "suggested_budget": float(buffered_cost_lin),
-                "base_cost_prediction": float(cost_lin),
+                "suggested_budget": int(math.ceil(buffered_cost_lin)),
+                "base_cost_prediction": int(math.ceil(cost_lin)),
             }
         except Exception as e:
-            logger.error("budget_prediction_failed", error=str(e))
+            logger.error(
+                "budget_prediction_failed", error=str(e), model="budget_prediction"
+            )
             raise
 
     def is_ready(self) -> bool:

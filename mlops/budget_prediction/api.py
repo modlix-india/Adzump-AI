@@ -2,12 +2,12 @@ import os
 import structlog
 from fastapi import APIRouter, FastAPI
 from contextlib import asynccontextmanager
-from mlops.budget.budget_schemas import (
+from mlops.budget_prediction.schemas import (
     BudgetPredictionReq,
     BudgetPredictionData,
     BudgetAPIResponse,
 )
-from mlops.budget.budget_predictor import BudgetPredictor
+from mlops.budget_prediction.predictor import BudgetPredictor
 from oserver.utils import helpers
 
 logger = structlog.get_logger()
@@ -23,9 +23,10 @@ def get_initialized_predictor() -> BudgetPredictor:
         model_rel = os.getenv("BUDGET_PREDICTOR_MODEL_PATH")
 
         if not model_rel:
-            logger.warning("BUDGET_PREDICTOR_MODEL_PATH not set in environment")
-            # Fallback or error? For now, we'll proceed but load_model will likely fail if path is None or empty
-            # But let's handle None gracefully
+            logger.warning(
+                "budget_predictor_model_path_missing",
+                message="BUDGET_PREDICTOR_MODEL_PATH not set in environment",
+            )
 
         def join_url(base, path):
             if not path:

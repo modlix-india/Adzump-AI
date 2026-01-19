@@ -4,7 +4,7 @@ import pytest
 import structlog
 from dotenv import load_dotenv
 from oserver.utils.helpers import get_base_url
-from mlops.budget.budget_predictor import BudgetPredictor
+from mlops.budget_prediction.predictor import BudgetPredictor
 
 load_dotenv()
 
@@ -74,7 +74,7 @@ async def test_prediction():
         result_data = data["data"]
         assert "suggested_budget" in result_data
         assert "base_cost_prediction" in result_data
-        assert isinstance(result_data["suggested_budget"], float)
+        assert isinstance(result_data["suggested_budget"], int)
         assert result_data["suggested_budget"] > 0
 
 
