@@ -1,8 +1,10 @@
-from pydantic import BaseModel, HttpUrl
-from typing import Optional
+from pydantic import BaseModel
+from typing import Dict, Optional
 
+class MetaCampaignRequest(BaseModel):
+    dataObjectId: Optional[str] = None
+    businessName: Optional[str] = None
+    goal: Optional[str] = None
 
-class GenerateMetaCampaignRequest(BaseModel):
-    dataObjectId: str
-    businessName: str
-    goal: str
+    adAccountId: Optional[str] = None
+    campaignPayload: Optional[Dict] = None
