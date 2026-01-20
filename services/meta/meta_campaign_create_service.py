@@ -1,7 +1,6 @@
 import httpx
 from fastapi import HTTPException
-
-META_BASE_URL = "https://graph.facebook.com/v21.0"
+from config.meta import META_BASE_URL, META_HTTP_TIMEOUT
 
 
 class MetaCampaignCreateService:
@@ -19,7 +18,7 @@ class MetaCampaignCreateService:
             "status": "PAUSED"
         }
 
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=META_HTTP_TIMEOUT) as client:
             response = await client.post(
                 url,
                 json=payload,

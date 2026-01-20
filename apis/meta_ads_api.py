@@ -4,8 +4,6 @@ from services.meta.meta_campaign_service import MetaCampaignService
 from services.meta.meta_campaign_create_service import MetaCampaignCreateService
 from models.meta.meta_adset_request import GenerateMetaAdSetRequest
 from models.meta.meta_create_adset_request import CreateMetaAdSetRequest
-from services.meta.meta_adset_service import MetaAdSetService
-from services.meta.meta_adset_create_service import MetaAdSetCreateService
 
 router = APIRouter(
     prefix="/api/ds/ads",
