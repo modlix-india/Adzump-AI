@@ -163,4 +163,5 @@ async def analyze_search_terms_route(
     
 @router.get("/get-basic-details/{session_id}")
 async def get_session(session_id: str):
+    
     return await chat_service.get_basic_details(session_id)
