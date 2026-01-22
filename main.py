@@ -12,10 +12,13 @@ from apis.maps import router as maps_router
 from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
 
+from apis.meta_ads_api import router as meta_ads_router
+
 from db import db_session
 from config.logging_config import setup_logging
 from services.geo_target_service import GeoTargetService
 from structlog import get_logger  # type: ignore
+
 
 from dotenv import load_dotenv
 
@@ -80,5 +83,7 @@ app.include_router(maps_router)
 app.include_router(prediction_router)
 
 app.include_router(feedback_router)
+
+app.include_router(meta_ads_router)
 
 setup_exception_handlers(app)
