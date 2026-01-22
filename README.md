@@ -1,4 +1,5 @@
 # Adzump-AI
+
 Adzump ai automation
 ## Overview
 Adzump-AI is a comprehensive suite designed to streamline digital marketing workflows through advanced artificial intelligence. By leveraging machine learning models, the platform automates campaign management, creative generation, and performance optimization to maximize ROI.
