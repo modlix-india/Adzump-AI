@@ -10,6 +10,7 @@ from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service, chat_service
 from services.age_optimization_service import generate_age_optimizations
+from services.gender_optimization_service import generate_gender_optimizations
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -178,6 +179,29 @@ async def generate_age_optimization(
 ):
     try:
         result = await generate_age_optimizations(
+            customer_id=customerId,
+            login_customer_id=loginCustomerId,
+            campaign_id=campaignId,
+            client_code=clientCode,
+            duration=duration,
+        )
+        return {"status": "success", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimize/gender")
+async def generate_gender_optimization(
+    clientCode: str = Header(...),
+    loginCustomerId: str = Header(...),
+    customerId: str = Header(...),
+    campaignId: str = Query(...),
+    duration: str = Query(...),
+):
+    try:
+        result = await generate_gender_optimizations(
             customer_id=customerId,
             login_customer_id=loginCustomerId,
             campaign_id=campaignId,
