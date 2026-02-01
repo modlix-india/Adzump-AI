@@ -4,8 +4,8 @@ from fastapi import status
 class BaseAppException(Exception):
     """Base class for all app-specific exceptions."""
     def __init__(
-        self, 
-        message: str, 
+        self,
+        message: str,
         status_code: int = status.HTTP_400_BAD_REQUEST,
         details: Optional[dict] = None
     ):
@@ -43,3 +43,8 @@ class DatabaseException(BaseAppException):
     """Database operation failed."""
     def __init__(self, message: str = "A database error occurred", details: Optional[dict] = None):
         super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR, details)
+
+class MetaAPIException(BaseAppException):
+    """Meta/Facebook API error."""
+    def __init__(self, message: str = "Meta API request failed"):
+        super().__init__(message, status.HTTP_502_BAD_GATEWAY)

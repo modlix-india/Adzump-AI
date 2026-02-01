@@ -2,6 +2,7 @@ from structlog import get_logger  # type: ignore
 from fastapi import HTTPException
 import json
 from typing import List
+
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
@@ -23,8 +24,8 @@ from oserver.models.storage_request_model import (
     StorageRequestWithPayload,
     StorageUpdateWithPayload,
 )
-from services.openai_client import chat_completion
 from oserver.services.storage_service import StorageService
+from services.openai_client import chat_completion
 from services.geo_target_service import GeoTargetService
 from utils.helpers import normalize_url
 
