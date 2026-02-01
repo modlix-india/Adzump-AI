@@ -12,8 +12,9 @@ from apis.business_api import router as business_router
 from apis.maps import router as maps_router
 from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
+from core.middleware import AuthContextMiddleware
 
-from apis.meta_ads_api import router as meta_ads_router
+from api.meta import router as meta_ads_router
 
 from db import db_session
 from config.logging_config import setup_logging
@@ -55,6 +56,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
+
+# Auth context middleware - extracts access-token and clientCode headers into request context.
+# Headers are optional here; endpoints requiring auth should validate via their own logic.
+app.add_middleware(AuthContextMiddleware)
 
 @app.get("/health")
 async def health_check():

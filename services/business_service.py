@@ -1,14 +1,14 @@
-from structlog import get_logger    #type: ignore
 import json
 from typing import List
+
+from fastapi import HTTPException
+from structlog import get_logger  # type: ignore
+
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
 )
-from services.scraper_service import scrape_website
-from utils import prompt_loader
 from models.business_model import BusinessMetadata, WebsiteSummaryResponse
-from fastapi import HTTPException
 from oserver.models.storage_request_model import (
     StorageFilter,
     StorageReadRequest,
@@ -16,11 +16,14 @@ from oserver.models.storage_request_model import (
     StorageRequestWithPayload,
     StorageUpdateWithPayload,
 )
-from services.openai_client import chat_completion
 from oserver.services.storage_service import StorageService
+from services.openai_client import chat_completion
+from services.scraper_service import scrape_website
+from utils import prompt_loader
 from utils.helpers import normalize_url
 
 logger = get_logger(__name__)
+
 
 class BusinessService:
     OPENAI_MODEL = "gpt-4o-mini"
@@ -121,8 +124,7 @@ class BusinessService:
             )
         return product_data
 
-
-
+    # TODO: Refactor - extract summary fetching logic to StorageService.fetch_business_summary()
     async def process_website_data(
         self,
         website_url: str,
@@ -152,7 +154,9 @@ class BusinessService:
                 clientCode=client_code,
                 filter=StorageFilter(field="businessUrl", value=website_url),
             )
-            existing_data_response = await storage_service.read_page_storage(read_request)
+            existing_data_response = await storage_service.read_page_storage(
+                read_request
+            )
 
             existing_record = None
             existing_id = None
@@ -185,7 +189,6 @@ class BusinessService:
                 and existing_summary.strip()
                 and not rescrape
             ):
-
                 return WebsiteSummaryResponse(
                     storage_id=existing_id,
                     business_url=website_url,
@@ -296,7 +299,8 @@ class BusinessService:
         except Exception as e:
             logger.exception(f"Unexpected error in process_website_data: {e}")
             raise HTTPException(
-                status_code=500, detail="Internal server error during website processing"
+                status_code=500,
+                detail="Internal server error during website processing",
             )
 
     async def generate_website_summary(self, scraped_data: dict) -> str:
@@ -322,4 +326,3 @@ class BusinessService:
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
             raise AIProcessingException("Failed to generate summary")
-

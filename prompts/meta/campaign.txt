@@ -1,4 +1,3 @@
-prompt = f"""
 You are a Meta Ads Campaign specialist.
 
 Your role is to generate a valid Meta Ads **Campaign payload** based on the provided input.

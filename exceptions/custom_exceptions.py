@@ -36,3 +36,8 @@ class DatabaseException(BaseAppException):
     """Database operation failed."""
     def __init__(self, message: str = "A database error occurred"):
         super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class MetaAPIException(BaseAppException):
+    """Meta/Facebook API error."""
+    def __init__(self, message: str = "Meta API request failed"):
+        super().__init__(message, status.HTTP_502_BAD_GATEWAY)

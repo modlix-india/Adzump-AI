@@ -2,6 +2,8 @@ from fastapi import Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
+
+from adapters.meta.exceptions import MetaAPIError
 from exceptions.custom_exceptions import BaseAppException
 from utils.response_helpers import error_response
 from structlog import get_logger    #type: ignore
@@ -41,3 +43,8 @@ def setup_exception_handlers(app):
     async def db_exception_handler(request: Request, exc: SQLAlchemyError):
         logger.exception(f"Database Error at {request.url.path}: {exc}")
         return error_response("A database error occurred.", status_code=500)
+
+    @app.exception_handler(MetaAPIError)
+    async def meta_api_error_handler(request: Request, exc: MetaAPIError):
+        logger.warning(f"Meta API Error at {request.url.path}: {exc.message}")
+        return error_response(exc.message, status_code=exc.status_code)
