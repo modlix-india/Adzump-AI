@@ -41,5 +41,5 @@ class InternalServerException(BaseAppException):
 
 class DatabaseException(BaseAppException):
     """Database operation failed."""
-    def __init__(self, message: str = "A database error occurred", details: Optional[dict] = None):
-        super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR, details)
+    def __init__(self, message: str = "A database error occurred"):
+        super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR)

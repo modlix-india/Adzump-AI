@@ -1,21 +1,16 @@
-from structlog import get_logger  # type: ignore
-from fastapi import HTTPException
 import json
 from typing import List
+
+from fastapi import HTTPException
+from structlog import get_logger  # type: ignore
+
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
     InternalServerException,
     ScraperException,
 )
-from services.scraper_service import ScraperService
-from utils import prompt_loader
-from models.business_model import (
-    BusinessMetadata,
-    WebsiteSummaryResponse,
-    LocationInfo,
-    ScrapeResult,
-)
+from models.business_model import BusinessMetadata, WebsiteSummaryResponse
 from oserver.models.storage_request_model import (
     StorageFilter,
     StorageReadRequest,
@@ -23,9 +18,10 @@ from oserver.models.storage_request_model import (
     StorageRequestWithPayload,
     StorageUpdateWithPayload,
 )
-from services.openai_client import chat_completion
 from oserver.services.storage_service import StorageService
-from services.geo_target_service import GeoTargetService
+from services.openai_client import chat_completion
+from services.scraper_service import scrape_website
+from utils import prompt_loader
 from utils.helpers import normalize_url
 
 logger = get_logger(__name__)
@@ -130,6 +126,7 @@ class BusinessService:
             )
         return product_data
 
+    # TODO: Refactor - extract summary fetching logic to StorageService.fetch_business_summary()
     async def process_website_data(
         self,
         website_url: str,
@@ -417,8 +414,9 @@ class BusinessService:
 
         except Exception as e:
             logger.exception(f"Unexpected error in process_website_data: {e}")
-            raise InternalServerException(
-                "Internal server error during website processing"
+            raise HTTPException(
+                status_code=500,
+                detail="Internal server error during website processing",
             )
 
     async def generate_website_summary(self, scraped_data: dict) -> str:
