@@ -1,5 +1,3 @@
-from dotenv import load_dotenv
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,6 +7,7 @@ from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
 from apis.business_api import router as business_router
+from mlops.performance.prediction_api import router as prediction_router
 from apis.maps import router as maps_router
 from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
@@ -18,7 +17,10 @@ from api.meta import router as meta_ads_router
 
 from db import db_session
 from config.logging_config import setup_logging
-from structlog import get_logger    #type: ignore
+from services.geo_target_service import GeoTargetService
+from structlog import get_logger  # type: ignore
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -27,6 +29,7 @@ setup_logging()
 
 # Get structlog logger
 logger = get_logger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,12 +40,14 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         logger.info("Database connected", component="db")
-        
+
         # Make engine available to routes/services via app.state
         app.state.engine = engine
         yield
     except Exception as e:
-        logger.error("Database connection failed", component="db", error=str(e), exc_info=True)
+        logger.error(
+            "Database connection failed", component="db", error=str(e), exc_info=True
+        )
         # Re-raise to fail-fast on bad DB config
         raise
     finally:
@@ -52,7 +57,13 @@ async def lifespan(app: FastAPI):
                 await engine.dispose()
                 logger.info("Database engine disposed", component="db")
             except Exception as e:
-                logger.error("Error during DB dispose", component="db", error=str(e), exc_info=True)
+                logger.error(
+                    "Error during DB dispose",
+                    component="db",
+                    error=str(e),
+                    exc_info=True,
+                )
+        await GeoTargetService.close_client()
 
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
@@ -65,12 +76,14 @@ app.add_middleware(AuthContextMiddleware)
 async def health_check():
     logger.info("Health check requested", endpoint="/health")
     return {"status": "healthy", "service": "ds-service"}
-    
+
+
 app.include_router(ads_router)
 app.include_router(chat_router)
 app.include_router(assets_router)
 app.include_router(business_router)
 app.include_router(maps_router)
+app.include_router(prediction_router)
 
 app.include_router(feedback_router)
 

@@ -1,41 +1,42 @@
 from fastapi import HTTPException
-from typing import List
-import re
 import json
+from typing import List
+from services.assets.base_asset_service import BaseAssetService
 from services.business_service import BusinessService
+import re
 
 
-
-class CallAssetsService():
-    
+class CallAssetsService(BaseAssetService):
     @staticmethod
-    def extract_phone_numbers(text: str) -> List[str]:
-        pattern = re.compile(
-            r'(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,5}\)?[-.\s]?)?\d{3,5}[-.\s]?\d{4,6}'
-        )
-        matches = re.findall(pattern, text or "")
-        return [m.strip() for m in matches if len(m.strip()) >= 7]
+    def extract_possible_numbers(text: str) -> List[str]:
+        if not text:
+            return []
+        pattern = re.compile(r"\+?\d[\d\-\s().]{6,20}")
+        return [m.strip() for m in re.findall(pattern, text)]
 
     @staticmethod
-    def clean_phone_numbers(numbers: List[str]) -> List[str]:
-        cleaned_phone_numbers = []
-        for num in numbers:
-            digits = re.sub(r'\D', '', num)
-            if 10 <= len(digits) <= 13:
-                # Convert to +91 if 10-digit (India assumption)
-                if len(digits) == 10:
-                    digits = "+91" + digits
-                elif not digits.startswith("+"):
-                    digits = "+" + digits
-                cleaned_phone_numbers.append(digits)
-        # Deduplicate
-        return list(set(cleaned_phone_numbers))
+    def normalize_number(num: str) -> str:
+        if not num:
+            return ""
+        num = num.strip()
+        if num.startswith("+"):
+            return "+" + re.sub(r"\D", "", num[1:])
+        return re.sub(r"\D", "", num)
 
     @staticmethod
-    async def generate(data_object_id: str, access_token: str, client_code: str,x_forwarded_host=str,
-            x_forwarded_port=str) -> List[str]:
+    async def generate(
+        data_object_id: str,
+        access_token: str,
+        client_code: str,
+        x_forwarded_host: str,
+        x_forwarded_port: str,
+    ) -> List[dict]:
         product_data = await BusinessService.fetch_product_details(
-            data_object_id, access_token, client_code,x_forwarded_host,x_forwarded_port
+            data_object_id,
+            access_token,
+            client_code,
+            x_forwarded_host,
+            x_forwarded_port,
         )
 
         if not product_data:
@@ -44,31 +45,35 @@ class CallAssetsService():
         summary = product_data.get("summary", "")
         links = product_data.get("siteLinks", [])
 
-        # --- Extract numbers from tel: links ---
+        # 1. tel: links
         tel_numbers = [
             link.get("href", "").replace("tel:", "").strip()
             for link in links
             if link.get("href", "").startswith("tel:")
         ]
 
-        # --- Extract numbers from JSON of links ---
-        link_text_data = json.dumps(links)
-        text_numbers = CallAssetsService.extract_phone_numbers(link_text_data)
+        # 2. extract numbers
+        link_numbers = CallAssetsService.extract_possible_numbers(json.dumps(links))
+        summary_numbers = CallAssetsService.extract_possible_numbers(summary)
 
-        # --- Extract numbers from summary as fallback ---
-        summary_numbers = CallAssetsService.extract_phone_numbers(summary)
+        # 3. Normalize + Deduplicate
+        raw_numbers = list(
+            {
+                CallAssetsService.normalize_number(n)
+                for n in (tel_numbers + link_numbers + summary_numbers)
+                if n
+            }
+        )
 
-        # Combine all sources
-        all_numbers = tel_numbers + text_numbers + summary_numbers
-
-        # Clean & deduplicate
-        cleaned_phone_numbers = CallAssetsService.clean_phone_numbers(all_numbers)
-
-        if not cleaned_phone_numbers:
+        if not raw_numbers:
             return []
 
-        structured_numbers = [
-            {"phoneNumber": num, "countryCode": "IN"} for num in cleaned_phone_numbers
-        ]
+        # 4. LLM validation (country-aware)
+        call_assets = await BaseAssetService.generate_from_prompt(
+            "callAsset_prompt.txt", {"raw_numbers": raw_numbers}
+        )
 
-        return structured_numbers
+        if not call_assets:
+            return []
+
+        return call_assets[:3]

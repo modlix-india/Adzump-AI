@@ -1,4 +1,5 @@
 import os
+import json
 import pytesseract
 from structlog import get_logger    #type: ignore
 from PyPDF2 import PdfReader
@@ -128,8 +129,17 @@ async def merge_summaries(summaries: list[str]) -> str:
         temperature=0.2
     )
 
-    final_text = response.choices[0].message.content.strip()
-    logger.info(f"[PDF-Merge] Final merged summary length={len(final_text)}")
+    raw_response = response.choices[0].message.content.strip()
+    logger.debug(f"[PDF-Merge] Raw response length={len(raw_response)}")
+
+    # Parse JSON response and extract mergedSummary
+    try:
+        parsed = json.loads(raw_response)
+        final_text = parsed.get("mergedSummary", raw_response)
+        logger.info(f"[PDF-Merge] Parsed mergedSummary length={len(final_text)}")
+    except json.JSONDecodeError:
+        logger.warning("[PDF-Merge] Failed to parse JSON, using raw response")
+        final_text = raw_response
 
     return final_text
 

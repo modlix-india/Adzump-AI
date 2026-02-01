@@ -2,16 +2,12 @@ import json
 import os
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
 from typing import List
 
 from services.maps.place_resolver import resolve_place_to_id
+from models.maps_model import MapRequest
 
 router = APIRouter(prefix="/api/ds/maps", tags=["Maps"])
-
-
-class MapRequest(BaseModel):
-    places: List[str]
 
 
 @router.post("/render")
@@ -25,9 +21,7 @@ async def render_map_url(req: MapRequest):
         pid = await resolve_place_to_id(place)
         place_ids.append(pid)
 
-    return {
-        "iframe_url": f"/api/ds/maps/view?pids={','.join(place_ids)}"
-    }
+    return {"iframe_url": f"/api/ds/maps/view?pids={','.join(place_ids)}"}
 
 
 @router.get("/view", response_class=HTMLResponse)

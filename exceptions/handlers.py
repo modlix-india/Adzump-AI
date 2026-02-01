@@ -37,7 +37,8 @@ def setup_exception_handlers(app):
     
     @app.exception_handler(BaseAppException)
     async def app_exception_handler(request: Request, exc: BaseAppException):
-        return error_response(exc.message, status_code=exc.status_code)
+        details = getattr(exc, 'details', None)
+        return error_response(exc.message, details=details, status_code=exc.status_code)
     
     @app.exception_handler(SQLAlchemyError)
     async def db_exception_handler(request: Request, exc: SQLAlchemyError):
