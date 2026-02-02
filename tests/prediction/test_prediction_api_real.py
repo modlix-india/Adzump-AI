@@ -39,8 +39,8 @@ async def test_live_prediction_endpoint():
         logger.info("prediction_api_response", response_data=data)
 
         # Verify structure
-        assert "status" in data
-        assert data["status"] == "success"
+        assert "success" in data
+        assert data["success"] is True
         assert "data" in data
 
         result_data = data["data"]

@@ -2,13 +2,17 @@ import os
 import structlog
 from fastapi import APIRouter, FastAPI
 from contextlib import asynccontextmanager
-from mlops.performance import (
+from mlops.google_search.performance.prediction_schemas import (
     PerformancePredictionReq,
-    PerformancePredictionData,
     PerformanceAPIResponse,
+)
+from mlops.google_search.performance import (
     AdPerformancePredictor,
 )
 from oserver.utils import helpers
+from exceptions.custom_exceptions import (
+    ModelNotLoadedException,
+)
 
 # Configure logger
 logger = structlog.get_logger()
@@ -58,7 +62,7 @@ async def lifespan(app: FastAPI):
     # Initialize and load models
     current_predictor = get_initialized_predictor()
     try:
-        current_predictor.load_models()
+        await current_predictor.load_models()
         logger.info("performance_models_loaded_successfully")
     except FileNotFoundError as e:
         logger.warning("performance_models_load_file_not_found", error=str(e))
@@ -74,7 +78,9 @@ async def lifespan(app: FastAPI):
 
 
 router = APIRouter(
-    prefix="/api/ds/prediction/performance", tags=["performance"], lifespan=lifespan
+    prefix="/api/ds/prediction/performance",
+    tags=["Performance Prediction"],
+    lifespan=lifespan,
 )
 
 
@@ -84,37 +90,24 @@ async def forecast_performance(
 ) -> PerformanceAPIResponse:
     """
     Predict ad performance metrics (impressions, clicks, conversions).
-
     """
     current_predictor = get_initialized_predictor()
     if not current_predictor.is_ready():
-        return PerformanceAPIResponse(
-            status="error",
-            error="Prediction models not loaded. Please ensure model files are available.",
+        raise ModelNotLoadedException(
+            "Prediction models not loaded. Please ensure model files are available."
         )
 
-    try:
-        # Convert Pydantic models to dict format using model_dump()
-        keyword_data = [kw.model_dump() for kw in request.keyword_data]
+    # Convert Pydantic models to dict format using model_dump()
+    keyword_data = [kw.model_dump() for kw in request.keyword_data]
 
-        result = current_predictor.predict(
-            keyword_data=keyword_data,
-            total_budget=request.total_budget,
-            bid_strategy=request.bid_strategy,
-            period=request.period,
-        )
+    result = current_predictor.predict(
+        keyword_data=keyword_data,
+        total_budget=request.total_budget,
+        bid_strategy=request.bid_strategy,
+        period=request.period,
+    )
 
-        return PerformanceAPIResponse(
-            status="success", data=PerformancePredictionData(**result)
-        )
-
-    except ValueError as e:
-        return PerformanceAPIResponse(status="error", error=str(e))
-    except Exception as e:
-        logger.error("performance_prediction_failed", error=str(e))
-        return PerformanceAPIResponse(
-            status="error", error=f"Prediction failed: {str(e)}"
-        )
+    return PerformanceAPIResponse(success=True, data=result)
 
 
 @router.get("/health")

@@ -1,5 +1,5 @@
-from mlops.budget_prediction.predictor import BudgetPredictor
-from mlops.budget_prediction.schemas import (
+from mlops.google_search.budget_prediction.predictor import BudgetPredictor
+from mlops.google_search.budget_prediction.schemas import (
     BudgetPredictionReq,
     BudgetPredictionData,
     BudgetAPIResponse,

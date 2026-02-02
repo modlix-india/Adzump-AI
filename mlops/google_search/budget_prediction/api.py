@@ -2,13 +2,13 @@ import os
 import structlog
 from fastapi import APIRouter, FastAPI
 from contextlib import asynccontextmanager
-from mlops.budget_prediction.schemas import (
+from mlops.google_search.budget_prediction.schemas import (
     BudgetPredictionReq,
-    BudgetPredictionData,
     BudgetAPIResponse,
 )
-from mlops.budget_prediction.predictor import BudgetPredictor
+from mlops.google_search.budget_prediction.predictor import BudgetPredictor
 from oserver.utils import helpers
+from exceptions.custom_exceptions import ModelNotLoadedException
 
 logger = structlog.get_logger()
 
@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     current_predictor = get_initialized_predictor()
     if current_predictor.model_path:
         try:
-            current_predictor.load_model()
+            await current_predictor.load_model()
             logger.info("budget_model_loaded_successfully")
         except FileNotFoundError as e:
             logger.warning("budget_model_not_found", error=str(e))
@@ -59,38 +59,31 @@ async def lifespan(app: FastAPI):
 
 
 router = APIRouter(
-    prefix="/api/ds/prediction/budget", tags=["budget-prediction"], lifespan=lifespan
+    prefix="/api/ds/prediction/budget",
+    tags=["Budget Prediction"],
+    lifespan=lifespan,
 )
 
 
-@router.post("/recommend", response_model=BudgetAPIResponse)
+@router.post("/", response_model=BudgetAPIResponse)
 async def recommend_budget(request: BudgetPredictionReq) -> BudgetAPIResponse:
     """
     Recommend a budget based on clicks, conversions, and duration.
     """
     current_predictor = get_initialized_predictor()
     if not current_predictor.is_ready():
-        return BudgetAPIResponse(
-            status="error", error="Budget prediction model not loaded."
-        )
+        raise ModelNotLoadedException("Budget prediction model not loaded.")
 
-    try:
-        result = current_predictor.predict(
-            clicks=request.clicks,
-            conversions=request.conversions,
-            duration_days=request.duration_days,
-            buffer_percent=request.buffer_percent,
-        )
-        return BudgetAPIResponse(
-            status="success",
-            data=BudgetPredictionData(
-                suggested_budget=result["suggested_budget"],
-                base_cost_prediction=result["base_cost_prediction"],
-            ),
-        )
-    except Exception as e:
-        logger.error("budget_prediction_error", error=str(e))
-        return BudgetAPIResponse(status="error", error=f"Prediction failed: {str(e)}")
+    result = current_predictor.predict(
+        conversions=request.conversions,
+        duration_days=request.duration_days,
+        expected_conversion_rate=request.expected_conversion_rate,
+        buffer_percent=request.buffer_percent,
+    )
+    return BudgetAPIResponse(
+        success=True,
+        data=result,
+    )
 
 
 @router.get("/health")

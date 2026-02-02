@@ -2,7 +2,7 @@ import os
 import pytest
 import structlog
 from dotenv import load_dotenv
-from mlops.performance import AdPerformancePredictor
+from mlops.google_search.performance import AdPerformancePredictor
 from oserver.utils.helpers import get_base_url
 
 logger = structlog.get_logger()
@@ -56,7 +56,7 @@ async def test_model_loading_from_url():
     # 4. Load Models
     # This will raise an exception if download fails or pickle is invalid
     try:
-        predictor.load_models()
+        await predictor.load_models()
     except Exception as e:
         pytest.fail(f"Failed to load models: {str(e)}")
 
