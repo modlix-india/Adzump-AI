@@ -91,10 +91,10 @@ class ModelNotLoadedException(BaseAppException):
         self, message: str = "Model not loaded", details: Optional[dict] = None
     ):
         super().__init__(message, status.HTTP_503_SERVICE_UNAVAILABLE, details)
-    def __init__(self, message: str = "A database error occurred", details: Optional[dict] = None):
-        super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR, details)
+
 
 class MetaAPIException(BaseAppException):
     """Meta/Facebook API error."""
+
     def __init__(self, message: str = "Meta API request failed"):
         super().__init__(message, status.HTTP_502_BAD_GATEWAY)
