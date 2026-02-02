@@ -1,15 +1,21 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Header, status, Body, Query
+from services.google_kw_update_service.google_keywords_update_service import (
+    GoogleAdsKeywordUpdateService,
+)
 from services.search_term_pipeline import SearchTermPipeline
 from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
 from services.budget_recommendation_service import generate_budget_recommendations
 from services.create_campaign_service import CampaignServiceError
-from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
+from models.keyword_model import (
+    KeywordResearchRequest,
+    GoogleNegativeKwReq,
+)
+from third_party.google.models.keyword_model import UpdateKeywordsStrategyRequest
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
-from services import create_campaign_service ,chat_service
-
+from services import create_campaign_service, chat_service
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -37,6 +43,7 @@ async def create_ad_assets(
 
 
 gks = GoogleKeywordService()
+gs_update = GoogleAdsKeywordUpdateService()
 
 
 @router.post("/gks/positive")
@@ -46,7 +53,7 @@ async def gks_positive(
     session_id: str = Header(..., alias="sessionId"),
     access_token: str = Header(..., alias="access-token"),
     x_forwarded_host: str = Header(..., alias="x-forwarded-host"),
-    x_forwarded_port: str = Header(..., alias="x-forwarded-port")
+    x_forwarded_port: str = Header(..., alias="x-forwarded-port"),
 ):
     try:
         positives = await gks.extract_positive_strategy(
@@ -55,7 +62,7 @@ async def gks_positive(
             session_id=session_id,
             access_token=access_token,
             x_forwarded_host=x_forwarded_host,
-            x_forwarded_port=x_forwarded_port
+            x_forwarded_port=x_forwarded_port,
         )
         return {"status": "success", "data": positives}
     except Exception as e:
@@ -68,7 +75,7 @@ async def gks_negative(
     client_code: str = Header(..., alias="clientCode"),
     access_token: str = Header(..., alias="access-token"),
     x_forwarded_host: str = Header(..., alias="x-forwarded-host"),
-    x_forwarded_port: str = Header(..., alias="x-forwarded-port")
+    x_forwarded_port: str = Header(..., alias="x-forwarded-port"),
 ):
     try:
         negatives = await gks.extract_negative_strategy(
@@ -76,7 +83,7 @@ async def gks_negative(
             client_code=client_code,
             access_token=access_token,
             x_forwarded_host=x_forwarded_host,
-            x_forwarded_port=x_forwarded_port
+            x_forwarded_port=x_forwarded_port,
         )
         return {
             "status": "success",
@@ -84,7 +91,8 @@ async def gks_negative(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 @router.post("/optimize/budget")
 async def generate_budget_recommendation(
     clientCode: str = Header(...),
@@ -105,6 +113,7 @@ async def generate_budget_recommendation(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/generate-campaign")
 async def generate_campaign(
@@ -133,7 +142,7 @@ async def generate_campaign(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
-    
+
 @router.post("/search_term")
 async def analyze_search_terms_route(
     access_token: str = Header(..., alias="accessToken"),
@@ -159,7 +168,26 @@ async def analyze_search_terms_route(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
+@router.post("/keywords/analyze-update")
+async def analyze_update_keywords(
+    request: UpdateKeywordsStrategyRequest,
+    client_code: str = Header(..., alias="clientCode"),
+    access_token: str = Header(..., alias="access-token"),
+    x_forwarded_host: str = Header(None, alias="x-forwarded-host"),
+    x_forwarded_port: str = Header(None, alias="x-forwarded-port"),
+):
+    result = await gs_update.analyze_and_update_campaign_keywords(
+        keyword_update_request=request,
+        storage_access_token=access_token,
+        client_code=client_code,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port,
+    )
+    return result
+
+
 @router.get("/get-basic-details/{session_id}")
 async def get_session(session_id: str):
     return await chat_service.get_basic_details(session_id)

@@ -16,6 +16,7 @@ from feedback.keyword.api import router as feedback_router
 from db import db_session
 from config.logging_config import setup_logging
 from services.geo_target_service import GeoTargetService
+from utils import httpx_utils
 from structlog import get_logger  # type: ignore
 
 from dotenv import load_dotenv
@@ -62,6 +63,7 @@ async def lifespan(app: FastAPI):
                     exc_info=True,
                 )
         await GeoTargetService.close_client()
+        await httpx_utils.close_httpx_client()
 
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
