@@ -12,6 +12,9 @@ from mlops.google_search.budget_prediction.api import router as budget_router
 from apis.maps import router as maps_router
 from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
+from core.middleware import AuthContextMiddleware
+
+from api.meta import router as meta_ads_router
 
 from db import db_session
 from config.logging_config import setup_logging
@@ -66,6 +69,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
 
+# Auth context middleware - extracts access-token and clientCode headers into request context.
+# Headers are optional here; endpoints requiring auth should validate via their own logic.
+app.add_middleware(AuthContextMiddleware)
 
 @app.get("/health")
 async def health_check():
@@ -82,5 +88,7 @@ app.include_router(performance_router)
 app.include_router(budget_router)
 
 app.include_router(feedback_router)
+
+app.include_router(meta_ads_router)
 
 setup_exception_handlers(app)
