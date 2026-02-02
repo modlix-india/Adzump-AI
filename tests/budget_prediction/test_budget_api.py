@@ -5,6 +5,7 @@ import structlog
 from dotenv import load_dotenv
 from oserver.utils.helpers import get_base_url
 from mlops.google_search.budget_prediction.predictor import BudgetPredictor
+from utils.helpers import join_url
 
 load_dotenv()
 
@@ -18,17 +19,12 @@ HEALTH_ENDPOINT = f"{BASE_URL}/api/ds/prediction/budget/health"
 @pytest.mark.asyncio
 async def test_model_loading():
     base_url = get_base_url()
-    model_rel = os.getenv("BUDGET_PREDICTOR_MODEL_PATH")
+    model_path = os.getenv("BUDGET_PREDICTOR_MODEL_PATH")
 
-    if not model_rel:
+    if not model_path:
         pytest.skip("BUDGET_PREDICTOR_MODEL_PATH not set in environment")
 
-    def join_url(base, path):
-        if not path:
-            return ""
-        return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
-
-    model_path = join_url(base_url, model_rel)
+    model_path = join_url(base_url, model_path)
     logger.info("testing_budget_model_loading", model_path=model_path)
 
     predictor = BudgetPredictor(model_path=model_path)

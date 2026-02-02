@@ -4,16 +4,12 @@ import structlog
 from dotenv import load_dotenv
 from mlops.google_search.performance import AdPerformancePredictor
 from oserver.utils.helpers import get_base_url
+from utils.helpers import join_url
 
 logger = structlog.get_logger()
 
 # Load environment variables
 load_dotenv()
-
-
-def join_url(base, path):
-    """Helper to join base URL and relative path."""
-    return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
 
 
 @pytest.mark.asyncio

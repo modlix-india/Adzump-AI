@@ -9,6 +9,7 @@ from mlops.google_search.budget_prediction.schemas import (
 from mlops.google_search.budget_prediction.predictor import BudgetPredictor
 from oserver.utils import helpers
 from exceptions.custom_exceptions import ModelNotLoadedException
+from utils.helpers import join_url
 
 logger = structlog.get_logger()
 
@@ -20,20 +21,15 @@ def get_initialized_predictor() -> BudgetPredictor:
     global predictor
     if predictor is None:
         base_url = helpers.get_base_url()
-        model_rel = os.getenv("BUDGET_PREDICTOR_MODEL_PATH")
+        model_path = os.getenv("BUDGET_PREDICTOR_MODEL_PATH")
 
-        if not model_rel:
+        if not model_path:
             logger.warning(
                 "budget_predictor_model_path_missing",
                 message="BUDGET_PREDICTOR_MODEL_PATH not set in environment",
             )
 
-        def join_url(base, path):
-            if not path:
-                return ""
-            return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
-
-        model_path = join_url(base_url, model_rel)
+        model_path = join_url(base_url, model_path)
 
         predictor = BudgetPredictor(model_path=model_path)
     return predictor
@@ -48,9 +44,9 @@ async def lifespan(app: FastAPI):
             await current_predictor.load_model()
             logger.info("budget_model_loaded_successfully")
         except FileNotFoundError as e:
-            logger.warning("budget_model_not_found", error=str(e))
+            logger.error("budget_model_not_found", error=str(e))
         except Exception as e:
-            logger.warning("budget_model_load_failed", error=str(e))
+            logger.error("budget_model_load_failed", error=str(e))
     else:
         logger.warning("budget_model_path_missing_skipping_load")
 

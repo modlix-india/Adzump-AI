@@ -1,18 +1,20 @@
+import io
+import math
 import os
 import pickle
-import math
-import io
-import structlog
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import httpx
 import numpy as np
 import pandas as pd
-from datetime import datetime
-from typing import Dict, List, Any, Optional
+import structlog
 from sentence_transformers import SentenceTransformer
+
+from exceptions.custom_exceptions import ModelNotLoadedException, PredictionException
 from mlops.google_search.performance.prediction_schemas import (
     PerformancePredictionData,
 )
-from exceptions.custom_exceptions import PredictionException, ModelNotLoadedException
 
 logger = structlog.get_logger()
 
@@ -36,35 +38,6 @@ class AdPerformancePredictor:
         self.sentence_model: Optional[SentenceTransformer] = None
         self._is_loaded = False
 
-    async def _load_artifact(self, path: str, description: str) -> Any:
-        """
-        Load a pickled artifact from a file path or URL.
-
-        Unpickled Python object.
-        """
-        try:
-            if path.startswith("http://") or path.startswith("https://"):
-                logger.info(
-                    "performance_model_downloading_artifact",
-                    description=description,
-                    url=path,
-                    model="performance_prediction",
-                )
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(path, timeout=30)
-                    response.raise_for_status()
-                    return pickle.load(io.BytesIO(response.content))
-            else:
-                if not os.path.exists(path):
-                    raise FileNotFoundError(f"{description} not found: {path}")
-                with open(path, "rb") as f:
-                    return pickle.load(f)
-        except Exception as e:
-            raise PredictionException(
-                message=f"Failed to load {description}",
-                details={"path": path, "original_error": str(e)},
-            )
-
     async def load_models(self) -> None:
         """
         Load models and artifacts from pickle files or URLs.
@@ -73,7 +46,6 @@ class AdPerformancePredictor:
         if self._is_loaded:
             return
 
-        # Load artifacts using helper
         self.models = await self._load_artifact(self.lgbm_model_path, "LightGBM models")
         self.uncertainty_sigmas = await self._load_artifact(
             self.sigmas_path, "Uncertainty sigmas"
@@ -82,20 +54,8 @@ class AdPerformancePredictor:
             self.columns_path, "Reference columns"
         )
 
-        # Load SentenceTransformer for keyword embeddings
         self._load_sentence_transformer()
-
         self._is_loaded = True
-
-    def _load_sentence_transformer(self) -> None:
-        """Load SentenceTransformer model."""
-        try:
-            self.sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
-        except Exception as e:
-            raise PredictionException(
-                message="Failed to load SentenceTransformer model",
-                details={"error": str(e)},
-            )
 
     def predict(
         self,
@@ -125,7 +85,7 @@ class AdPerformancePredictor:
         match_types = [item["match_type"] for item in keyword_data]
         budget_per_kw = total_budget / len(keyword_data)
 
-        # Batch encode embeddings (Eliminates the loop for encoding)
+        # Batch encode embeddings
         embeddings = self.sentence_model.encode(keywords)
 
         # Vectorized feature engineering
@@ -171,12 +131,9 @@ class AdPerformancePredictor:
         for target in ["Impressions", "Clicks", "Conversions"]:
             model_key = f"{period}_{target}_Model"
             if model_key in self.models:
-                # Predict for all keywords in one call
                 preds_log = self.models[model_key].predict(X_batch)
                 sigma = self.uncertainty_sigmas[model_key]
 
-                # Calculate range bounds and take their average as the point estimate
-                # This provides a more intuitive "middle" than the raw median.
                 lows = np.expm1(preds_log - sigma)
                 highs = np.expm1(preds_log + sigma)
                 mid_estimates = (lows + highs) / 2
@@ -187,32 +144,60 @@ class AdPerformancePredictor:
             aggregated_metrics, total_budget, period
         )
 
+    def is_ready(self) -> bool:
+        """Check if predictor is loaded."""
+        return self._is_loaded
+
+    async def _load_artifact(self, path: str, description: str) -> Any:
+        """Load a pickled artifact from a file path or URL."""
+        try:
+            if path.startswith("http://") or path.startswith("https://"):
+                logger.info(
+                    "performance_model_downloading_artifact",
+                    description=description,
+                    url=path,
+                    model="performance_prediction",
+                )
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(path, timeout=30)
+                    response.raise_for_status()
+                    return pickle.load(io.BytesIO(response.content))
+            else:
+                if not os.path.exists(path):
+                    raise FileNotFoundError(f"{description} not found: {path}")
+                with open(path, "rb") as f:
+                    return pickle.load(f)
+        except Exception as e:
+            raise PredictionException(
+                message=f"Failed to load {description}",
+                details={"path": path, "original_error": str(e)},
+            )
+
+    def _load_sentence_transformer(self) -> None:
+        """Load SentenceTransformer model."""
+        try:
+            self.sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
+        except Exception as e:
+            raise PredictionException(
+                message="Failed to load SentenceTransformer model",
+                details={"error": str(e)},
+            )
+
     def _format_prediction_response(
         self,
         aggregated_metrics: Dict[str, float],
         total_budget: float,
         period: str,
-    ) -> Dict[str, str]:
-        """
-        Calculates derived metrics and formats the final response dictionary using single point estimates.
-        Uses math.ceil for base metrics to ensure consistent UI math and optimistic reporting.
-        """
-        # 1. Extract values and apply "Ceil" rounding for higher values / UI consistency
+    ) -> PerformancePredictionData:
+        """Format aggregated metrics into response object."""
         impressions = math.ceil(max(0, aggregated_metrics["Impressions"]))
         clicks = math.ceil(max(0, aggregated_metrics["Clicks"]))
         conversions = math.ceil(max(0, aggregated_metrics["Conversions"]))
 
-        # 2. Calculate Derived Metrics (Averages)
-        # CTR = (Clicks / Impressions) * 100
         ctr = (clicks / impressions * 100) if impressions > 0 else 0
-
-        # CPA = Total Budget / Conversions
         cpa = (total_budget / conversions) if conversions > 0 else 0
-
-        # Conv Rate = (Conversions / Clicks) * 100
         cv_rate = (conversions / clicks * 100) if clicks > 0 else 0
 
-        # 3. Construct response
         return PerformancePredictionData(
             timeframe=period,
             budget_allocated=f"₹{total_budget:,.0f}",
@@ -230,7 +215,7 @@ class AdPerformancePredictor:
         is_percent: bool = False,
         is_currency: bool = False,
     ) -> str:
-        """Helper for formatting single metric values with symbols."""
+        """Format single metric value with symbols."""
         prefix = "₹" if is_currency else ""
         suffix = "%" if is_percent else ""
 
@@ -238,7 +223,3 @@ class AdPerformancePredictor:
             return f"{val:.2f}{suffix}"
 
         return f"{prefix}{round(val):,}{suffix}"
-
-    def is_ready(self) -> bool:
-        """Check if predictor is loaded."""
-        return self._is_loaded

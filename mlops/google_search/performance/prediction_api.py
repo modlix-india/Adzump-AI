@@ -13,6 +13,7 @@ from oserver.utils import helpers
 from exceptions.custom_exceptions import (
     ModelNotLoadedException,
 )
+from utils.helpers import join_url
 
 # Configure logger
 logger = structlog.get_logger()
@@ -30,23 +31,19 @@ def get_initialized_predictor() -> AdPerformancePredictor:
         logger.info("performance_model_using_base_url", base_url=base_url)
 
         # Get relative paths from env (Lazy loading after load_dotenv)
-        lgbm_rel = os.getenv("AD_PREDICTOR_LGBM_PATH")
-        sigmas_rel = os.getenv("AD_PREDICTOR_SIGMAS_PATH")
-        columns_rel = os.getenv("AD_PREDICTOR_COLUMNS_PATH")
+        lgbm_path = os.getenv("AD_PREDICTOR_LGBM_PATH")
+        sigmas_path = os.getenv("AD_PREDICTOR_SIGMAS_PATH")
+        columns_path = os.getenv("AD_PREDICTOR_COLUMNS_PATH")
 
-        if not all([lgbm_rel, sigmas_rel, columns_rel]):
+        if not all([lgbm_path, sigmas_path, columns_path]):
             logger.warning(
                 "performance_model_paths_missing",
                 message="One or more model paths are missing in environment variables.",
             )
 
-        # Construct full URLs
-        def join_url(base, path):
-            return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
-
-        lgbm_path = join_url(base_url, lgbm_rel)
-        sigmas_path = join_url(base_url, sigmas_rel)
-        columns_path = join_url(base_url, columns_rel)
+        lgbm_path = join_url(base_url, lgbm_path)
+        sigmas_path = join_url(base_url, sigmas_path)
+        columns_path = join_url(base_url, columns_path)
 
         predictor = AdPerformancePredictor(
             lgbm_model_path=lgbm_path,

@@ -1,14 +1,15 @@
-import os
+import io
 import math
 import pickle
-import io
-import structlog
-import numpy as np
-import pandas as pd
+
 import httpx
+import numpy as np
+import pandas as pd  # type: ignore
+import structlog
 from typing import Any
+
+from exceptions.custom_exceptions import ModelNotLoadedException, PredictionException
 from mlops.google_search.budget_prediction.schemas import BudgetPredictionData
-from exceptions.custom_exceptions import PredictionException, ModelNotLoadedException
 
 
 logger = structlog.get_logger()
@@ -29,30 +30,6 @@ class BudgetPredictor:
 
         self.model = await self._load_artifact(self.model_path, "Budget Linear Model")
         self._is_loaded = True
-
-    async def _load_artifact(self, path: str, description: str) -> Any:
-        try:
-            if path.startswith("http://") or path.startswith("https://"):
-                logger.info(
-                    "budget_model_downloading_artifact",
-                    description=description,
-                    url=path,
-                    model="budget_prediction",
-                )
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(path, timeout=30)
-                    response.raise_for_status()
-                    return pickle.load(io.BytesIO(response.content))
-            else:
-                if not os.path.exists(path):
-                    raise FileNotFoundError(f"{description} not found: {path}")
-                with open(path, "rb") as f:
-                    return pickle.load(f)
-        except Exception as e:
-            raise PredictionException(
-                message=f"Failed to load {description}",
-                details={"path": path, "original_error": str(e)},
-            )
 
     def predict(
         self,
@@ -105,3 +82,38 @@ class BudgetPredictor:
 
     def is_ready(self) -> bool:
         return self._is_loaded
+
+    async def _load_artifact(self, path: str, description: str) -> Any:
+        try:
+            if path.startswith("http://") or path.startswith("https://"):
+                logger.info(
+                    "budget_model_downloading_artifact",
+                    description=description,
+                    url=path,
+                    model="budget_prediction",
+                )
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(path, timeout=30)
+                    response.raise_for_status()
+                    return pickle.load(io.BytesIO(response.content))
+            else:
+                with open(path, "rb") as f:
+                    return pickle.load(f)
+        except (
+            FileNotFoundError,
+            httpx.HTTPStatusError,
+            httpx.RequestError,
+            pickle.UnpicklingError,
+            OSError,
+        ) as e:
+            logger.error(
+                "artifact_load_failed",
+                description=description,
+                path=path,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
+            raise PredictionException(
+                message=f"Failed to load {description}",
+                details={"path": path, "original_error": str(e)},
+            ) from e
