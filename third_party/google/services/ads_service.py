@@ -1,6 +1,6 @@
 import os
 import httpx
-from structlog import get_logger    #type: ignore
+from structlog import get_logger  # type: ignore
 
 from oserver.models.storage_request_model import StorageFilter, StorageReadRequest
 from oserver.services.connection import fetch_google_api_token_simple
@@ -8,22 +8,21 @@ from oserver.services.storage_service import StorageService
 
 logger = get_logger(__name__)
 
+
 async def fetch_ads(
     client_code: str,
     customer_id: str,
     login_customer_id: str,
     campaign_id: str,
-    access_token:str
+    access_token: str,
 ) -> list:
     """
     Fetch ads (currently final URLs) for a given campaign from Google Ads API.
     """
     try:
-
         developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        google_ads_access_token = fetch_google_api_token_simple(client_code=client_code)
-        
-
+        # google_ads_access_token = fetch_google_api_token_simple(client_code=client_code)
+        google_ads_access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
 
         if not developer_token or not google_ads_access_token:
             raise ValueError("Missing Google Ads credentials or tokens.")
@@ -36,10 +35,11 @@ async def fetch_ads(
             "Content-Type": "application/json",
         }
 
-
         ad_query = f"""
         SELECT
           campaign.id,
+          campaign.name,
+          customer.id,
           ad_group.id,
           ad_group_ad.ad.id,
           ad_group_ad.ad.name,
@@ -54,14 +54,18 @@ async def fetch_ads(
         ORDER BY campaign.id
         """
         async with httpx.AsyncClient() as client:
-            response = await client.post(endpoint, headers=headers, json={"query": ad_query})
+            response = await client.post(
+                endpoint, headers=headers, json={"query": ad_query}
+            )
             if not response.is_success:
-                logger.error(f"Ad fetch failed: {response.text}")
+                logger.error(
+                    "[AdsService] Ad fetch failed", error_body=response.text[:500]
+                )
                 return []
 
             data = response.json().get("results", [])
 
-        logger.info(f"Ad Group Ad View returned {len(data)} rows")
+        logger.info("[AdsService] Ad Group Ad View response", row_count=len(data))
 
         if not data:
             return []
@@ -73,45 +77,51 @@ async def fetch_ads(
 
             ad_obj = {
                 "ad_id": ad_info.get("id"),
-                "name": ad_info.get("name"),
                 "final_urls": final_urls,
                 "status": row.get("adGroupAd", {}).get("status"),
                 "summaries": [],
             }
 
-            for url in final_urls:
-                final_url = url.rstrip('/') 
-                storage_service = StorageService(
-                    access_token=access_token,
-                    client_code=client_code
-                )
-                read_request = StorageReadRequest(
-                    storageName="AISuggestedData",
-                    appCode="marketingai",
-                    clientCode=client_code,
-                    filter=StorageFilter(field="businessUrl", value=final_url),
-                )
-                product_summary = await storage_service.read_page_storage(read_request)
+            final_url = final_urls[0].rstrip("/")
+            storage_service = StorageService(
+                access_token=access_token, client_code=client_code
+            )
+            read_request = StorageReadRequest(
+                storageName="AISuggestedData",
+                appCode="marketingai",
+                clientCode=client_code,
+                filter=StorageFilter(field="businessUrl", value=final_url),
+            )
+            product_summary = await storage_service.read_page_storage(read_request)
+
+            summary = ""
+
+            try:
+                summary = product_summary.result[0]["result"]["result"]["content"][
+                    0
+                ].get("finalSummary", "")
+                product_id = product_summary.result[0]["result"]["result"]["content"][
+                    0
+                ].get("_id", "")
+
+            except (AttributeError, IndexError, KeyError, TypeError):
                 summary = ""
-                try:
-                    summary = product_summary.result[0]["result"]["result"]["content"][0].get("summary", "")
-                except (AttributeError, IndexError, KeyError, TypeError):
-                    summary = ""
 
-                if not summary:
-                    raise Exception(status_code=400, detail="Missing 'summary' or 'businessUrl' in product data")
-                if summary:
-                    ad_obj["summaries"].append(summary)
-            
+            if not summary:
+                raise Exception("Missing 'summary' or 'businessUrl' in product data")
 
-            
+            ad_obj["summaries"].append(summary)
+            ad_obj["product_id"] = product_id
+            ad_obj["campaign_name"] = row.get("campaign", {}).get("name")
+            ad_obj["customer_id"] = row.get("customer", {}).get("id")
+
             ads_with_summary.append(ad_obj)
 
-        logger.info(f"Final ads count: {len(ads_with_summary)}")
+        logger.info("[AdsService] Final ads processed", count=len(ads_with_summary))
         return ads_with_summary
 
     except httpx.RequestError as e:
-        logger.error(f"Request failed: {e}")
+        logger.error("[AdsService] Request failed", error=str(e))
         return []
     except Exception as e:
         logger.exception(f"Unexpected error: {e}")
