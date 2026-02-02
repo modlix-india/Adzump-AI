@@ -68,16 +68,15 @@ class PerformancePredictionData(BaseModel):
 
 
 class PerformanceAPIResponse(BaseModel):
-    status: Literal["success", "error"] = Field(..., description="Response status")
+    success: bool = Field(True, description="Response status indicator")
     data: Optional[PerformancePredictionData] = Field(
         None, description="Prediction data if success"
     )
-    error: Optional[str] = Field(None, description="Error message if failed")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "status": "success",
+                "success": True,
                 "data": {
                     "timeframe": "Monthly",
                     "budget_allocated": "₹15,000",
@@ -88,7 +87,6 @@ class PerformanceAPIResponse(BaseModel):
                     "cpa": "₹1,363",
                     "conversion_rate": "5.21%",
                 },
-                "error": None,
             }
         }
     )

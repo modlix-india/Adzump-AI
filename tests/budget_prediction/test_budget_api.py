@@ -4,37 +4,33 @@ import pytest
 import structlog
 from dotenv import load_dotenv
 from oserver.utils.helpers import get_base_url
-from mlops.budget_prediction.predictor import BudgetPredictor
+from mlops.google_search.budget_prediction.predictor import BudgetPredictor
+from utils.helpers import join_url
 
 load_dotenv()
 
 logger = structlog.get_logger()
 
 BASE_URL = "http://127.0.0.1:8000"
-ENDPOINT = f"{BASE_URL}/api/ds/prediction/budget/recommend"
+ENDPOINT = f"{BASE_URL}/api/ds/prediction/budget/"
 HEALTH_ENDPOINT = f"{BASE_URL}/api/ds/prediction/budget/health"
 
 
 @pytest.mark.asyncio
 async def test_model_loading():
     base_url = get_base_url()
-    model_rel = os.getenv("BUDGET_PREDICTOR_MODEL_PATH")
+    model_path = os.getenv("BUDGET_PREDICTOR_MODEL_PATH")
 
-    if not model_rel:
+    if not model_path:
         pytest.skip("BUDGET_PREDICTOR_MODEL_PATH not set in environment")
 
-    def join_url(base, path):
-        if not path:
-            return ""
-        return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
-
-    model_path = join_url(base_url, model_rel)
+    model_path = join_url(base_url, model_path)
     logger.info("testing_budget_model_loading", model_path=model_path)
 
     predictor = BudgetPredictor(model_path=model_path)
 
     try:
-        predictor.load_model()
+        await predictor.load_model()
     except Exception as e:
         pytest.fail(f"Failed to load budget model from {model_path}: {str(e)}")
 
@@ -45,9 +41,9 @@ async def test_model_loading():
 @pytest.mark.asyncio
 async def test_prediction():
     payload = {
-        "clicks": 500,
         "conversions": 10,
         "duration_days": 30,
+        "expected_conversion_rate": 12.0,
         "buffer_percent": 0.20,
     }
 
@@ -65,10 +61,9 @@ async def test_prediction():
         logger.info("budget_api_response", response_data=data)
 
         # Verify structure
-        assert "status" in data
-        assert data["status"] == "success"
+        assert "success" in data
+        assert data["success"] is True
         assert "data" in data
-        assert "error" in data
 
         # Verify result data
         result_data = data["data"]

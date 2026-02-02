@@ -2,13 +2,18 @@ import os
 import structlog
 from fastapi import APIRouter, FastAPI
 from contextlib import asynccontextmanager
-from mlops.performance import (
+from mlops.google_search.performance.prediction_schemas import (
     PerformancePredictionReq,
-    PerformancePredictionData,
     PerformanceAPIResponse,
+)
+from mlops.google_search.performance import (
     AdPerformancePredictor,
 )
 from oserver.utils import helpers
+from exceptions.custom_exceptions import (
+    ModelNotLoadedException,
+)
+from utils.helpers import join_url
 
 # Configure logger
 logger = structlog.get_logger()
@@ -26,23 +31,19 @@ def get_initialized_predictor() -> AdPerformancePredictor:
         logger.info("performance_model_using_base_url", base_url=base_url)
 
         # Get relative paths from env (Lazy loading after load_dotenv)
-        lgbm_rel = os.getenv("AD_PREDICTOR_LGBM_PATH")
-        sigmas_rel = os.getenv("AD_PREDICTOR_SIGMAS_PATH")
-        columns_rel = os.getenv("AD_PREDICTOR_COLUMNS_PATH")
+        lgbm_path = os.getenv("AD_PREDICTOR_LGBM_PATH")
+        sigmas_path = os.getenv("AD_PREDICTOR_SIGMAS_PATH")
+        columns_path = os.getenv("AD_PREDICTOR_COLUMNS_PATH")
 
-        if not all([lgbm_rel, sigmas_rel, columns_rel]):
+        if not all([lgbm_path, sigmas_path, columns_path]):
             logger.warning(
                 "performance_model_paths_missing",
                 message="One or more model paths are missing in environment variables.",
             )
 
-        # Construct full URLs
-        def join_url(base, path):
-            return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
-
-        lgbm_path = join_url(base_url, lgbm_rel)
-        sigmas_path = join_url(base_url, sigmas_rel)
-        columns_path = join_url(base_url, columns_rel)
+        lgbm_path = join_url(base_url, lgbm_path)
+        sigmas_path = join_url(base_url, sigmas_path)
+        columns_path = join_url(base_url, columns_path)
 
         predictor = AdPerformancePredictor(
             lgbm_model_path=lgbm_path,
@@ -58,7 +59,7 @@ async def lifespan(app: FastAPI):
     # Initialize and load models
     current_predictor = get_initialized_predictor()
     try:
-        current_predictor.load_models()
+        await current_predictor.load_models()
         logger.info("performance_models_loaded_successfully")
     except FileNotFoundError as e:
         logger.warning("performance_models_load_file_not_found", error=str(e))
@@ -74,7 +75,9 @@ async def lifespan(app: FastAPI):
 
 
 router = APIRouter(
-    prefix="/api/ds/prediction/performance", tags=["performance"], lifespan=lifespan
+    prefix="/api/ds/prediction/performance",
+    tags=["Performance Prediction"],
+    lifespan=lifespan,
 )
 
 
@@ -84,37 +87,24 @@ async def forecast_performance(
 ) -> PerformanceAPIResponse:
     """
     Predict ad performance metrics (impressions, clicks, conversions).
-
     """
     current_predictor = get_initialized_predictor()
     if not current_predictor.is_ready():
-        return PerformanceAPIResponse(
-            status="error",
-            error="Prediction models not loaded. Please ensure model files are available.",
+        raise ModelNotLoadedException(
+            "Prediction models not loaded. Please ensure model files are available."
         )
 
-    try:
-        # Convert Pydantic models to dict format using model_dump()
-        keyword_data = [kw.model_dump() for kw in request.keyword_data]
+    # Convert Pydantic models to dict format using model_dump()
+    keyword_data = [kw.model_dump() for kw in request.keyword_data]
 
-        result = current_predictor.predict(
-            keyword_data=keyword_data,
-            total_budget=request.total_budget,
-            bid_strategy=request.bid_strategy,
-            period=request.period,
-        )
+    result = current_predictor.predict(
+        keyword_data=keyword_data,
+        total_budget=request.total_budget,
+        bid_strategy=request.bid_strategy,
+        period=request.period,
+    )
 
-        return PerformanceAPIResponse(
-            status="success", data=PerformancePredictionData(**result)
-        )
-
-    except ValueError as e:
-        return PerformanceAPIResponse(status="error", error=str(e))
-    except Exception as e:
-        logger.error("performance_prediction_failed", error=str(e))
-        return PerformanceAPIResponse(
-            status="error", error=f"Prediction failed: {str(e)}"
-        )
+    return PerformanceAPIResponse(success=True, data=result)
 
 
 @router.get("/health")
