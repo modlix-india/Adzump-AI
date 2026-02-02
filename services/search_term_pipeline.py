@@ -13,9 +13,7 @@ import utils.date_utils as date_utils
 logger = get_logger(__name__)
 
 
-# --------------------------------------------------
 # Prompt loader
-# --------------------------------------------------
 def load_search_term_prompt(file_name: str) -> str:
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prompt_path = os.path.join(root_dir, "prompts", "search_term", file_name)
@@ -23,9 +21,7 @@ def load_search_term_prompt(file_name: str) -> str:
         return f.read()
 
 
-# --------------------------------------------------
 # Pipeline
-# --------------------------------------------------
 class SearchTermPipeline:
     OPENAI_MODEL = "gpt-4o-mini"
 
@@ -48,9 +44,7 @@ class SearchTermPipeline:
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
         self.google_ads_access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
 
-    # --------------------------------------------------
-    # 🔥 LLM Caller (no silent failures)
-    # --------------------------------------------------
+    # LLM Caller (no silent failures)
     async def _call_llm(self, system_msg: str, user_msg: str, label: str) -> dict:
         try:
             messages = [
@@ -75,9 +69,7 @@ class SearchTermPipeline:
             logger.exception("LLM call failed", label=label, error=str(e))
             return {}
 
-    # --------------------------------------------------
-    # ✅ Normalizers (schema enforcement)
-    # --------------------------------------------------
+    # Normalizers (schema enforcement)
     @staticmethod
     def normalize_brand(resp: dict) -> dict:
         if isinstance(resp, dict) and "brand" in resp:
@@ -119,9 +111,7 @@ class SearchTermPipeline:
             }
         }
 
-    # --------------------------------------------------
     # Relevance checks
-    # --------------------------------------------------
     async def check_brand_relevance(self, summary: str, search_term: str) -> dict:
         system_msg = load_search_term_prompt("brand_relevancy_prompt.txt")
         user_msg = f"PROJECT SUMMARY:{summary}\nSEARCH TERM:{search_term}"
@@ -174,9 +164,7 @@ class SearchTermPipeline:
         )
         return await self._call_llm(system_msg, user_msg, "overall")
 
-    # --------------------------------------------------
     # Fetch search terms
-    # --------------------------------------------------
     async def fetch_search_terms(self, customer_id: str = None) -> list:
         target_customer_id = customer_id or self.customer_id
         endpoint = f"https://googleads.googleapis.com/v20/customers/{target_customer_id}/googleAds:search"
@@ -261,9 +249,7 @@ class SearchTermPipeline:
 
         return results
 
-    # --------------------------------------------------
-    # 🔥 Full pipeline
-    # --------------------------------------------------
+    #  Full pipeline
     async def run_pipeline(self) -> dict:
         ads_data = await ads_service.fetch_ads(
             client_code=self.client_code,

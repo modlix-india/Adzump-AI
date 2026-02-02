@@ -33,7 +33,7 @@ async def process_search_terms(
 
     logger.info("Starting search term service", campaign_id=campaign_id)
 
-    # 1️⃣ Run pipeline if no precomputed suggestions
+    # Run pipeline if no precomputed suggestions
 
     if ai_suggestions is None:
         pipeline = SearchTermPipeline(
@@ -62,17 +62,13 @@ async def process_search_terms(
         campaign_name = campaign_name if "campaign_name" in locals() else "Unknown"
         product_id = product_id if "product_id" in locals() else "Unknown"
 
-    # -------------------------
-    # 2️⃣ Initialize storage service
-    # -------------------------
+    # Initialize storage service
     storage_service = StorageService(
         access_token=access_token,
         client_code=client_code,
     )
 
-    # -------------------------
-    # 3️⃣ Read existing storage by campaignId
-    # -------------------------
+    # Read existing storage by campaignId
     read_request = StorageReadRequest(
         storageName="campaignSuggestions",
         appCode="marketingai",
@@ -112,9 +108,7 @@ async def process_search_terms(
 
     today = datetime.utcnow().date()
 
-    # -------------------------
-    # 4️⃣ Same day reuse
-    # -------------------------
+    # Same day reuse
     if existing_record:
         updated_date_str = existing_record.get("updatedAt")
 
@@ -155,9 +149,7 @@ async def process_search_terms(
                         campaign_id=campaign_id,
                     )
 
-    # -------------------------
-    # 5️⃣ Normalize fields for schema compliance
-    # -------------------------
+    # Normalize fields for schema compliance
     if existing_record:
         fields = existing_record.get("fields", {})
     else:
@@ -175,9 +167,7 @@ async def process_search_terms(
 
     fields["searchTerms"] = [suggestion_entry]
 
-    # -------------------------
-    # 7️⃣ CREATE or UPDATE storage
-    # -------------------------
+    # CREATE or UPDATE storage
     if not existing_id:
         logger.info("No storage found → creating new")
         create_payload = StorageRequestWithPayload(
