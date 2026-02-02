@@ -68,6 +68,33 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 - No unnecessary comments - code should be self-explanatory
 - Type hints for function signatures
 
+## Changelog
+
+Update `CHANGELOG.md` for user-facing changes. Add entries under `[Unreleased]` section.
+
+**Categories:**
+| Category | Use Case |
+|----------|----------|
+| `Added` | New features |
+| `Changed` | Changes to existing functionality |
+| `Improved` | Enhancements to existing features |
+| `Fixed` | Bug fixes |
+| `Removed` | Removed features |
+
+**Rules:**
+- Focus on **what changed for users**, not implementation details
+- Keep entries concise (one line preferred)
+- Avoid mentioning file names, fields, or technical internals
+- Use present tense ("adds" not "added")
+
+**Good:**
+- `Geo-targeting now discovers nearby localities within a configurable radius`
+- `Campaign creation supports custom budget allocation`
+
+**Bad:**
+- `Refactored GeoTargetService to use grid-based sampling`
+- `Added product_coordinates field to LocationInfo model`
+
 ## Testing
 
 - Run `pytest` before pushing
