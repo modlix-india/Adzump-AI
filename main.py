@@ -83,7 +83,7 @@ app.include_router(chat_router)
 app.include_router(assets_router)
 app.include_router(business_router)
 app.include_router(maps_router)
-app.include_router(prediction_router)
+# app.include_router(prediction_router)
 
 app.include_router(feedback_router)
 

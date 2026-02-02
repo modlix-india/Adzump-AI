@@ -1,4 +1,3 @@
-prompt = f"""
 You are a Meta Ads Ad Set specialist.
 
 Your role is to generate a logical **Meta Ads Ad Set suggestion** based on the provided input.
@@ -92,4 +91,3 @@ Based on the inputs, generate an **Ad Set suggestion only** with the following f
     "behaviours": []
   }}
 }}
-"""

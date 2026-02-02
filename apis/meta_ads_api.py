@@ -5,6 +5,12 @@ from services.meta.meta_campaign_create_service import MetaCampaignCreateService
 from models.meta.meta_adset_request import MetaAdSetRequest
 from services.meta.meta_adset_service import MetaAdSetService
 from services.meta.meta_adset_create_service import MetaAdSetCreateService
+from models.meta.meta_ad_image_request import MetaAdImageRequest
+from services.meta.meta_ad_image_service import MetaAdImageService
+from services.meta.meta_ad_image_create_service import MetaAdImageCreateService
+from models.meta.meta_creative_request import MetaCreativeRequest
+from services.meta.meta_creative_pipeline import MetaCreativePipeline
+
 
 
 router = APIRouter(
@@ -102,3 +108,69 @@ async def create_meta_adset(
         "data": {"adsetId": result.get("id")}
     }
 
+# Generate Meta Ad Image
+
+@router.post("/meta-ad-image/service")
+async def meta_ad_image_service(
+    request: MetaAdImageRequest,
+    authorization: str = Header(...),
+    client_code: str = Header(..., alias="clientCode"),
+    x_forwarded_host: str = Header(None),
+    x_forwarded_port: str = Header(None),
+):
+    result = await MetaAdImageService.generate_images(
+        data_object_id=request.dataObjectId,
+        access_token=authorization,
+        client_code=client_code,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port,
+    )
+
+    return {
+        "status": "success",
+        "data": result
+    }
+
+
+# Upload Meta Ad Image
+
+@router.post("/meta-ad-image/create")
+async def create_meta_ad_image(
+    request: MetaAdImageRequest,
+    meta_access_token: str = Header(..., alias="meta-access-token"),
+):
+    result = await MetaAdImageCreateService.upload_image(
+        ad_account_id=request.adAccountId,
+        access_token=meta_access_token,
+        image_url=request.imageUrl
+    )
+
+    return {
+        "status": "success",
+        "data": result
+    }
+
+
+# Generate Meta Creative
+
+@router.post("/meta-creative/service")
+async def generate_meta_creative(
+    request: MetaCreativeRequest,
+    authorization: str = Header(...),
+    client_code: str = Header(..., alias="clientCode"),
+    x_forwarded_host: str = Header(None),
+    x_forwarded_port: str = Header(None),
+):
+    result = await MetaCreativePipeline.generate_creative(
+        data_object_id=request.dataObjectId,
+        access_token=authorization,
+        client_code=client_code,
+        logo_url=request.logoUrl,
+        x_forwarded_host=x_forwarded_host,
+        x_forwarded_port=x_forwarded_port,
+    )
+
+    return {
+        "status": "success",
+        "data": result
+    }
