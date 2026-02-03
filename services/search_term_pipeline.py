@@ -7,7 +7,8 @@ from structlog import get_logger  # type: ignore
 from third_party.google.services import ads_service
 from services.search_term_analyzer import analyze_search_term_performance
 from services.openai_client import chat_completion
-from services.json_utils import clean_llm_json
+from services.json_utils import safe_json_parse
+from oserver.services.connection import fetch_google_api_token_simple
 import utils.date_utils as date_utils
 
 logger = get_logger(__name__)
@@ -42,7 +43,9 @@ class SearchTermPipeline:
         self.access_token = access_token
 
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self.google_ads_access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+        self.google_ads_access_token = fetch_google_api_token_simple(
+            client_code=client_code
+        )
 
     # LLM Caller (no silent failures)
     async def _call_llm(self, system_msg: str, user_msg: str, label: str) -> dict:
@@ -57,7 +60,7 @@ class SearchTermPipeline:
                 response.choices[0].message.content.strip() if response.choices else ""
             )
 
-            parsed = clean_llm_json(content)
+            parsed = safe_json_parse(content)
 
             if not parsed:
                 logger.error("LLM JSON parsing failed", label=label)
