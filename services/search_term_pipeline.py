@@ -7,8 +7,8 @@ from structlog import get_logger  # type: ignore
 from third_party.google.services import ads_service
 from services.search_term_analyzer import analyze_search_term_performance
 from services.openai_client import chat_completion
-from services.json_utils import safe_json_parse
 from oserver.services.connection import fetch_google_api_token_simple
+from services.json_utils import safe_json_parse
 import utils.date_utils as date_utils
 
 logger = get_logger(__name__)
