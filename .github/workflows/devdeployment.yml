@@ -43,6 +43,7 @@ jobs:
         run: |
           docker build \
             --pull \
+            -f docker/service/Dockerfile \
             --build-arg PIP_REFRESH=${{ steps.dockerVersion.outputs.VERSION }} \
             -t dev-ds-service:${{ steps.dockerVersion.outputs.VERSION }} \
             .
