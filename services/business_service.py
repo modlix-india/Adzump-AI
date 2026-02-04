@@ -195,10 +195,10 @@ class BusinessService:
                                     "area_location"
                                 ),
                                 product_location=existing_location_data.get(
-                                    "product_location", ""
+                                    "product_location"
                                 ),
-                                interested_locations=existing_location_data.get(
-                                    "interested_locations", []
+                                product_coordinates=existing_location_data.get(
+                                    "product_coordinates"
                                 ),
                             )
                 except Exception as e:
@@ -265,9 +265,7 @@ class BusinessService:
             location_data = parsed.get("location", {})
             location_info = (
                 LocationInfo(
-                    area_location=location_data.get("area_location"),
-                    product_location=location_data.get("product_location", ""),
-                    interested_locations=location_data.get("interested_locations", []),
+                    area_location=location_data.get("area_location", ""),
                 )
                 if location_data
                 else None
@@ -295,9 +293,10 @@ class BusinessService:
                     area_location=location_info.area_location if location_info else None,
                 )
 
-                # Update product_location from reverse geocoding if available
-                if geo_result.product_location and location_info:
+                # Update location info with resolved product details
+                if location_info:
                     location_info.product_location = geo_result.product_location
+                location_info.product_coordinates = geo_result.product_coordinates
 
                 # Convert geo targets to storable format
                 suggested_geo_targets = [
@@ -338,10 +337,10 @@ class BusinessService:
                             else None,
                             "product_location": location_info.product_location
                             if location_info
-                            else "",
-                            "interested_locations": location_info.interested_locations
+                            else None,
+                            "product_coordinates": location_info.product_coordinates
                             if location_info
-                            else [],
+                            else None,
                         },
                         "suggestedGeoTargets": suggested_geo_targets,
                     },
@@ -380,10 +379,10 @@ class BusinessService:
                         else None,
                         "product_location": location_info.product_location
                         if location_info
-                        else "",
-                        "interested_locations": location_info.interested_locations
+                        else None,
+                        "product_coordinates": location_info.product_coordinates
                         if location_info
-                        else [],
+                        else None,
                     },
                     "suggestedGeoTargets": suggested_geo_targets,
                 },

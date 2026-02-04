@@ -7,7 +7,8 @@ from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
 from apis.business_api import router as business_router
-from mlops.performance.prediction_api import router as prediction_router
+from mlops.google_search.performance.prediction_api import router as performance_router
+from mlops.google_search.budget_prediction.api import router as budget_router
 from apis.maps import router as maps_router
 from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
@@ -84,7 +85,8 @@ app.include_router(chat_router)
 app.include_router(assets_router)
 app.include_router(business_router)
 app.include_router(maps_router)
-app.include_router(prediction_router)
+app.include_router(performance_router)
+app.include_router(budget_router)
 
 app.include_router(feedback_router)
 

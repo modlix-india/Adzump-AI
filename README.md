@@ -1,11 +1,27 @@
 # Adzump-AI
 
-Adzump ai automation
-## Overview
-Adzump-AI is a comprehensive suite designed to streamline digital marketing workflows through advanced artificial intelligence. By leveraging machine learning models, the platform automates campaign management, creative generation, and performance optimization to maximize ROI.
+AI-powered digital advertising automation platform.
 
-## Key Features
-- **Automated Campaign Management**: End-to-end automation for launching and scaling digital ad campaigns.
-- **Generative Creative Assets**: AI-driven generation of high-converting ad copy and visual elements.
-- **Predictive Analytics**: Real-time performance forecasting and budget allocation optimization.
-- **Multi-Platform Integration**: Seamless connectivity with major advertising networks.
+## Why Agents?
+
+Traditional ad campaign creation requires expertise across multiple platforms, each with its own interface and terminology. Our agent-based approach changes this:
+
+**Before:** User learns platform → Fills complex forms → Makes optimization decisions → Manages across platforms
+
+**After:** User describes business goals → Agent handles the rest
+
+## How It Works
+
+Agents act as intelligent intermediaries between users and ad platforms. They:
+
+- Understand natural language business descriptions
+- Generate platform-specific campaign structures
+- Validate and optimize before submission
+- Abstract away platform complexity
+
+## Benefits
+
+- **Reduced Complexity** - No need to learn platform-specific interfaces
+- **Consistency** - Same conversation flow works across Google Ads, Meta, etc.
+- **Intelligence** - LLMs bring contextual understanding to campaign creation
+- **Speed** - Minutes instead of hours to launch campaigns

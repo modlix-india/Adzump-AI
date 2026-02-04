@@ -2,18 +2,14 @@ import os
 import pytest
 import structlog
 from dotenv import load_dotenv
-from mlops.performance import AdPerformancePredictor
+from mlops.google_search.performance import AdPerformancePredictor
 from oserver.utils.helpers import get_base_url
+from utils.helpers import join_url
 
 logger = structlog.get_logger()
 
 # Load environment variables
 load_dotenv()
-
-
-def join_url(base, path):
-    """Helper to join base URL and relative path."""
-    return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
 
 
 @pytest.mark.asyncio
@@ -56,7 +52,7 @@ async def test_model_loading_from_url():
     # 4. Load Models
     # This will raise an exception if download fails or pickle is invalid
     try:
-        predictor.load_models()
+        await predictor.load_models()
     except Exception as e:
         pytest.fail(f"Failed to load models: {str(e)}")
 
