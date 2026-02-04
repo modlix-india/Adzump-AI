@@ -29,12 +29,8 @@ class GeoTargetService:
     def __init__(self, client_code: str):
         self._google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         self._developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
+        self._access_token = fetch_google_api_token_simple(client_code)
         # self._access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
-        try:
-            self._access_token = fetch_google_api_token_simple(client_code)
-        except Exception as e:
-            logger.warning(f"Failed to fetch Google API token: {e}. Geo-targeting will be limited.")
-            self._access_token = None
 
     _client: Optional[httpx.AsyncClient] = None
 

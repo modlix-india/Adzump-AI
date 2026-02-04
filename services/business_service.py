@@ -1,8 +1,7 @@
+from structlog import get_logger  # type: ignore
+from fastapi import HTTPException
 import json
 from typing import List
-
-from fastapi import HTTPException
-from structlog import get_logger  # type: ignore
 
 from exceptions.custom_exceptions import (
     AIProcessingException,
@@ -10,13 +9,14 @@ from exceptions.custom_exceptions import (
     InternalServerException,
     ScraperException,
 )
+from services.scraper_service import ScraperService
+from utils import prompt_loader
 from models.business_model import (
     BusinessMetadata,
+    WebsiteSummaryResponse,
     LocationInfo,
     ScrapeResult,
-    WebsiteSummaryResponse,
 )
-from services.geo_target_service import GeoTargetService
 from oserver.models.storage_request_model import (
     StorageFilter,
     StorageReadRequest,
@@ -26,8 +26,7 @@ from oserver.models.storage_request_model import (
 )
 from oserver.services.storage_service import StorageService
 from services.openai_client import chat_completion
-from services.scraper_service import ScraperService
-from utils import prompt_loader
+from services.geo_target_service import GeoTargetService
 from utils.helpers import normalize_url
 
 logger = get_logger(__name__)
@@ -132,7 +131,6 @@ class BusinessService:
             )
         return product_data
 
-    # TODO: Refactor - extract summary fetching logic to StorageService.fetch_business_summary()
     async def process_website_data(
         self,
         website_url: str,
@@ -272,48 +270,36 @@ class BusinessService:
             )
 
             # STEP 5: SUGGEST GEO TARGETS
-            suggested_geo_targets = []
-            unresolved_locations = []
+            logger.info("Suggesting geo targets from coordinates and area location...")
+            geo_service = GeoTargetService(client_code=client_code)
+
+            # Extract coordinates from first map embed
+            coordinates = None
+            map_embeds = scraped_data.get("map_embeds", [])
+            if map_embeds and map_embeds[0].get("coordinates"):
+                coordinates = map_embeds[0]["coordinates"]
+
+            geo_result = await geo_service.suggest_geo_targets(
+                coordinates=coordinates,
+                area_location=location_info.area_location if location_info else None,
+                radius_km=15,
+            )
             
-            try:
-                logger.info("Suggesting geo targets from coordinates and locations")
-                geo_service = GeoTargetService(client_code=client_code)
-
-                # Extract coordinates from first map embed
-                coordinates = None
-                map_embeds = scraped_data.get("map_embeds", [])
-                if map_embeds and map_embeds[0].get("coordinates"):
-                    coordinates = map_embeds[0]["coordinates"]
-
-                geo_result = await geo_service.suggest_geo_targets(
-                    coordinates=coordinates,
-                    interested_locations=location_info.interested_locations
-                    if location_info
-                    else [],
-                    area_location=location_info.area_location if location_info else None,
-                )
-
-                # Update location info with resolved product details
-                if location_info:
-                    location_info.product_location = geo_result.product_location
+            # Update location info with resolved product details
+            if location_info:
+                location_info.product_location = geo_result.product_location
                 location_info.product_coordinates = geo_result.product_coordinates
 
-                # Convert geo targets to storable format
-                suggested_geo_targets = [
-                    {
-                        "name": loc.name,
-                        "resourceName": loc.resource_name,
-                        "canonicalName": loc.canonical_name,
-                        "targetType": loc.target_type,
-                    }
-                    for loc in geo_result.locations
-                ]
-                unresolved_locations = geo_result.unresolved
-                
-            except Exception as e:
-                logger.warning(f"Geo-targeting failed: {e}. Continuing without geo targets.")
-                suggested_geo_targets = []
-                unresolved_locations = []
+            # Convert geo targets to storable format
+            suggested_geo_targets = [
+                {
+                    "name": loc.name,
+                    "resourceName": loc.resource_name,
+                    "canonicalName": loc.canonical_name,
+                    "targetType": loc.target_type,
+                }
+                for loc in geo_result.locations
+            ]    
 
             # STEP 6: DECIDE UPDATE OR CREATE
             # Case A: UPDATE EXISTING RECORD
@@ -356,7 +342,7 @@ class BusinessService:
                     final_summary=summary_text,
                     location=location_info,
                     suggested_geo_targets=suggested_geo_targets,
-                    unresolved_locations=unresolved_locations,
+                    unresolved_locations=geo_result.unresolved,
                 )
 
             # Case B: CREATE NEW RECORD
@@ -429,9 +415,8 @@ class BusinessService:
 
         except Exception as e:
             logger.exception(f"Unexpected error in process_website_data: {e}")
-            raise HTTPException(
-                status_code=500,
-                detail="Internal server error during website processing",
+            raise InternalServerException(
+                "Internal server error during website processing"
             )
 
     async def generate_website_summary(self, scraped_data: dict) -> str:
