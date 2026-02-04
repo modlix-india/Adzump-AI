@@ -1,13 +1,16 @@
 import httpx
 from fastapi import HTTPException
-from config.meta import META_BASE_URL, META_HTTP_TIMEOUT
+
+from adapters.meta.client import META_BASE_URL, META_HTTP_TIMEOUT
+from adapters.meta.targeting_sanitizer import sanitize_flexible_spec, map_locales
+
 
 
 async def _search(
     ad_account_id: str,
     access_token: str,
     search_type: str,
-    query: str
+    query: str,
 ):
     url = f"{META_BASE_URL}/act_{ad_account_id}/targetingsearch"
 
@@ -18,8 +21,8 @@ async def _search(
                 "access_token": access_token,
                 "type": search_type,
                 "q": query,
-                "limit": 5
-            }
+                "limit": 5,
+            },
         )
 
     if res.status_code != 200:
@@ -32,23 +35,32 @@ async def resolve_targeting_items(
     names: list[str],
     ad_account_id: str,
     access_token: str,
-    search_type: str
+    search_type: str,
 ):
     items = []
 
     for name in names:
+        if not name:
+            continue
+
+        query = name.strip()
+        if not query:
+            continue
+
         data = await _search(
             ad_account_id=ad_account_id,
             access_token=access_token,
             search_type=search_type,
-            query=name
+            query=query,
         )
 
         if data:
-            items.append({
-                "id": data[0]["id"],
-                "name": data[0]["name"]
-            })
+            items.append(
+                {
+                    "id": data[0]["id"],
+                    "name": data[0]["name"],
+                }
+            )
 
     return items
 
@@ -70,15 +82,19 @@ async def build_meta_targeting(
     llm_output: dict,
     ad_account_id: str,
     access_token: str,
-    region: str
+    region: str,
 ) -> dict:
+    age_range = llm_output.get("age_range", {})
+    age_min = max(18, age_range.get("min", 18))
+    age_max = min(65, age_range.get("max", 65))
 
     targeting = {
         "geo_locations": {
-            "countries": [region]
+            "countries": [region],
         },
-        "age_min": llm_output["age_range"]["min"],
-        "age_max": llm_output["age_range"]["max"],
+        "age_min": age_min,
+        "age_max": age_max,
+        "publisher_platforms": ["facebook", "instagram"],
     }
 
     genders = map_gender(llm_output.get("gender"))
@@ -91,28 +107,21 @@ async def build_meta_targeting(
         names=detailed.get("interests", []),
         ad_account_id=ad_account_id,
         access_token=access_token,
-        search_type="adinterest"
+        search_type="adinterest",
     )
 
     behaviors = await resolve_targeting_items(
-        names=detailed.get("behaviours", []),
+        names=detailed.get("behaviors", []) or detailed.get("behaviours", []),
         ad_account_id=ad_account_id,
         access_token=access_token,
-        search_type="adbehavior"
+        search_type="adbehavior",
     )
 
     demographics = await resolve_targeting_items(
         names=detailed.get("demographics", []),
         ad_account_id=ad_account_id,
         access_token=access_token,
-        search_type="adDemographic"
-    )
-
-    languages = await resolve_targeting_items(
-        names=llm_output.get("languages", []),
-        ad_account_id=ad_account_id,
-        access_token=access_token,
-        search_type="adlanguage"
+        search_type="adDemographic",
     )
 
     flexible_spec = []
@@ -126,10 +135,12 @@ async def build_meta_targeting(
     if demographics:
         flexible_spec.append({"demographics": demographics})
 
-    if flexible_spec:
-        targeting["flexible_spec"] = flexible_spec
+    sanitized_flexible_spec = sanitize_flexible_spec(flexible_spec)
+    if sanitized_flexible_spec:
+        targeting["flexible_spec"] = sanitized_flexible_spec
 
-    if languages and can_use_languages(llm_output):
-        targeting["languages"] = [{"id": l["id"]} for l in languages]
+    locales = map_locales(llm_output.get("languages", []))
+    if locales:
+        targeting["locales"] = locales
 
     return targeting

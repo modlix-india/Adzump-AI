@@ -3,14 +3,14 @@ from typing import Any
 from adapters.meta.client import MetaClient
 from core.context import auth_context
 from oserver.services.connection import fetch_meta_api_token
-
+import os
 
 class MetaCampaignAdapter:
     """Adapter for Meta Campaign CRUD operations."""
 
     def _get_client(self) -> MetaClient:
-        meta_token = fetch_meta_api_token(auth_context.client_code)
-        # meta_token = os.getenv("META_ACCESS_TOKEN", "")
+        # meta_token = fetch_meta_api_token(auth_context.client_code)
+        meta_token = os.getenv("META_ACCESS_TOKEN", "")
         return MetaClient(meta_token)
 
     def _normalize_ad_account_id(self, ad_account_id: str) -> str:

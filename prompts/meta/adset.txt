@@ -52,7 +52,19 @@ Based on the inputs, generate an **Ad Set suggestion only** with the following f
 ## Language Rules
 
 - Suggest relevant languages based on the Region.
-- Return language names only (example: `English`, `Hindi`).
+- Return **plain language names only**, without variants or regions.
+- Allowed examples: `English`, `Hindi`, `Tamil`, `Telugu`.
+- Do NOT include regional variants like `English (UK)` or `English (India)`.
+
+---
+## Budget Rules
+
+- Generate a realistic `daily_budget` in INR.
+- Use these guidelines:
+  - OUTCOME_LEADS: 500 – 2000
+  - TRAFFIC / AWARENESS: 300 – 1500
+- Return a single integer value (example: 800, 1200).
+
 
 ---
 
@@ -76,7 +88,7 @@ Based on the inputs, generate an **Ad Set suggestion only** with the following f
 - Return **only valid JSON**
 - Do not include explanations, comments, or formatting text
 - Do not include Meta IDs
-- Do not include campaign, budget, bidding, or creatives
+- Do not include campaign, bidding, or creatives
 - The output must match the following structure exactly:
 
 {{
