@@ -284,7 +284,7 @@ class BusinessService:
                 area_location=location_info.area_location if location_info else None,
                 radius_km=15,
             )
-            
+
             # Update location info with resolved product details
             if location_info:
                 location_info.product_location = geo_result.product_location
@@ -299,7 +299,7 @@ class BusinessService:
                     "targetType": loc.target_type,
                 }
                 for loc in geo_result.locations
-            ]    
+            ]
 
             # STEP 6: DECIDE UPDATE OR CREATE
             # Case A: UPDATE EXISTING RECORD
@@ -407,7 +407,7 @@ class BusinessService:
                 final_summary=summary_text,
                 location=location_info,
                 suggested_geo_targets=suggested_geo_targets,
-                unresolved_locations=unresolved_locations,
+                unresolved_locations=geo_result.unresolved,
             )
 
         except ScraperException:
