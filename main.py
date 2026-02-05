@@ -20,7 +20,6 @@ from api.optimization import router as optimization_router
 
 from db import db_session
 from config.logging_config import setup_logging
-from services.geo_target_service import GeoTargetService
 from structlog import get_logger  # type: ignore
 
 from dotenv import load_dotenv
@@ -71,7 +70,6 @@ async def lifespan(app: FastAPI):
                     error=str(e),
                     exc_info=True,
                 )
-        await GeoTargetService.close_client()
         await close_http_client()
         logger.info("HTTP client closed", component="http")
 
