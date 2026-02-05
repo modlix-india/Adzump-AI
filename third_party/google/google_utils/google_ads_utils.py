@@ -1,6 +1,6 @@
 import structlog
 from typing import List, Dict, Any
-from utils import httpx_utils
+from core.infrastructure.http_client import get_http_client as get_httpx_client
 from third_party.google.google_utils import google_api_client
 from third_party.google.models.keyword_model import Keyword
 
@@ -35,7 +35,7 @@ async def execute_google_ads_query(
         "login-customer-id": login_customer_id,
     }
 
-    client = await httpx_utils.get_httpx_client()
+    client = get_httpx_client()
 
     logger.info(f"Executing GAQL query using endpoint {endpoint_type}")
 
@@ -95,7 +95,7 @@ async def execute_google_ads_service_call(
         "login-customer-id": login_customer_id,
     }
 
-    client = await httpx_utils.get_httpx_client()
+    client = get_httpx_client()
 
     logger.info(f"Executing service method: {service_method}")
 

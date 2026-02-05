@@ -2,7 +2,7 @@ import structlog
 import httpx
 import asyncio
 from typing import List
-from utils.httpx_utils import get_httpx_client
+from core.infrastructure.http_client import get_http_client as get_httpx_client
 from exceptions.custom_exceptions import GoogleAutocompleteException
 
 logger = structlog.get_logger(__name__)
@@ -25,7 +25,7 @@ async def fetch_autocomplete_suggestions(
         }
 
         if client is None:
-            client = await get_httpx_client()
+            client = get_httpx_client()
         response = await client.get(AUTOCOMPLETE_URL, params=params, timeout=5.0)
         response.raise_for_status()
 
