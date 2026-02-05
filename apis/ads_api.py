@@ -8,8 +8,9 @@ from services.create_campaign_service import CampaignServiceError
 from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
-from services import create_campaign_service ,chat_service
-
+from services import create_campaign_service, chat_service
+# TODO: Remove age optimization import - replaced by api/optimization.py
+from services.age_optimization_service import generate_age_optimizations
 
 
 
@@ -47,7 +48,7 @@ async def gks_positive(
     session_id: str = Header(..., alias="sessionId"),
     access_token: str = Header(..., alias="access-token"),
     x_forwarded_host: str = Header(..., alias="x-forwarded-host"),
-    x_forwarded_port: str = Header(..., alias="x-forwarded-port")
+    x_forwarded_port: str = Header(..., alias="x-forwarded-port"),
 ):
     try:
         positives = await gks.extract_positive_strategy(
@@ -56,7 +57,7 @@ async def gks_positive(
             session_id=session_id,
             access_token=access_token,
             x_forwarded_host=x_forwarded_host,
-            x_forwarded_port=x_forwarded_port
+            x_forwarded_port=x_forwarded_port,
         )
         return {"status": "success", "data": positives}
     except Exception as e:
@@ -69,7 +70,7 @@ async def gks_negative(
     client_code: str = Header(..., alias="clientCode"),
     access_token: str = Header(..., alias="access-token"),
     x_forwarded_host: str = Header(..., alias="x-forwarded-host"),
-    x_forwarded_port: str = Header(..., alias="x-forwarded-port")
+    x_forwarded_port: str = Header(..., alias="x-forwarded-port"),
 ):
     try:
         negatives = await gks.extract_negative_strategy(
@@ -77,7 +78,7 @@ async def gks_negative(
             client_code=client_code,
             access_token=access_token,
             x_forwarded_host=x_forwarded_host,
-            x_forwarded_port=x_forwarded_port
+            x_forwarded_port=x_forwarded_port,
         )
         return {
             "status": "success",
@@ -85,7 +86,8 @@ async def gks_negative(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 @router.post("/optimize/budget")
 async def generate_budget_recommendation(
     clientCode: str = Header(...),
@@ -106,6 +108,7 @@ async def generate_budget_recommendation(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/generate-campaign")
 async def generate_campaign(
@@ -134,7 +137,7 @@ async def generate_campaign(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
-    
+
 @router.post("/search_term")
 async def analyze_search_terms_route(
     access_token: str = Header(..., alias="accessToken"),
@@ -160,8 +163,31 @@ async def analyze_search_terms_route(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 @router.get("/get-basic-details/{session_id}")
 async def get_session(session_id: str):
-    
     return await chat_service.get_basic_details(session_id)
+
+
+@router.post("/optimize/age")
+async def generate_age_optimization(
+    clientCode: str = Header(...),
+    loginCustomerId: str = Header(...),
+    customerId: str = Header(...),
+    campaignId: str = Query(...),
+    duration: str = Query(...),
+):
+    try:
+        result = await generate_age_optimizations(
+            customer_id=customerId,
+            login_customer_id=loginCustomerId,
+            campaign_id=campaignId,
+            client_code=clientCode,
+            duration=duration,
+        )
+        return {"status": "success", "data": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
