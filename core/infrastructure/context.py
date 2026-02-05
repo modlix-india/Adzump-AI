@@ -5,7 +5,7 @@ Uses Python's contextvars which work correctly with async/await.
 
 Usage:
     # Read in any service/agent
-    from core.context import auth_context
+    from core.infrastructure.context import auth_context
     token = auth_context.access_token
     client = auth_context.client_code
 """
@@ -28,8 +28,8 @@ _auth_context: ContextVar[AuthContext] = ContextVar(
 
 
 def set_auth_context(
-    access_token: str,
-    client_code: str,
+    access_token: str = "",
+    client_code: str = "",
     x_forwarded_host: str = "",
     x_forwarded_port: str = "",
 ) -> None:

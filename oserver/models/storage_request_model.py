@@ -36,3 +36,4 @@ class StorageReadRequest(BaseModel):
     eager: bool = Field(default=False, description="Whether to eagerly load related data")
     eagerFields: List[str] = Field(default_factory=list, description="List of fields to eagerly load")
     filter: Optional[StorageFilter] = Field(None, description="Optional filter condition for fetching specific records")
+    size: Optional[int] = Field(None, description="Number of records per page")
