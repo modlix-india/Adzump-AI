@@ -1,5 +1,4 @@
 import os
-import httpx
 import math
 import asyncio
 import urllib.parse
@@ -9,6 +8,7 @@ from typing import List, Dict, Optional
 from structlog import get_logger  # type: ignore
 from models.maps_model import TargetPlaceLocation, TargetPlaceResponse
 from oserver.services.connection import fetch_google_api_token_simple
+from core.infrastructure.http_client import get_http_client
 
 logger = get_logger(__name__)
 
@@ -26,28 +26,10 @@ class GeoTargetService:
     MAX_CONCURRENT_GEOCODE = 10  # Parallel requests
     MIN_DISTANCE_KM = 2.0  # Deduplication threshold
 
-    def __init__(self, client_code: str):
+    def __init__(self, client_code: str) -> None:
         self._google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         self._developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
         self._access_token = fetch_google_api_token_simple(client_code)
-        # self._access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
-
-    _client: Optional[httpx.AsyncClient] = None
-
-    @classmethod
-    async def _get_client(cls) -> httpx.AsyncClient:
-        """Get or create shared httpx client."""
-        if cls._client is None or cls._client.is_closed:
-            cls._client = httpx.AsyncClient(timeout=cls.HTTP_TIMEOUT)
-        return cls._client
-
-    @classmethod
-    async def close_client(cls):
-        """Close the shared httpx client."""
-        if cls._client and not cls._client.is_closed:
-            await cls._client.aclose()
-            logger.info("GeoTargetService http client closed")
-        cls._client = None
 
     async def suggest_geo_targets(
         self,
@@ -75,7 +57,7 @@ class GeoTargetService:
                 return TargetPlaceResponse(locations=[], unresolved=[])
 
         # If coordinates were provided directly (map embed), reverse-geocode to get the specific business site name
-        if self._is_valid_coordinates(product_coordinates):
+        if product_coordinates and self._is_valid_coordinates(product_coordinates):
             rev_geo = await self._reverse_geocode_center(
                 product_coordinates["lat"], product_coordinates["lng"]
             )
@@ -188,7 +170,7 @@ class GeoTargetService:
                 await asyncio.sleep(0.05)  # Rate limiting
 
                 try:
-                    client = await self._get_client()
+                    client = get_http_client()
                     url = (
                         f"{self.GEOCODING_API_URL}?"
                         f"latlng={point['lat']},{point['lng']}&"
@@ -287,7 +269,7 @@ class GeoTargetService:
 
     def _deduplicate_locations(self, locations: List[Dict]) -> List[Dict]:
         """Deduplicate by name and distance."""
-        unique = []
+        unique: List[Dict] = []
 
         for new_loc in locations:
             is_duplicate = False
@@ -348,7 +330,7 @@ class GeoTargetService:
             }
 
             try:
-                client = await self._get_client()
+                client = get_http_client()
                 response = await client.post(
                     self.SUGGEST_ENDPOINT, headers=headers, json=payload
                 )
@@ -427,7 +409,7 @@ class GeoTargetService:
             encoded_address = urllib.parse.quote(area_location)
             url = f"{self.GEOCODING_API_URL}?address={encoded_address}&key={self._google_maps_api_key}"
 
-            client = await self._get_client()
+            client = get_http_client()
             response = await client.get(url, timeout=10.0)
 
             if response.status_code != 200:
@@ -468,7 +450,7 @@ class GeoTargetService:
 
         try:
             url = f"{self.GEOCODING_API_URL}?latlng={lat},{lng}&key={self._google_maps_api_key}"
-            client = await self._get_client()
+            client = get_http_client()
             response = await client.get(url, timeout=10.0)
             data = response.json()
 
@@ -487,7 +469,7 @@ class GeoTargetService:
         """Build headers for Google Ads API requests."""
         return {
             "Authorization": f"Bearer {self._access_token}",
-            "developer-token": self._developer_token,
+            "developer-token": self._developer_token or "",
             "Content-Type": "application/json",
         }
 
@@ -513,7 +495,7 @@ class GeoTargetService:
         async def verify_one(name: str):
             async with semaphore:
                 try:
-                    client = await self._get_client()
+                    client = get_http_client()
                     params = {
                         "address": name,
                         "key": self._google_maps_api_key,
@@ -568,7 +550,7 @@ class GeoTargetService:
     def _process_suggestions(
         self,
         suggestions: List[Dict],
-        original_locations: set = None,
+        original_locations: Optional[set] = None,
     ) -> tuple[List[TargetPlaceLocation], set]:
         resolved: List[TargetPlaceLocation] = []
         resolved_canonical_names: set = set()
