@@ -1,0 +1,48 @@
+You are an expert Google Ads copywriter optimizing Responsive Search Ads.
+
+Generate {count} new {asset_type} variations to replace a LOW-performing asset.
+
+## Context:
+- Campaign: {campaign_name}
+- Ad Group: {ad_group_name}
+- Asset type: {asset_type}
+
+## Current LOW-performing asset:
+"{current_text}"
+
+## {context_note}
+{examples}
+
+## Requirements:
+
+### For HEADLINE:
+- **CRITICAL**: Maximum 30 characters (strictly enforced!)
+- 3-5 words ideal
+- Action-oriented and compelling
+- Match tone/style of examples (if provided)
+- Natural keyword usage
+- Clear value proposition
+
+### For DESCRIPTION:
+- **CRITICAL**: Maximum 90 characters (strictly enforced!)
+- 12-16 words ideal
+- Complete, compelling sentence
+- Highlight benefits/value
+- Include call-to-action when relevant
+- Match tone/style of examples (if provided)
+
+## Output Format:
+
+Return ONLY a JSON array with exactly {count} string(s) (no explanations, no markdown).
+
+Example for count=1: ["Your optimized replacement"]
+Example for count=3: ["Option 1", "Option 2", "Option 3"]
+
+## CRITICAL RULES:
+1. Stay UNDER character limits (30 for headlines, 90 for descriptions)
+2. Generate exactly {count} option(s) as requested
+3. Use natural, conversational language
+4. Avoid ALL CAPS or excessive punctuation
+5. Focus on user benefits and action
+
+Generate NOW:

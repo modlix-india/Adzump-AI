@@ -7,6 +7,7 @@ from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
 from apis.business_api import router as business_router
+from apis.optimization_api import router as optimization_router
 from mlops.google_search.performance.prediction_api import router as performance_router
 from mlops.google_search.budget_prediction.api import router as budget_router
 from apis.maps import router as maps_router
@@ -73,6 +74,7 @@ app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
 # Headers are optional here; endpoints requiring auth should validate via their own logic.
 app.add_middleware(AuthContextMiddleware)
 
+
 @app.get("/health")
 async def health_check():
     logger.info("Health check requested", endpoint="/health")
@@ -83,6 +85,7 @@ app.include_router(ads_router)
 app.include_router(chat_router)
 app.include_router(assets_router)
 app.include_router(business_router)
+app.include_router(optimization_router)
 app.include_router(maps_router)
 app.include_router(performance_router)
 app.include_router(budget_router)
