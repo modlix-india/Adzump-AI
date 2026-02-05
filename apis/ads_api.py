@@ -173,19 +173,11 @@ async def analyze_search_terms_route(
 @router.post("/keywords/analyze-update")
 async def analyze_update_keywords(
     request: UpdateKeywordsStrategyRequest,
-    client_code: str = Header(..., alias="clientCode"),
-    access_token: str = Header(..., alias="access-token"),
-    x_forwarded_host: str = Header(None, alias="x-forwarded-host"),
-    x_forwarded_port: str = Header(None, alias="x-forwarded-port"),
 ):
     result = await gs_update.analyze_and_update_campaign_keywords(
         keyword_update_request=request,
-        storage_access_token=access_token,
-        client_code=client_code,
-        x_forwarded_host=x_forwarded_host,
-        x_forwarded_port=x_forwarded_port,
     )
-    return result
+    return success_response(data=result.model_dump())
 
 
 @router.get("/get-basic-details/{session_id}")

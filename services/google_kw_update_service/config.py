@@ -5,13 +5,19 @@ TOP_PERFORMER_PERCENTAGE = 0.2
 
 # Keyword Performance Classifier
 CTR_THRESHOLD = 2.0
-QUALITY_SCORE_THRESHOLD = 3
+QUALITY_SCORE_THRESHOLD = 4  # Stricter: Flag QS ≤ 4 as poor
 CPL_MULTIPLIER = 1.5
-MIN_CLICKS_FOR_CONVERSIONS = 20
+MIN_CLICKS_FOR_CONVERSIONS = 15  # Balanced: Suitable for real estate sales cycle
 CONVERSION_RATE_THRESHOLD = 1.0  # Minimum acceptable conversion rate (%)
 CRITICAL_CLICK_THRESHOLD = 50
+CRITICAL_COST_THRESHOLD = 2000.0  # Flag keywords with high spend and no conversions
 DEFAULT_MAX_CPL = 2000.0
 DEFAULT_MIN_CPL = 50.0
+
+# Enhanced Seed Expansion Feature
+ENABLE_ENHANCED_SEED_EXPANSION = True
+LLM_SEED_COUNT = 10  # Number of LLM variations to generate
+AUTOCOMPLETE_MAX_SUGGESTIONS = 5  # Max autocomplete results per seed
 
 # Performance Scoring Weights
 PERFORMANCE_WEIGHTS = {

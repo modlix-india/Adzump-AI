@@ -1,7 +1,7 @@
 import structlog
 from typing import List, Dict, Any
 from utils import httpx_utils
-from third_party.google.google_utils import keyword_utils
+from third_party.google.google_utils import google_api_client
 from third_party.google.models.keyword_model import Keyword
 
 logger = structlog.get_logger(__name__)
@@ -39,7 +39,7 @@ async def execute_google_ads_query(
 
     logger.info(f"Executing GAQL query using endpoint {endpoint_type}")
 
-    response = await keyword_utils.retry_post_with_backoff(
+    response = await google_api_client.retry_post_with_backoff(
         client=client,
         endpoint=endpoint,
         headers=headers,
@@ -95,11 +95,11 @@ async def execute_google_ads_service_call(
         "login-customer-id": login_customer_id,
     }
 
-    client = await httpx_utils.get_http_client()
+    client = await httpx_utils.get_httpx_client()
 
     logger.info(f"Executing service method: {service_method}")
 
-    response = await keyword_utils.retry_post_with_backoff(
+    response = await google_api_client.retry_post_with_backoff(
         client=client,
         endpoint=endpoint,
         headers=headers,

@@ -9,6 +9,7 @@ from models.business_model import BusinessMetadata
 class MatchType(str, Enum):
     EXACT = "exact"
     PHRASE = "phrase"
+    BROAD = "broad"
 
 
 class CompetitionLevel(str, Enum):
@@ -44,6 +45,9 @@ class KeywordSuggestion(BaseModel):
     )
     competitionIndex: float = Field(
         ge=0.0, le=1.0, default=0.0, description="Competition index (0-1)"
+    )
+    semantic_score: Optional[float] = Field(
+        default=None, description="Semantic similarity score (0-100)"
     )
 
     @field_validator("keyword")
@@ -390,7 +394,7 @@ class Keyword(BaseModel):
         return cls(
             keyword=keyword_text,
             criterion_id=criterion_id,
-            match_type=keyword_info.get("matchType", "PHRASE"),
+            match_type=keyword_info.get("matchType", "PHRASE").lower(),
             ad_group_id=str(ad_group.get("id", "")),
             ad_group_name=ad_group.get("name", ""),
             campaign_id=str(campaign.get("id", "")),

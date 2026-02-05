@@ -78,26 +78,37 @@ class KeywordPerformanceClassifier:
         reasons = []
         is_critical_failure = False
 
-        # 1. Critical failure check: 0 conversions + high click volume
+        # 1. Critical failure check: High spend with 0 conversions
+        if keyword.conversions == 0 and keyword.cost >= config.CRITICAL_COST_THRESHOLD:
+            reasons.append(f"Critical: ₹{keyword.cost:.2f} spent with no conversions")
+            is_critical_failure = True
+
+        # 2. Critical failure check: 0 conversions + high click volume
         if (
             keyword.conversions == 0
             and keyword.clicks >= config.CRITICAL_CLICK_THRESHOLD
+            and not is_critical_failure
         ):
             reasons.append(f"Critical: No conversions after {keyword.clicks} clicks")
             is_critical_failure = True
 
-        # 2. Check CTR
-        if keyword.ctr < config.CTR_THRESHOLD:
-            reasons.append(f"Low CTR ({keyword.ctr:.1f}%)")
+        # 3. Check CTR
+        # kw.ctr is fraction (e.g. 0.05), THRESHOLD is percentage (e.g. 2.0)
+        if (keyword.ctr * 100) < config.CTR_THRESHOLD:
+            reasons.append(f"Low CTR ({(keyword.ctr * 100):.1f}%)")
 
-        # 3. Check quality score
+        # 4. Check for zero clicks despite impressions (Zombie Keywords)
+        if keyword.clicks == 0 and keyword.impressions > 0:
+            reasons.append(f"No clicks after {keyword.impressions} impressions")
+
+        # 5. Check quality score
         if (
             keyword.quality_score
             and keyword.quality_score <= config.QUALITY_SCORE_THRESHOLD
         ):
             reasons.append(f"Low quality score ({keyword.quality_score})")
 
-        # 4. Check conversions
+        # 6. Check conversions
         if (
             keyword.conversions == 0
             and keyword.clicks >= config.MIN_CLICKS_FOR_CONVERSIONS
@@ -105,11 +116,11 @@ class KeywordPerformanceClassifier:
         ):
             reasons.append("No conversions despite clicks")
 
-        # 5. Check CPL (only if not already flagged for no conversions)
+        # 7. Check CPL (only if not already flagged for no conversions)
         elif keyword.cpl and keyword.cpl > median_cpl * config.CPL_MULTIPLIER:
             reasons.append(f"High CPL (₹{keyword.cpl:.2f} vs ₹{median_cpl:.2f} median)")
 
-        # 6. Check conversion rate
+        # 8. Check conversion rate
         if (
             keyword.conv_rate < config.CONVERSION_RATE_THRESHOLD
             and keyword.clicks >= config.MIN_CLICKS_FOR_CONVERSIONS

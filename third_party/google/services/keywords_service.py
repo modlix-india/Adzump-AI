@@ -1,7 +1,8 @@
 import os
 import asyncio
 from typing import List, Dict, Optional, Any
-from third_party.google.google_utils import google_ads_utils, date_utils
+from third_party.google.google_utils import google_ads_utils
+from utils import google_dateutils as date_utils
 from structlog import get_logger  # type: ignore
 from utils import text_utils
 from third_party.google.models.keyword_model import (
@@ -10,6 +11,7 @@ from third_party.google.models.keyword_model import (
     Keyword,
     FetchKeywordsResponse,
 )
+from exceptions.custom_exceptions import GoogleAdsException
 
 logger = get_logger(__name__)
 
@@ -101,6 +103,10 @@ async def fetch_campaign_keywords(
 
     except Exception as e:
         logger.exception(f"Error fetching keywords: {e}")
+        if not isinstance(e, GoogleAdsException):
+            raise GoogleAdsException(
+                message=f"Error fetching campaign keywords: {str(e)}"
+            )
         raise
 
 
@@ -128,7 +134,7 @@ def _build_keywords_fetch_query(
             metrics.average_cpc,
             metrics.cost_micros,
             metrics.conversions,
-            metrics.cost_per_conversion,
+            metrics.cost_per_conversion
         """
 
     query = f"""
@@ -163,6 +169,7 @@ async def google_ads_generate_keyword_ideas(
     login_customer_id: str,
     access_token: str,
     seed_keywords: List[str],
+    developer_token: Optional[str] = None,
     url: str = None,
     location_ids: List[str] = None,
     language_id: int = DEFAULT_LANGUAGE_ID,
@@ -173,7 +180,7 @@ async def google_ads_generate_keyword_ideas(
     all_suggestions: List[KeywordSuggestion] = []
 
     try:
-        developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
+        developer_token = developer_token or os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
         if not developer_token:
             raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
 
@@ -203,7 +210,11 @@ async def google_ads_generate_keyword_ideas(
 
     except Exception as e:
         logger.exception(f"Google Ads suggestions failed: {e}")
-        return []
+        if not isinstance(e, GoogleAdsException):
+            raise GoogleAdsException(
+                message=f"Failed to generate keyword ideas: {str(e)}"
+            )
+        raise
 
 
 async def _process_keyword_chunk(
@@ -233,7 +244,7 @@ async def _process_keyword_chunk(
             payload=payload,
         )
 
-        results = response_data.json().get("results", [])
+        results = response_data.get("results", [])
         if not results:
             logger.info(f"No results in chunk {chunk_num}")
             return 0

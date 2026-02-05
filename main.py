@@ -75,6 +75,7 @@ app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
 # Headers are optional here; endpoints requiring auth should validate via their own logic.
 app.add_middleware(AuthContextMiddleware)
 
+
 @app.get("/health")
 async def health_check():
     logger.info("Health check requested", endpoint="/health")

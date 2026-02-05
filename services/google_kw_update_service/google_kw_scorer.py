@@ -4,6 +4,7 @@ import numpy as np
 from services.openai_client import generate_embeddings
 from third_party.google.models.keyword_model import Keyword
 from services.google_kw_update_service import config
+from exceptions.custom_exceptions import AIProcessingException
 
 logger = structlog.get_logger(__name__)
 
@@ -12,36 +13,39 @@ class SemanticSimilarityScorer:
     """Calculates semantic similarity scores between keyword suggestions and top performers."""
 
     async def calculate_semantic_similarity_scores(
-        self, suggestion_keywords: List[Dict], top_performer_keywords: List[Keyword]
+        self, suggestion_keywords: List[Dict], anchor_keywords: List[Keyword]
     ) -> Dict[str, float]:
-        """Calculate semantic similarity scores for suggestions using OpenAI embeddings."""
+        """Calculate semantic similarity scores for suggestions using anchor keywords."""
         logger.info("Calculating semantic similarity scores...")
 
-        if not suggestion_keywords or not top_performer_keywords:
-            logger.warning("Empty suggestions or top performers list")
+        if not suggestion_keywords or not anchor_keywords:
+            logger.warning("Empty suggestions or anchor keywords list")
             return {}
 
         try:
             # Extract keyword texts
-            top_performer_texts = [kw.keyword for kw in top_performer_keywords]
-            suggestion_texts = [s.get("keyword", "") for s in suggestion_keywords]
+            anchor_texts = [kw.keyword for kw in anchor_keywords]
+            suggestion_texts = [
+                s.keyword if hasattr(s, "keyword") else s.get("keyword", "")
+                for s in suggestion_keywords
+            ]
 
             logger.info(
                 "Generating embeddings",
-                top_performer_count=len(top_performer_texts),
+                anchor_count=len(anchor_texts),
                 suggestion_count=len(suggestion_texts),
             )
 
             # Generate embeddings
             # Note: OpenAI embeddings are normalized to length 1, so dot product == cosine similarity
-            top_embeddings = np.array(await generate_embeddings(top_performer_texts))
+            anchor_embeddings = np.array(await generate_embeddings(anchor_texts))
             suggestion_embeddings = np.array(
                 await generate_embeddings(suggestion_texts)
             )
 
             # Calculate cosine similarities (dot product since normalized)
-            # Shape: (num_suggestions, num_top_performers)
-            similarity_matrix = np.dot(suggestion_embeddings, top_embeddings.T)
+            # Shape: (num_suggestions, num_anchor_keywords)
+            similarity_matrix = np.dot(suggestion_embeddings, anchor_embeddings.T)
 
             # Get max similarity for each suggestion
             max_similarities = similarity_matrix.max(axis=1)
@@ -61,8 +65,9 @@ class SemanticSimilarityScorer:
 
         except Exception as e:
             logger.exception(f"Error calculating semantic similarity scores: {e}")
-            # Return default scores on error
-            return {s["keyword"].lower(): 50.0 for s in suggestion_keywords}
+            raise AIProcessingException(
+                message=f"Semantic similarity calculation failed: {str(e)}"
+            )
 
 
 class MultiFactorKeywordScorer:
