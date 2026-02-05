@@ -9,6 +9,9 @@ from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service ,chat_service
+from services.locations_optimization import optimize_locations_for_client , init_http_client , close_http_client
+
+
 
 
 
@@ -165,3 +168,56 @@ async def analyze_search_terms_route(
 async def get_session(session_id: str):
     
     return await chat_service.get_basic_details(session_id)
+
+
+
+@router.post("/optimize/locations")
+async def optimize_locations(
+    clientCode: str = Header(..., alias="clientCode"),
+    loginCustomerId: str = Header(..., alias="loginCustomerId"),
+):
+    try:
+        await init_http_client()
+
+        result = await optimize_locations_for_client(
+            client_code=clientCode,
+            login_customer_id=loginCustomerId,
+        )
+
+        return {
+            "status": "success",
+            "data": result,
+        }
+
+    #Preserve service / Google Ads errors
+    except HTTPException as e:
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.detail,
+        )
+
+    #Validation / business errors
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "source": "router_validation",
+                "message": str(e),
+            },
+        )
+
+    #Unexpected system errors
+    except Exception as e:
+        print("ERROR:", repr(e))
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "source": "location_optimization_router",
+                "type": "internal_error",
+                "message": str(e),
+            },
+        )
+
+    finally:
+        await close_http_client()
