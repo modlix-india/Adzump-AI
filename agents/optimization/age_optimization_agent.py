@@ -11,6 +11,9 @@ from utils.prompt_loader import load_prompt
 logger = get_logger(__name__)
 
 
+# TODO: Filter recommendations based on existing targeting:
+#   - ADD recommendations: only for age ranges not already targeted
+#   - REMOVE recommendations: only for age ranges already targeted
 class AgeOptimizationAgent:
     def __init__(self):
         self.accounts_adapter = GoogleAccountsAdapter()
