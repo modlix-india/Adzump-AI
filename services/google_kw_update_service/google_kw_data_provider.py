@@ -9,7 +9,7 @@ from services.business_service import BusinessService
 from models.business_model import BusinessMetadata
 from third_party.google.models.keyword_model import Keyword
 from services.google_kw_update_service import config
-from core.context import auth_context
+from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import (
     GoogleAdsException,
     StorageException,
