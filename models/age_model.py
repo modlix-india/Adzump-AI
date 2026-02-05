@@ -1,3 +1,4 @@
+# TODO: Remove this file - replaced by core/models/optimization.py
 from pydantic import BaseModel
 from typing import List, Optional
 

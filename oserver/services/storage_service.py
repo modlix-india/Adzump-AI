@@ -8,7 +8,7 @@ from oserver.models.storage_request_model import (
 )
 from oserver.models.storage_response_model import StorageResponse
 from oserver.services.base_api_service import BaseAPIService
-from core.context import auth_context
+from core.infrastructure.context import auth_context
 
 
 class StorageService:
