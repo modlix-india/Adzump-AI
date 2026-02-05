@@ -2,7 +2,7 @@
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from core.context import set_auth_context
+from core.infrastructure.context import set_auth_context
 
 
 class AuthContextMiddleware(BaseHTTPMiddleware):

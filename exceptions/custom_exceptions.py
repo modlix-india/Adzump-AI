@@ -154,3 +154,25 @@ class GoogleAutocompleteException(BaseAppException):
         details: Optional[dict] = None,
     ):
         super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
+
+
+class GoogleAPIException(BaseAppException):
+    """Google Ads API error."""
+
+    def __init__(
+        self,
+        message: str = "Google API request failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
+
+
+class CoreTokenException(BaseAppException):
+    """Core token service error."""
+
+    def __init__(
+        self,
+        message: str = "Failed to fetch token from core service",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_401_UNAUTHORIZED, details)
