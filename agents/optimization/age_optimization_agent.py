@@ -79,7 +79,7 @@ class AgeOptimizationAgent:
         """Send metrics to LLM for analysis and return parsed recommendations."""
         prompt = load_prompt("optimization/age_optimization_prompt.txt")
         formatted = prompt.format(
-            platform="google_ads",
+            platform="GOOGLE",
             parent_account_id=parent_account_id,
             account_id=account_id,
             metrics=json.dumps(metrics, indent=2),

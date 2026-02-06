@@ -6,6 +6,7 @@ from core.models.optimization import CampaignRecommendation
 from oserver.models.storage_request_model import (
     StorageReadRequest,
     StorageRequestWithPayload,
+    StorageUpdateWithPayload,
     FilterCondition,
     ComplexCondition,
 )
@@ -29,7 +30,11 @@ class RecommendationStorageService:
         base_fields = existing.get("fields", {}) if existing else None
 
         doc = self._build_recommendation(recommendation, base_fields)
-        response = await self._create(doc)
+        await self._create(doc)
+
+        if existing:
+            await self._mark_completed(existing["_id"])
+
         return {"fields": doc["fields"]}
 
     async def _fetch_existing(
@@ -63,7 +68,7 @@ class RecommendationStorageService:
             "productId": rec.product_id,
             "completed": False,
             "campaignType": rec.campaign_type,
-            "platform": rec.platform.replace("_ads", "").upper(),
+            "platform": rec.platform,
             "fields": fields,
         }
 
@@ -73,6 +78,8 @@ class RecommendationStorageService:
         fields = dict[Any, Any](base_fields) if base_fields else {}
         rec_fields = rec.fields.model_dump(exclude_none=True)
         for key, new_items in rec_fields.items():
+            for item in new_items:
+                item["applied"] = False
             existing = fields.get(key, [])
             # keywords have origin (e.g. SEARCH_TERM, KEYWORD_PLANNER)
             # replace only matching origin items, preserve others
@@ -92,6 +99,15 @@ class RecommendationStorageService:
             dataObject=doc,
         )
         return await self.storage.write_storage(request)
+
+    async def _mark_completed(self, record_id: str):
+        request = StorageUpdateWithPayload(
+            storageName=self.STORAGE_NAME,
+            appCode=self.APP_CODE,
+            dataObjectId=record_id,
+            dataObject={"completed": True},
+        )
+        return await self.storage.update_storage(request)
 
 
 recommendation_storage_service = RecommendationStorageService()

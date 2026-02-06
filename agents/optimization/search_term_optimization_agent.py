@@ -64,7 +64,7 @@ class SearchTermOptimizationAgent:
                 continue
 
             recommendations.append(CampaignRecommendation(
-                platform="google_ads",
+                platform="GOOGLE",
                 parent_account_id=parent_id,
                 account_id=account_id,
                 product_id=mapping["product_id"],
