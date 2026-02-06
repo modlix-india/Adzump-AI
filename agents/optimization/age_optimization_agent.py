@@ -2,7 +2,7 @@ import json
 from structlog import get_logger
 
 from core.services.campaign_mapping import campaign_mapping_service
-from core.models.optimization import AgeOptimizationResponse, CampaignRecommendation
+from core.models.optimization import OptimizationResponse, CampaignRecommendation
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.age import GoogleAgeAdapter
 from services.openai_client import chat_completion
@@ -101,7 +101,7 @@ class AgeOptimizationAgent:
         if content.startswith("```"):
             content = "\n".join(content.splitlines()[1:-1]).strip()
 
-        parsed = AgeOptimizationResponse.model_validate_json(content)
+        parsed = OptimizationResponse.model_validate_json(content)
         return list(parsed.recommendations)
 
 

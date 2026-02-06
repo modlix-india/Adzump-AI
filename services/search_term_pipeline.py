@@ -10,6 +10,7 @@ from services.openai_client import chat_completion
 from oserver.services.connection import fetch_google_api_token_simple
 from services.json_utils import safe_json_parse
 import utils.date_utils as date_utils
+from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
 
@@ -43,7 +44,7 @@ class SearchTermPipeline:
         self.access_token = access_token
 
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self.google_ads_access_token = fetch_google_api_token_simple(
+        self.google_ads_access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(
             client_code=client_code
         )
 
@@ -244,7 +245,7 @@ class SearchTermPipeline:
                         "conversions": metrics.get("conversions", 0),
                         "costMicros": cost_micros,
                         "averageCpc": metrics.get("averageCpc", 0),
-                        "cost": cost_micros / 1_000_000,
+                        "cost": micros_to_rupees(cost_micros),
                         "costPerConversion": metrics.get("costPerConversion", 0),
                     },
                 }

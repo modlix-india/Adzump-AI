@@ -13,7 +13,6 @@ class GoogleAdsClient:
 
     def __init__(self) -> None:
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self._token_cache: dict[str, str] = {}
 
     async def get(self, endpoint: str, client_code: str) -> dict:
         """Authenticated GET request to Google Ads API."""
@@ -55,13 +54,8 @@ class GoogleAdsClient:
             raise GoogleAPIException(message=f"Failed to parse response: {e}")
 
     def _get_token(self, client_code: str) -> str:
-        """Get access token (cached per client_code)."""
-        if client_code in self._token_cache:
-            return self._token_cache[client_code]
-
-        token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
-        self._token_cache[client_code] = token
-        return token
+        """Get fresh access token for client."""
+        return os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
 
     def _headers(self, access_token: str, login_customer_id: str | None = None) -> dict:
         """Build common headers for Google Ads API requests."""
