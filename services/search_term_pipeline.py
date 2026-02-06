@@ -1,3 +1,4 @@
+# TODO: Remove after trust in new search term optimization service (core/services/search_term_analyzer.py)
 import os
 import json
 import asyncio

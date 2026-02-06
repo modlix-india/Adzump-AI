@@ -1,3 +1,4 @@
+# TODO: Remove after trust in new prompts (prompts/optimization/search_term/)
 # === BRAND_RELEVANCY ===
 SYSTEM_PROMPT:
 You are a precise real-estate brand and project identification expert.

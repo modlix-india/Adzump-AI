@@ -138,6 +138,7 @@ async def generate_campaign(
         )
 
 
+# TODO: Remove after trust in new search term optimization service (api/optimization.py)
 @router.post("/search_term")
 async def analyze_search_terms_route(
     access_token: str = Header(..., alias="accessToken"),

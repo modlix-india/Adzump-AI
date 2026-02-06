@@ -1,3 +1,4 @@
+# TODO: Remove after trust in new prompts (prompts/optimization/search_term/)
 # === LOCATION_RELEVANCY ===
 SYSTEM_PROMPT:
 You are a real estate intent evaluator. Your task is to determine LOCATION relevancy between a SEARCH TERM and a PROJECT SUMMARY.

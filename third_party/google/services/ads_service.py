@@ -1,3 +1,4 @@
+# TODO: Remove after trust in new search term optimization service (adapters/google/optimization/search_term.py)
 import os
 import httpx
 from structlog import get_logger  # type: ignore
