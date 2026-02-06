@@ -30,7 +30,7 @@ class EnhancedSeedExpander:
                 good_keyword_count=len(good_keywords),
             )
 
-            # 1. Start LLM and Original Autocomplete tasks concurrently
+            # Start LLM and Original Autocomplete tasks concurrently
             original_seeds = [kw.keyword for kw in good_keywords]
 
             # Fire LLM generation
@@ -59,7 +59,7 @@ class EnhancedSeedExpander:
                 )
                 auto_original_results = []
 
-            # 2. Identify and expand ONLY the NEW seeds from LLM using the utility
+            # Identify and expand ONLY the NEW seeds from LLM using the utility
             seen_seeds = {s.lower().strip() for s in original_seeds if s.strip()}
             llm_seeds_list = llm_seeds if isinstance(llm_seeds, list) else []
             new_llm_seeds = self._deduplicate_seeds(llm_seeds_list, seen=seen_seeds)
@@ -73,7 +73,7 @@ class EnhancedSeedExpander:
                 except Exception as e:
                     logger.warning("AI seeds autocomplete failed", error=str(e))
 
-            # 3. Final Merge: Original + AI Seeds + All Autocomplete Results
+            # Final Merge: Original + AI Seeds + All Autocomplete Results
             all_seeds = list(original_seeds)
             if isinstance(llm_seeds, list):
                 all_seeds.extend(llm_seeds)
