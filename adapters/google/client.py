@@ -1,10 +1,7 @@
 import os
-from structlog import get_logger
 from oserver.services.connection import fetch_google_api_token_simple
 from core.infrastructure.http_client import get_http_client
 from exceptions.custom_exceptions import GoogleAPIException
-
-logger = get_logger(__name__)
 
 
 class GoogleAdsClient:
@@ -16,7 +13,7 @@ class GoogleAdsClient:
 
     async def get(self, endpoint: str, client_code: str) -> dict:
         """Authenticated GET request to Google Ads API."""
-        token = self._get_token(client_code)
+        token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
         headers = self._headers(token)
         url = f"{self.BASE_URL}/{self.API_VERSION}/{endpoint}"
 
@@ -35,7 +32,7 @@ class GoogleAdsClient:
         self, query: str, customer_id: str, login_customer_id: str, client_code: str
     ) -> list:
         """Execute GAQL query via searchStream."""
-        token = self._get_token(client_code)
+        token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
         headers = self._headers(token, login_customer_id)
         url = f"{self.BASE_URL}/{self.API_VERSION}/customers/{customer_id}/googleAds:searchStream"
 
@@ -52,10 +49,6 @@ class GoogleAdsClient:
             return self._parse_stream(response.json())
         except Exception as e:
             raise GoogleAPIException(message=f"Failed to parse response: {e}")
-
-    def _get_token(self, client_code: str) -> str:
-        """Get fresh access token for client."""
-        return os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
 
     def _headers(self, access_token: str, login_customer_id: str | None = None) -> dict:
         """Build common headers for Google Ads API requests."""

@@ -23,7 +23,7 @@ class KeywordRecommendation(BaseModel):
     match_type: str
     recommendation: Literal["ADD"] = "ADD"
     reason: str
-    source: Literal["SEARCH_TERM"] = "SEARCH_TERM"
+    origin: Literal["SEARCH_TERM"] = "SEARCH_TERM"
     metrics: dict
     analysis: SearchTermAnalysis
 

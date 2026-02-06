@@ -11,6 +11,7 @@ from core.models.optimization import (
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.search_term import GoogleSearchTermAdapter
 from core.services.search_term_analyzer import SearchTermAnalyzer
+from core.services.recommendation_storage import recommendation_storage_service
 
 logger = get_logger(__name__)
 
@@ -33,6 +34,10 @@ class SearchTermOptimizationAgent:
             self._process_account(acc, campaign_mapping) for acc in accounts
         ])
         all_recs = [r for recs in results for r in recs]
+
+        for rec in all_recs:
+            await recommendation_storage_service.store(rec, client_code)
+
         return {"recommendations": [r.model_dump() for r in all_recs]}
 
     async def _process_account(self, account: dict, campaign_mapping: dict) -> list[CampaignRecommendation]:
