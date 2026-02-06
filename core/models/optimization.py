@@ -14,6 +14,7 @@ class SearchTermAnalysis(BaseModel):
     brand: dict
     configuration: dict
     location: dict
+    performance: dict
     strength: Literal["LOW", "MEDIUM", "STRONG"]
 
 

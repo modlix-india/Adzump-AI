@@ -6,6 +6,7 @@ from structlog import get_logger
 from services.openai_client import chat_completion
 from services.json_utils import safe_json_parse
 from utils.prompt_loader import load_prompt
+from agents.optimization.config import SEARCH_TERM_COST_PER_CONVERSION_THRESHOLD
 
 logger = get_logger(__name__)
 
@@ -61,18 +62,25 @@ class SearchTermAnalyzer:
         overall = overall_result.get("overall", {})
         suggestion_type = str(overall.get("suggestion_type", "negative"))
         match_level = str(overall.get("match_level", "No Match"))
+        reason = str(overall.get("reason", ""))
+
+        performance_result = self._check_performance(metrics)
+        if not performance_result.get("match"):
+            suggestion_type = "negative"
+            reason = f"{performance_result.get('reason', '')} {reason}"
 
         return {
             "text": search_term,
             "recommendation": "ADD",
-            "recommendation_type": "positive" if suggestion_type == "positive" else "negative",
-            "reason": str(overall.get("reason", "")),
+            "recommendation_type": suggestion_type,
+            "reason": reason,
             "source": "SEARCH_TERM",
             "metrics": metrics,
             "analysis": {
                 "brand": brand_result.get("brand", {}),
                 "configuration": config_result.get("configuration", {}),
                 "location": location_result.get("location", {}),
+                "performance": performance_result,
                 "strength": MATCH_LEVEL_TO_STRENGTH.get(match_level, "LOW"),
             },
         }
@@ -97,6 +105,26 @@ class SearchTermAnalyzer:
                 }
             }
         return await self._check_relevancy(summary, search_term, "location")
+
+    # TODO: Use variable threshold based on product price and margin ratio
+    def _check_performance(self, metrics: dict) -> dict:
+        cost_per_conversion = metrics.get("cost_per_conversion", 0)
+        threshold = SEARCH_TERM_COST_PER_CONVERSION_THRESHOLD
+        if not cost_per_conversion or cost_per_conversion <= threshold:
+            return {
+                "match": True,
+                "match_level": "Good",
+                "cost_per_conversion": cost_per_conversion,
+                "threshold": threshold,
+                "reason": f"Cost per conversion ({cost_per_conversion}) is within threshold ({threshold}).",
+            }
+        return {
+            "match": False,
+            "match_level": "Poor",
+            "cost_per_conversion": cost_per_conversion,
+            "threshold": threshold,
+            "reason": f"High cost per conversion ({cost_per_conversion}) exceeds threshold ({threshold}).",
+        }
 
     async def _check_overall(
         self,
