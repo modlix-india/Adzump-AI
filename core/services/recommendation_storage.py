@@ -31,9 +31,11 @@ class RecommendationStorageService:
 
         doc = self._build_recommendation(recommendation, base_fields)
         await self._create(doc)
+        logger.info("recommendation_created", campaign_id=campaign_id)
 
         if existing:
             await self._mark_completed(existing["_id"])
+            logger.info("recommendation_previous_completed", campaign_id=campaign_id, record_id=existing["_id"])
 
         return {"fields": doc["fields"]}
 
