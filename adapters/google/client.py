@@ -1,9 +1,12 @@
 import os
 
 import httpx
+import structlog
 
 from oserver.services.connection import fetch_google_api_token_simple
 from core.infrastructure.http_client import http_request
+
+logger = structlog.get_logger(__name__)
 from exceptions.custom_exceptions import (
     GoogleAPIException,
     GoogleAdsAuthException,
@@ -54,11 +57,14 @@ class GoogleAdsClient:
             headers["login-customer-id"] = login_customer_id
         return headers
 
-    def _parse_stream(self, response_json: list) -> list:
-        results = []
-        for chunk in response_json:
-            results.extend(chunk.get("results", []))
-        return results
+    def _parse_stream(self, response_json) -> list:
+        if isinstance(response_json, list):
+            results = []
+            for batch in response_json:
+                results.extend(batch.get("results", []))
+            return results
+        logger.warning("SearchStream returned non-list response")
+        return response_json.get("results", [])
 
 
 def _handle_google_error(response: httpx.Response) -> None:
