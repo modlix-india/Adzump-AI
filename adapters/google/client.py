@@ -37,6 +37,8 @@ class GoogleAdsClient:
         url = f"{self.BASE_URL}/{self.API_VERSION}/customers/{customer_id}/googleAds:searchStream"
 
         http = get_http_client()
+        # TODO: Use httpx stream reading (client.stream + aiter_lines) to process
+        # SearchStream batches as they arrive instead of buffering the full response.
         response = await http.post(url, headers=headers, json={"query": query})
 
         if response.status_code != 200:

@@ -3,23 +3,11 @@ from typing import Any, Optional
 import httpx
 import structlog
 
+from core.infrastructure.http_client import get_http_client
+
 META_BASE_URL = "https://graph.facebook.com/v22.0"
-META_HTTP_TIMEOUT = 30
 
 logger = structlog.get_logger()
-
-# Module-level client - reused across all requests for connection pooling
-_http_client: Optional[httpx.AsyncClient] = None
-
-
-def _get_http_client() -> httpx.AsyncClient:
-    global _http_client
-    if _http_client is None:
-        _http_client = httpx.AsyncClient(
-            base_url=META_BASE_URL,
-            timeout=META_HTTP_TIMEOUT,
-        )
-    return _http_client
 
 
 class MetaClient:
@@ -38,9 +26,10 @@ class MetaClient:
         json: Optional[dict[str, Any]] = None,
         params: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        client = _get_http_client()
+        client = get_http_client()
+        url = f"{META_BASE_URL}{endpoint}"
         response = await client.post(
-            endpoint, json=json, params=params, headers=self._headers()
+            url, json=json, params=params, headers=self._headers()
         )
         return self._handle_response(response)
 
@@ -49,8 +38,9 @@ class MetaClient:
         endpoint: str,
         params: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        client = _get_http_client()
-        response = await client.get(endpoint, params=params, headers=self._headers())
+        client = get_http_client()
+        url = f"{META_BASE_URL}{endpoint}"
+        response = await client.get(url, params=params, headers=self._headers())
         return self._handle_response(response)
 
     def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
