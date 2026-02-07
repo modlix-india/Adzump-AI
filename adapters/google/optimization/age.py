@@ -1,7 +1,8 @@
 from structlog import get_logger
 from core.infrastructure.context import auth_context
 from adapters.google.client import GoogleAdsClient
-from utils import google_dateutils as date_utils
+from utils.date_utils import format_duration_clause
+from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
 
@@ -53,7 +54,7 @@ class GoogleAgeAdapter:
             impressions = float(metrics.get("impressions", 0))
             conversions = float(metrics.get("conversions", 0))
 
-            cost = cost_micros / 1_000_000
+            cost = micros_to_rupees(cost_micros)
 
             entry["calculated_metrics"] = {
                 "cost": round(cost, 2),

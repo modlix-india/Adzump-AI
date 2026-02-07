@@ -10,9 +10,28 @@ class AgeFieldRecommendation(BaseModel):
     reason: str
 
 
+class SearchTermAnalysis(BaseModel):
+    brand: dict
+    configuration: dict
+    location: dict
+    performance: dict
+    strength: Literal["LOW", "MEDIUM", "STRONG"]
+
+
+class KeywordRecommendation(BaseModel):
+    text: str
+    match_type: str
+    recommendation: Literal["ADD"] = "ADD"
+    reason: str
+    origin: Literal["SEARCH_TERM"] = "SEARCH_TERM"
+    metrics: dict
+    analysis: SearchTermAnalysis
+
+
 class OptimizationFields(BaseModel):
     age: Optional[List[AgeFieldRecommendation]] = None
-    # Future: gender, device, location, etc.
+    keywords: Optional[List[KeywordRecommendation]] = None
+    negativeKeywords: Optional[List[KeywordRecommendation]] = None
 
 
 class CampaignRecommendation(BaseModel):
@@ -27,5 +46,5 @@ class CampaignRecommendation(BaseModel):
     fields: OptimizationFields
 
 
-class AgeOptimizationResponse(BaseModel):
+class OptimizationResponse(BaseModel):
     recommendations: List[CampaignRecommendation]

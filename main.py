@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+
 from fastapi import FastAPI
 from sqlalchemy import text
 
@@ -22,16 +24,13 @@ from db import db_session
 from config.logging_config import setup_logging
 from structlog import get_logger  # type: ignore
 
-from dotenv import load_dotenv
-
-load_dotenv()
+load_dotenv()  # Load env vars before other imports
 
 # Setup structlog for JSON structured logging
 setup_logging()
 
 # Get structlog logger
 logger = get_logger(__name__)
-
 
 # TODO: clean up this code later
 @asynccontextmanager
@@ -79,7 +78,6 @@ app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
 # Auth context middleware - extracts access-token and clientCode headers into request context.
 # Headers are optional here; endpoints requiring auth should validate via their own logic.
 app.add_middleware(AuthContextMiddleware)
-
 
 @app.get("/health")
 async def health_check():
