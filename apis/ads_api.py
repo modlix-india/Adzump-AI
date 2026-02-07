@@ -2,16 +2,16 @@ from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Header, status, Body, Query
 from services.search_term_service import process_search_terms
 from services.google_keywords_service import GoogleKeywordService
-from services.ads_service import generate_ad_assets
 from services.budget_recommendation_service import generate_budget_recommendations
 from services.create_campaign_service import CampaignServiceError
 from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service, chat_service
+
 # TODO: Remove age optimization import - replaced by api/optimization.py
 from services.age_optimization_service import generate_age_optimizations
-
+from services.ads_service import AdAssetsGenerator
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -22,7 +22,8 @@ async def create_ad_assets(
     summary: str = Body(...), positive_keywords: List[Dict[str, Any]] = Body(...)
 ):
     try:
-        result = await generate_ad_assets(summary, positive_keywords)
+        generator = AdAssetsGenerator()
+        result = await generator.generate(summary, positive_keywords)
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
         result = {

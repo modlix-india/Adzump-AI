@@ -1,11 +1,9 @@
 from contextlib import asynccontextmanager
-
 from dotenv import load_dotenv
-load_dotenv()  # Load env vars before other imports
 
+load_dotenv()
 from fastapi import FastAPI
 from sqlalchemy import text
-
 from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
@@ -17,13 +15,13 @@ from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
 from core.infrastructure.middleware import AuthContextMiddleware
 from core.infrastructure.http_client import init_http_client, close_http_client
-
 from api.meta import router as meta_ads_router
 from api.optimization import router as optimization_router
-
 from db import db_session
 from config.logging_config import setup_logging
 from structlog import get_logger  # type: ignore
+
+# Load env vars before other imports
 
 
 # Setup structlog for JSON structured logging
@@ -31,6 +29,7 @@ setup_logging()
 
 # Get structlog logger
 logger = get_logger(__name__)
+
 
 # TODO: clean up this code later
 @asynccontextmanager
@@ -79,6 +78,7 @@ app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
 # Headers are optional here; endpoints requiring auth should validate via their own logic.
 app.add_middleware(AuthContextMiddleware)
 
+
 @app.get("/health")
 async def health_check():
     logger.info("Health check requested", endpoint="/health")
@@ -92,9 +92,7 @@ app.include_router(business_router)
 app.include_router(maps_router)
 app.include_router(performance_router)
 app.include_router(budget_router)
-
 app.include_router(feedback_router)
-
 app.include_router(meta_ads_router)
 app.include_router(optimization_router)
 
