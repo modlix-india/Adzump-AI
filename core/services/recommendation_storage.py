@@ -49,7 +49,7 @@ class RecommendationStorageService:
             filter=ComplexCondition(
                 operator="AND",
                 conditions=[
-                    FilterCondition(field="campaignId", value=campaign_id),
+                    FilterCondition(field="campaign_id", value=campaign_id),
                     FilterCondition(field="completed", operator="IS_FALSE"),
                 ],
             ),
@@ -63,14 +63,15 @@ class RecommendationStorageService:
     ) -> dict:
         fields = self._merge_fields(rec, base_fields)
         return {
-            "updatedAt": datetime.now(timezone.utc).isoformat(),
-            "campaignId": rec.campaign_id,
-            "customerId": rec.account_id,
-            "campaignName": rec.campaign_name,
-            "productId": rec.product_id,
-            "completed": False,
-            "campaignType": rec.campaign_type,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "platform": rec.platform,
+            "parent_account_id": rec.parent_account_id,
+            "account_id": rec.account_id,
+            "product_id": rec.product_id,
+            "campaign_id": rec.campaign_id,
+            "campaign_name": rec.campaign_name,
+            "campaign_type": rec.campaign_type,
+            "completed": False,
             "fields": fields,
         }
 
