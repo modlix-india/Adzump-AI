@@ -14,7 +14,7 @@ from services.openai_client import chat_completion
 from utils import google_dateutils as date_utils
 from oserver.services.connection import fetch_google_api_token_simple
 from services.json_utils import safe_json_parse
-import utils.date_utils as date_utils
+from utils.google_dateutils import format_date_range
 from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
@@ -183,7 +183,7 @@ class SearchTermPipeline:
             "Content-Type": "application/json",
         }
 
-        duration_clause = date_utils.format_duration_clause(self.duration)
+        duration_clause = format_date_range(self.duration)
 
         query = f"""
         SELECT

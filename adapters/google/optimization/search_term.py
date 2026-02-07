@@ -1,7 +1,7 @@
 from structlog import get_logger
 from core.infrastructure.context import auth_context
 from adapters.google.client import GoogleAdsClient
-from utils.date_utils import format_duration_clause
+from utils.google_dateutils import format_date_range
 from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
@@ -34,7 +34,7 @@ class GoogleSearchTermAdapter:
             "metrics": {"impressions", "clicks", "conversions", "cost",
                 "ctr", "average_cpc", "cost_per_conversion"}}]
         """
-        duration_clause = format_duration_clause(self.DEFAULT_DURATION)
+        duration_clause = format_date_range(self.DEFAULT_DURATION)
 
         query = f"""
         SELECT
@@ -55,7 +55,7 @@ class GoogleSearchTermAdapter:
             metrics.cost_per_conversion
         FROM search_term_view
         WHERE
-            segments.date {duration_clause}
+            {duration_clause}
             AND search_term_view.status IN ('NONE')
             AND ad_group.status = 'ENABLED'
             AND campaign.status = 'ENABLED'
