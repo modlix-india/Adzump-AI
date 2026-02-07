@@ -8,7 +8,7 @@ from pathlib import Path
 def setup_logging():
 
     log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_file = os.getenv("LOG_FILE", "logs/ds-service.log")
+    log_file = os.getenv("LOG_FILE", "/logs/ds-service.log")
     environment = os.getenv("ENVIRONMENT", "dev")
 
     # Ensure log directory exists
