@@ -86,3 +86,7 @@ def join_url(base, path):
     if not path:
         return ""
     return f"{base.rstrip('/')}/{path.lstrip('/')}" if base and path else path
+
+
+def micros_to_rupees(micros) -> float:
+    return round(float(micros) / 1_000_000, 2)

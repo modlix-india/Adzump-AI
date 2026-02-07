@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Header, status, Body, Query
 from services.google_kw_update_service.google_keywords_update_service import (
     GoogleAdsKeywordUpdateService,
 )
-from services.search_term_pipeline import SearchTermPipeline
+from services.search_term_service import process_search_terms
 from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
 from services.budget_recommendation_service import generate_budget_recommendations
@@ -146,6 +146,7 @@ async def generate_campaign(
         )
 
 
+# TODO: Remove after trust in new search term optimization service (api/optimization.py)
 @router.post("/search_term")
 async def analyze_search_terms_route(
     access_token: str = Header(..., alias="accessToken"),
@@ -156,7 +157,7 @@ async def analyze_search_terms_route(
     duration: str = Query(...),
 ):
     try:
-        pipeline = SearchTermPipeline(
+        results = await process_search_terms(
             client_code=client_code,
             customer_id=customer_id,
             login_customer_id=login_customer_id,
@@ -164,8 +165,6 @@ async def analyze_search_terms_route(
             duration=duration,
             access_token=access_token,
         )
-
-        results = await pipeline.run_pipeline()
 
         return {"status": "success", "data": results}
 

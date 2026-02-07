@@ -1,29 +1,31 @@
+# TODO: Remove after trust in new search term optimization service (core/services/search_term_analyzer.py)
 import os
 import json
+import asyncio
+import httpx
 from structlog import get_logger  # type: ignore
-import requests
+
 from third_party.google.services import ads_service, keywords_service
 from services.search_term_analyzer import analyze_search_term_performance
 from services.openai_client import chat_completion
-from utils import google_dateutils as date_utils
+
 from oserver.services.connection import fetch_google_api_token_simple
-import asyncio
+from services.json_utils import safe_json_parse
+from utils import google_dateutils as date_utils
+from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
 
 
+# Prompt loader
 def load_search_term_prompt(file_name: str) -> str:
-    """
-    Loads search-term-specific prompts from:
-    prompts/search_term/{file_name}
-    """
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prompt_path = os.path.join(root_dir, "prompts", "search_term", file_name)
-
     with open(prompt_path, "r", encoding="utf-8") as f:
         return f.read()
 
 
+# Pipeline
 class SearchTermPipeline:
     """Pipeline to evaluate brand, configuration, and overall search term relevancy."""
 
@@ -44,111 +46,113 @@ class SearchTermPipeline:
         self.campaign_id = campaign_id
         self.duration = duration.strip()
         self.access_token = access_token
+
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self.google_ads_access_token = fetch_google_api_token_simple(
-            client_code=client_code
-        )
+        self.google_ads_access_token = os.getenv(
+            "GOOGLE_ADS_ACCESS_TOKEN"
+        ) or fetch_google_api_token_simple(client_code=client_code)
 
-    # Internal helper for LLM call
-
-    async def _call_llm(self, system_msg: str, user_msg: str, label: str):
-        """Send structured prompts to the OpenAI chat model and handle errors."""
+    # LLM Caller (no silent failures)
+    async def _call_llm(self, system_msg: str, user_msg: str, label: str) -> dict:
         try:
             messages = [
                 {"role": "system", "content": system_msg},
                 {"role": "user", "content": user_msg},
             ]
+
             response = await chat_completion(messages, model=self.OPENAI_MODEL)
             content = (
                 response.choices[0].message.content.strip() if response.choices else ""
             )
 
-            logger.info(f"[LLM] {label} relevance check completed.")
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError:
-                logger.warning(
-                    f"[LLM] {label} returned non-JSON response: {content[:200]}..."
-                )
-                return {"raw_response": content}
+            parsed = safe_json_parse(content)
+
+            if not parsed:
+                logger.error("LLM JSON parsing failed", label=label)
+                return {}
+
+            return parsed
 
         except Exception as e:
-            logger.error(f"[LLM] {label} relevance check failed: {e}")
-            return {"error": str(e)}
+            logger.exception("LLM call failed", label=label, error=str(e))
+            return {}
 
-    # Configuration Relevance
+    # Normalizers (schema enforcement)
+    @staticmethod
+    def normalize_brand(resp: dict) -> dict:
+        if isinstance(resp, dict) and "brand" in resp:
+            return resp
+
+        return {
+            "brand": {
+                "match": False,
+                "type": "generic",
+                "competitor_detected": False,
+                "match_level": "No Match",
+                "reason": "Invalid or malformed LLM response.",
+            }
+        }
+
+    @staticmethod
+    def normalize_configuration(resp: dict) -> dict:
+        if isinstance(resp, dict) and "configuration" in resp:
+            return resp
+
+        return {
+            "configuration": {
+                "match": False,
+                "match_level": "No Match",
+                "reason": "Invalid or malformed LLM response.",
+            }
+        }
+
+    @staticmethod
+    def normalize_location(resp: dict) -> dict:
+        if isinstance(resp, dict) and "location" in resp:
+            return resp
+
+        return {
+            "location": {
+                "match": False,
+                "match_level": "No Match",
+                "reason": "Invalid or malformed LLM response.",
+            }
+        }
+
+    # Relevance checks
+    async def check_brand_relevance(self, summary: str, search_term: str) -> dict:
+        system_msg = load_search_term_prompt("brand_relevancy_prompt.txt")
+        user_msg = f"PROJECT SUMMARY:{summary}\nSEARCH TERM:{search_term}"
+        return self.normalize_brand(await self._call_llm(system_msg, user_msg, "brand"))
+
     async def check_configuration_relevance(
         self, summary: str, search_term: str
     ) -> dict:
-        """Check if search term refers to configurations (1BHK, villa, etc.)."""
         system_msg = load_search_term_prompt("configuration_relevancy_prompt.txt")
+        user_msg = f"PROJECT SUMMARY:{summary}\nSEARCH TERM:{search_term}"
+        return self.normalize_configuration(
+            await self._call_llm(system_msg, user_msg, "configuration")
+        )
 
-        user_msg = f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
-        return await self._call_llm(system_msg, user_msg, "configuration")
-
-    # Brand Relevance
-    async def check_brand_relevance(self, summary: str, search_term: str) -> dict:
-        """Check if search term refers to brand, competitor, or generic."""
-        system_msg = load_search_term_prompt("brand_relevancy_prompt.txt")
-        user_msg = f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
-        return await self._call_llm(system_msg, user_msg, "brand")
-
-    # Location Relevance
     async def check_location_relevance(
-        self, summary: str, search_term: str, brand_type: dict
-    ):
-        """
-        Evaluates the location relevancy for a search term based on brand type.
-
-        - If brand.type == 'competitor': skips LLM call and returns 'skipped_due_to_competitor'.
-        - If brand.type in ['own_brand', 'generic']: calls LLM to evaluate location relevancy.
-        - If brand.type missing or invalid: returns 'no_brand_context'.
-        """
-
-        # Competitor case — skip LLM
+        self, summary: str, search_term: str, brand_type: str
+    ) -> dict:
         if brand_type == "competitor":
             return {
                 "location": {
                     "match": False,
                     "type": "skipped_due_to_competitor",
-                    "score": 0.0,
                     "match_level": "No Match",
-                    "reason": "Search term contains a competitor brand, so location relevancy check was skipped.",
+                    "reason": "Search term contains a competitor brand.",
                 }
             }
 
-        # Own brand or generic — perform LLM call
-        if brand_type in ("own_brand", "generic"):
-            system_msg = load_search_term_prompt("location_relevancy_prompt.txt")
-            user_msg = f"PROJECT SUMMARY:\n{summary}\n\nSEARCH TERM:\n{search_term}"
+        system_msg = load_search_term_prompt("location_relevancy_prompt.txt")
+        user_msg = f"PROJECT SUMMARY:{summary}\nSEARCH TERM:{search_term}"
 
-            try:
-                llm_response = await self._call_llm(system_msg, user_msg, "location")
-                return llm_response
-            except Exception as e:
-                return {
-                    "location": {
-                        "match": False,
-                        "type": "llm_error",
-                        "score": 0.0,
-                        "match_level": "No Match",
-                        "reason": f"Error during LLM evaluation: {str(e)}",
-                    }
-                }
-
-        # Unknown brand context — skip
-        return {
-            "location": {
-                "match": False,
-                "type": "no_brand_context",
-                "score": 0.0,
-                "match_level": "No Match",
-                "reason": (
-                    "Brand type was not identified (missing or invalid), "
-                    "so location relevance check was skipped."
-                ),
-            }
-        }
+        return self.normalize_location(
+            await self._call_llm(system_msg, user_msg, "location")
+        )
 
     # Overall Relevance
     async def check_overall_relevance(
@@ -163,24 +167,20 @@ class SearchTermPipeline:
         Ensures consistent output structure: overallPerformance -> overall"""
         system_msg = load_search_term_prompt("overall_relevancy_prompt.txt")
         user_msg = (
-            f"PROJECT SUMMARY:\n{summary}\n\n"
-            f"SEARCH TERM:\n{search_term}\n\n"
-            f"BRAND RELEVANCE RESULT:\n{json.dumps(brand_result, indent=2)}\n\n"
-            f"CONFIGURATION RELEVANCE RESULT:\n{json.dumps(config_result, indent=2)}"
-            f"LOCATION RELEVANCE RESULT:\n{json.dumps(location_result, indent=2)}"
+            f"PROJECT SUMMARY:{summary}\n"
+            f"SEARCH TERM:{search_term}\n"
+            f"BRAND:{json.dumps(brand_result)}\n"
+            f"CONFIG:{json.dumps(config_result)}\n"
+            f"LOCATION:{json.dumps(location_result)}"
         )
         return await self._call_llm(system_msg, user_msg, "overall")
 
-    # Google Ads Search Term Fetch
-    def fetch_search_terms(self, keywords: list) -> list:
-        """Fetch all search terms for multiple keywords in one API call."""
-        logger.info("Fetching search terms...")
-
-        if not keywords:
-            logger.warning("No keywords provided.")
-            return []
-
-        endpoint = f"https://googleads.googleapis.com/v20/customers/{self.customer_id}/googleAds:search"
+    # Fetch search terms
+    async def fetch_search_terms(
+        self, customer_id: str = None, keywords: list = None
+    ) -> list:
+        target_customer_id = customer_id or self.customer_id
+        endpoint = f"https://googleads.googleapis.com/v20/customers/{target_customer_id}/googleAds:search"
         headers = {
             "Authorization": f"Bearer {self.google_ads_access_token}",
             "developer-token": self.developer_token,
@@ -188,14 +188,19 @@ class SearchTermPipeline:
             "Content-Type": "application/json",
         }
 
-        try:
-            # Use the new date_utils for consistent GAQL date filtering
-            duration_clause = (
-                date_utils.format_date_range(self.duration)
-                or "segments.date DURING LAST_30_DAYS"
-            )
+        # Use the new date_utils for consistent GAQL date filtering
+        duration_clause = (
+            date_utils.format_date_range(self.duration)
+            or "segments.date DURING LAST_30_DAYS"
+        )
+
+        query = ""
+
+        if keywords:
             keyword_texts = [kw.keyword for kw in keywords if kw.keyword]
-            keyword_list = "', '".join(keyword_texts)
+            # Escape single quotes in keywords to prevent GAQL injection/errors
+            escaped_keywords = [k.replace("'", "\\'") for k in keyword_texts]
+            keyword_list = "', '".join(escaped_keywords)
             in_clause = f"('{keyword_list}')"
 
             query = f"""
@@ -221,65 +226,85 @@ class SearchTermPipeline:
                 AND campaign.status = 'ENABLED'
             ORDER BY ad_group.id
             """
+        else:
+            query = f"""
+            SELECT
+                ad_group.id,
+                search_term_view.search_term,
+                search_term_view.status,
+                segments.search_term_match_type,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.ctr,
+                metrics.average_cpc,
+                metrics.cost_micros,
+                metrics.conversions,
+                metrics.cost_per_conversion
+            FROM search_term_view
+            WHERE
+                campaign.id = {self.campaign_id}
+                AND {duration_clause}
+                AND search_term_view.status IN ('NONE')
+                AND ad_group.status = 'ENABLED'
+                AND campaign.status = 'ENABLED'
+            """
 
-            response = requests.post(endpoint, headers=headers, json={"query": query})
-            data = response.json()
-
-            if "error" in data:
-                err_msg = data["error"].get("message", "Unknown GAQL error")
-                logger.error(f"Google Ads API error: {err_msg}")
-                return []
-
-            search_terms = []
-            for row in data.get("results", []):
-                metrics = row.get("metrics", {})
-                search_view = row.get("searchTermView", {})
-                segments = row.get("segments", {})
-                ad_group = row.get("adGroup", {})
-
-                term = search_view.get("searchTerm")
-                keyword_text = segments.get("keyword", {}).get("info", {}).get("text")
-                match_type = segments.get("searchTermMatchType")
-
-                if not term or not keyword_text:
-                    continue
-
-                search_terms.append(
-                    {
-                        "searchterm": term,
-                        "status": search_view.get("status"),
-                        "keyword": keyword_text,
-                        "matchType": match_type,
-                        "adGroupId": ad_group.get("resourceName"),
-                        "metrics": {
-                            "impressions": metrics.get("impressions", 0) or 0,
-                            "clicks": metrics.get("clicks", 0) or 0,
-                            "ctr": metrics.get("ctr", 0) or 0,
-                            "conversions": metrics.get("conversions", 0) or 0,
-                            "costMicros": int(metrics.get("costMicros", 0) or 0),
-                            "averageCpc": metrics.get("averageCpc", 0) or 0,
-                            "cost": (int(metrics.get("costMicros", 0) or 0))
-                            / 1_000_000,
-                            "costPerConversion": metrics.get("costPerConversion", 0)
-                            or 0,
-                        },
-                    }
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    endpoint, headers=headers, json={"query": query}
                 )
-
-            return search_terms
-
+                data = response.json()
         except Exception as e:
-            logger.exception(f"Error fetching search terms: {e}")
+            logger.error("Failed to fetch search terms", error=str(e))
             return []
 
-    # Full Pipeline
-    import asyncio  # <--- needed for concurrency
+        logger.info("[SearchTermService] Search terms response", response=data)
 
+        if "error" in data:
+            logger.error("Google Ads API error", error=data["error"])
+            return []
+
+        results = []
+        for row in data.get("results", []):
+            metrics = row.get("metrics", {})
+            search_view = row.get("searchTermView", {})
+            segments = row.get("segments", {})
+            ad_group = row.get("adGroup", {})
+
+            term = search_view.get("searchTerm")
+            if not term:
+                continue
+
+            cost_micros = int(metrics.get("costMicros", 0) or 0)
+
+            # Get keyword text if available (from specialized query)
+            keyword_text = segments.get("keyword", {}).get("info", {}).get("text")
+
+            results.append(
+                {
+                    "searchterm": term,
+                    "status": search_view.get("status"),
+                    "keyword": keyword_text,  # May be None if using standard query
+                    "matchType": segments.get("searchTermMatchType"),
+                    "adGroupId": ad_group.get("resourceName"),
+                    "metrics": {
+                        "impressions": metrics.get("impressions", 0),
+                        "clicks": metrics.get("clicks", 0),
+                        "ctr": metrics.get("ctr", 0),
+                        "conversions": metrics.get("conversions", 0),
+                        "costMicros": cost_micros,
+                        "averageCpc": metrics.get("averageCpc", 0),
+                        "cost": micros_to_rupees(cost_micros),
+                        "costPerConversion": metrics.get("costPerConversion", 0),
+                    },
+                }
+            )
+
+        return results
+
+    #  Full pipeline
     async def run_pipeline(self) -> dict:
-        """Full flow: fetch ads, keywords, search terms → analyze + LLM relevance with concurrency."""
-        logger.info("Running full search term analysis pipeline...")
-
-        # Fetch ads summary
         ads_data = await ads_service.fetch_ads(
             client_code=self.client_code,
             customer_id=self.customer_id,
@@ -287,9 +312,21 @@ class SearchTermPipeline:
             campaign_id=self.campaign_id,
             access_token=self.access_token,
         )
-        summary = ads_data.get("summary") if isinstance(ads_data, dict) else ""
 
-        # Fetch keywords using the refactored service
+        summary = ""
+        campaign_name = ""
+        product_id = ""
+        customer_id = ""
+
+        if ads_data:
+            first = ads_data[0]
+            campaign_name = first.get("campaign_name", "")
+            product_id = first.get("product_id", "")
+            customer_id = first.get("customer_id", "")
+            summaries = first.get("summaries", [])
+            summary = summaries[0] if summaries else ""
+
+        # Fetch keywords using the refactored service (HEAD logic)
         keywords_response = await keywords_service.fetch_campaign_keywords(
             customer_id=self.customer_id,
             login_customer_id=self.login_customer_id,
@@ -298,66 +335,74 @@ class SearchTermPipeline:
             duration=self.duration,
         )
         keywords = keywords_response.keywords
+        # If no keywords found, we can still fetch standard search terms or return empty?
+        # HEAD logic returned empty. Incoming didn't check keywords.
+        # Let's pass keywords to fetch_search_terms.
+        # If keywords are empty list, fetch_search_terms (with my logic) will fallback to standard query?
+        # No, if keywords is not None but empty list, it might filter by empty list -> fail?
+        # Let's ensure if keywords is empty list, we fallback or handle gracefully.
 
         if not keywords:
-            logger.warning("No keywords found — skipping search term fetch.")
-            return {"classified_search_terms": []}
+            logger.warning("No keywords found — proceeding without keyword filtering.")
+            # We can decide to either return empty (as HEAD did) or fetch ALL terms (Incoming).
+            # Incoming fetched ALL terms. HEAD returned empty.
+            # Returning empty is safer to avoid unrelated terms if intention was keyword-specific.
+            # But let's follow HEAD specific logic: "No keywords found - skipping search term fetch."
+            return {
+                "classified_search_terms": [],
+                "campaignName": campaign_name,
+                "productId": product_id,
+                "customerId": customer_id,
+            }
 
-        # Fetch search terms
-        search_terms = self.fetch_search_terms(keywords)
+        search_terms = await self.fetch_search_terms(
+            customer_id=customer_id, keywords=keywords
+        )
+
         if not search_terms:
-            logger.warning("No search terms found — skipping classification.")
-            return {"classified_search_terms": []}
+            return {
+                "classified_search_terms": [],
+                "campaignName": campaign_name,
+                "productId": product_id,
+                "customerId": customer_id,
+            }
 
-        # Analyze metrics
         classified_terms = await analyze_search_term_performance(search_terms)
 
-        async def process_term(term_data):
-            search_term = term_data["term"]
+        async def process_term(term_data: dict):
+            search_term = term_data.get("term") or term_data.get("searchterm")
             performances = term_data.pop("performances", {})
 
-            if "classification" in term_data or "recommendation" in term_data:
-                performances["cpc"] = {
-                    "classification": term_data.pop("classification", None),
-                    "recommendation": term_data.pop("recommendation", None),
-                }
+            brand_eval = await self.check_brand_relevance(summary, search_term)
+            brand_type = brand_eval["brand"]["type"]
 
-            # Run LLM calls concurrently
-            config_task = self.check_configuration_relevance(summary, search_term)
-            brand_task = self.check_brand_relevance(summary, search_term)
-            # We need brand type for location, so wait for brand first
-            brand_eval = await brand_task
-            brand_type = brand_eval.get("brand", {}).get("type", None)
-
-            location_task = self.check_location_relevance(
-                summary, search_term, brand_type
-            )
-
-            # Wait for configuration + location concurrently
             config_eval, location_eval = await asyncio.gather(
-                config_task, location_task
+                self.check_configuration_relevance(summary, search_term),
+                self.check_location_relevance(summary, search_term, brand_type),
             )
 
-            brand_match = brand_eval.get("brand", {}).get("match", False)
-            config_match = config_eval.get("configuration", {}).get("match", False)
+            brand_match = brand_eval["brand"]["match"]
+            config_match = config_eval["configuration"]["match"]
 
-            # Overall classification
             if not brand_match and not config_match:
-                summary_eval = {
+                overall_eval = {
                     "overall": {
                         "match": False,
                         "match_level": "No Match",
                         "intent_stage": "Irrelevant",
                         "suggestion_type": "negative",
-                        "reason": "No brand, configuration, or location match found — search term is unrelated to the project.",
+                        "reason": "No brand, configuration, or location match.",
                     }
                 }
             else:
-                summary_eval = await self.check_overall_relevance(
-                    summary, search_term, brand_eval, config_eval, location_eval
+                overall_eval = await self.check_overall_relevance(
+                    summary,
+                    search_term,
+                    brand_eval,
+                    config_eval,
+                    location_eval,
                 )
 
-            # Merge all evaluations
             term_data["evaluations"] = {
                 "performances": performances,
                 "relevancyCheck": {
@@ -365,14 +410,18 @@ class SearchTermPipeline:
                     "configurationRelevancy": config_eval,
                     "locationRelevancy": location_eval,
                 },
-                "overallPerformance": summary_eval,
+                "overallPerformance": overall_eval,
             }
 
             return term_data
 
-        # Process all terms concurrently
         classified_terms = await asyncio.gather(
-            *(process_term(td) for td in classified_terms)
+            *(process_term(t) for t in classified_terms)
         )
-        logger.info("Search term pipeline completed successfully.")
-        return {"classified_search_terms": classified_terms}
+
+        return {
+            "classified_search_terms": classified_terms,
+            "campaignName": campaign_name,
+            "productId": product_id,
+            "customerId": customer_id,
+        }

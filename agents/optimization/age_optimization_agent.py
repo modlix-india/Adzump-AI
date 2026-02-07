@@ -1,10 +1,12 @@
+import asyncio
 import json
 from structlog import get_logger
 
 from core.services.campaign_mapping import campaign_mapping_service
-from core.models.optimization import AgeOptimizationResponse, CampaignRecommendation
+from core.models.optimization import OptimizationResponse, CampaignRecommendation
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.age import GoogleAgeAdapter
+from core.services.recommendation_storage import recommendation_storage_service
 from services.openai_client import chat_completion
 from utils.prompt_loader import load_prompt
 
@@ -27,13 +29,16 @@ class AgeOptimizationAgent:
 
         campaign_product_map = await campaign_mapping_service.get_campaign_product_mapping(client_code)
 
-        all_recommendations: list[CampaignRecommendation] = []
-        for account in accounts:
-            recommendations = await self._process_google_account(
-                account=account,
-                campaign_product_map=campaign_product_map,
-            )
-            all_recommendations.extend(recommendations)
+        results = await asyncio.gather(*[
+            self._process_google_account(account=acc, campaign_product_map=campaign_product_map)
+            for acc in accounts
+        ])
+        all_recommendations = [rec for recs in results for rec in recs]
+
+        await asyncio.gather(*[
+            recommendation_storage_service.store(rec, client_code)
+            for rec in all_recommendations
+        ])
 
         return {"recommendations": [r.model_dump() for r in all_recommendations]}
 
@@ -79,7 +84,7 @@ class AgeOptimizationAgent:
         """Send metrics to LLM for analysis and return parsed recommendations."""
         prompt = load_prompt("optimization/age_optimization_prompt.txt")
         formatted = prompt.format(
-            platform="google_ads",
+            platform="GOOGLE",
             parent_account_id=parent_account_id,
             account_id=account_id,
             metrics=json.dumps(metrics, indent=2),
@@ -101,7 +106,7 @@ class AgeOptimizationAgent:
         if content.startswith("```"):
             content = "\n".join(content.splitlines()[1:-1]).strip()
 
-        parsed = AgeOptimizationResponse.model_validate_json(content)
+        parsed = OptimizationResponse.model_validate_json(content)
         return list(parsed.recommendations)
 
 

@@ -1,5 +1,8 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv()  # Load env vars before other imports
+
 from fastapi import FastAPI
 from sqlalchemy import text
 
@@ -22,9 +25,6 @@ from db import db_session
 from config.logging_config import setup_logging
 from structlog import get_logger  # type: ignore
 
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Setup structlog for JSON structured logging
 setup_logging()

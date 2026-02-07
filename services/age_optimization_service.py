@@ -9,6 +9,7 @@ from services.openai_client import chat_completion
 from utils.prompt_loader import load_prompt
 from oserver.services.connection import fetch_google_api_token_simple
 from third_party.google.services.age_service import fetch_age_metrics
+from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
 
@@ -23,7 +24,7 @@ def calculate_performance_metrics(metrics_data: List[dict]) -> List[dict]:
         impressions = float(metrics.get("impressions", 0))
         conversions = float(metrics.get("conversions", 0))
 
-        cost = cost_micros / 1_000_000
+        cost = micros_to_rupees(cost_micros)
 
         cpa = cost / conversions if conversions > 0 else 0.0
         ctr = (clicks / impressions * 100) if impressions > 0 else 0.0
