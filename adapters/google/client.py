@@ -6,12 +6,13 @@ import structlog
 from oserver.services.connection import fetch_google_api_token_simple
 from core.infrastructure.http_client import http_request
 
-logger = structlog.get_logger(__name__)
 from exceptions.custom_exceptions import (
     GoogleAPIException,
     GoogleAdsAuthException,
     GoogleAdsValidationException,
 )
+
+logger = structlog.get_logger(__name__)
 
 
 class GoogleAdsClient:
@@ -21,23 +22,41 @@ class GoogleAdsClient:
     def __init__(self) -> None:
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
+    async def get(self, endpoint: str, client_code: str) -> dict:
+        """Execute a GET request against the Google Ads REST API."""
+        token = self._get_token(client_code)
+        url = f"{self.BASE_URL}/{self.API_VERSION}/{endpoint}"
+        response = await http_request(
+            "GET",
+            url,
+            headers=self._headers(token),
+            error_handler=_handle_google_error,
+        )
+        return response.json()
+
     async def search_stream(
         self, query: str, customer_id: str, login_customer_id: str, client_code: str
     ) -> list:
         """Execute GAQL query via searchStream."""
-        token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
+        token = self._get_token(client_code)
         url = f"{self.BASE_URL}/{self.API_VERSION}/customers/{customer_id}/googleAds:searchStream"
 
         # TODO: Use httpx stream reading (client.stream + aiter_lines) to process
         # SearchStream batches as they arrive instead of buffering the full response.
         response = await http_request(
-            "POST", url,
+            "POST",
+            url,
             headers=self._headers(token, login_customer_id),
             json={"query": query},
             error_handler=_handle_google_error,
             retry_delay_parser=_parse_google_retry_delay,
         )
         return self._parse_stream(response.json())
+
+    def _get_token(self, client_code: str) -> str:
+        return os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(
+            client_code
+        )
 
     def _headers(self, access_token: str, login_customer_id: str | None = None) -> dict:
         if not self.developer_token or not access_token:
