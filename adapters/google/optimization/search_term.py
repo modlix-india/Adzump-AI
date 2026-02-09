@@ -2,21 +2,9 @@ from structlog import get_logger
 from core.infrastructure.context import auth_context
 from adapters.google.client import GoogleAdsClient
 from utils.google_dateutils import format_date_range
-from utils.helpers import micros_to_rupees
+from adapters.google.optimization._metrics import build_metrics
 
 logger = get_logger(__name__)
-
-
-def _build_metrics(raw: dict) -> dict:
-    return {
-        "impressions": int(raw.get("impressions", 0)),
-        "clicks": int(raw.get("clicks", 0)),
-        "conversions": float(raw.get("conversions", 0)),
-        "cost": micros_to_rupees(raw.get("costMicros", 0)),
-        "ctr": round(float(raw.get("ctr", 0)) * 100, 2),
-        "average_cpc": micros_to_rupees(raw.get("averageCpc", 0)),
-        "cost_per_conversion": micros_to_rupees(raw.get("costPerConversion", 0)),
-    }
 
 
 class GoogleSearchTermAdapter:
@@ -77,6 +65,7 @@ class GoogleSearchTermAdapter:
             )
             return []
 
+    # TODO: Replace with pydantic model when adapter models are finalized
     def _transform_results(self, results: list) -> list:
         """Transform raw API results into structured search term data."""
         transformed = []
@@ -98,7 +87,7 @@ class GoogleSearchTermAdapter:
                 "search_term": search_term,
                 "status": search_term_view.get("status"),
                 "match_type": entry.get("segments", {}).get("searchTermMatchType"),
-                "metrics": _build_metrics(entry.get("metrics", {})),
+                "metrics": build_metrics(entry.get("metrics", {})),
             })
 
         return transformed
