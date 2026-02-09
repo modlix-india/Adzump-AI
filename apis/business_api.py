@@ -7,7 +7,13 @@ from models.business_model import ScreenshotRequest, WebsiteSummaryRequest
 from services.business_service import BusinessService
 from services.external_link_summary_service import process_external_link
 from services.pdf_service import process_pdf_from_path
-from services.screenshot_service import ScreenshotService
+from services.browser import (
+    ScreenshotHandler,
+    BrowserPool,
+    ConcurrencyLimiter,
+    ContentDetector,
+)
+from services.browser.screenshot_storage_handler import ScreenshotStorageHandler
 from services.final_summary_service import generate_final_summary
 from utils.response_helpers import success_response
 from utils.response_helpers import error_response
@@ -20,18 +26,25 @@ async def take_screenshot(
     payload: ScreenshotRequest = Body(...),
     headers: CommonHeaders = Depends(get_common_headers),
 ):
-    service = ScreenshotService(
-        access_token=headers.access_token,
-        client_code=headers.client_code,
-        xh=headers.x_forwarded_host,
-        xp=headers.x_forwarded_port,
-    )
     target_url = payload.external_url or payload.business_url
-    result = await service.process(
-        business_url=payload.business_url,
-        url=target_url,
-        retake=payload.retake,
-    )
+    async with BrowserPool() as pool:
+        storage = ScreenshotStorageHandler(
+            access_token=headers.access_token,
+            client_code=headers.client_code,
+            x_forwarded_host=headers.x_forwarded_host,
+            x_forwarded_port=headers.x_forwarded_port,
+        )
+        handler = ScreenshotHandler(
+            pool=pool,
+            limiter=ConcurrencyLimiter(),
+            detector=ContentDetector(),
+            storage=storage,
+        )
+        result = await handler.capture_with_storage(
+            business_url=payload.business_url,
+            url=target_url,
+            retake=payload.retake,
+        )
     return success_response(result.model_dump())
 
 

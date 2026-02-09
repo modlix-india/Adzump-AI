@@ -1,0 +1,31 @@
+You are analyzing a website's internal links to identify the most valuable pages for understanding the business.
+
+Website: {url}
+
+Here are the internal links found on the homepage:
+{links}
+
+Select the {max_pages} most valuable pages for understanding this business.
+
+PRIORITIZE pages with these types of content:
+- About / About Us / Company
+- Services / What We Do
+- Products / Solutions
+- Pricing / Plans
+- Contact / Get in Touch
+- Team / Our Team
+- Portfolio / Work / Projects
+- FAQ / Help
+
+AVOID pages like:
+- Blog posts (individual articles)
+- Terms of Service / Privacy Policy
+- Login / Sign Up / Account pages
+- Social media links
+- External links
+
+Return your selection as JSON in this exact format:
+{"pages": ["/about", "/services", "/contact"]}
+
+Only include the path portion (e.g., "/about"), not the full URL.
+Return exactly {max_pages} pages or fewer if not enough valuable pages exist.

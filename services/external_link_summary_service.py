@@ -1,9 +1,16 @@
 import json
-from structlog import get_logger    #type: ignore
+from structlog import get_logger  # type: ignore
 from fastapi import HTTPException
 from models.business_model import WebsiteSummaryResponse, ScrapeResult
 from services.business_service import BusinessService
-from services.scraper_service import ScraperService
+from services.browser import (
+    Scraper,
+    BrowserPool,
+    PageFetcher,
+    ContentDetector,
+    DataExtractor,
+    ConcurrencyLimiter,
+)
 from utils.helpers import normalize_url
 from oserver.models.storage_request_model import (
     StorageFilter,
@@ -14,6 +21,7 @@ from oserver.services.storage_service import StorageService
 from services.final_summary_service import generate_final_summary
 
 logger = get_logger(__name__)
+
 
 async def process_external_link(
     external_url: str,
@@ -73,13 +81,13 @@ async def process_external_link(
             logger.info("[ExternalLink] Returning cached external summary")
 
             return WebsiteSummaryResponse(
-            storage_id=storage_id,
-            business_url=business_url,
-            external_url=external_url,
-            summary=existing_summary,
-            final_summary=record.get("finalSummary", ""),
-            locations=record.get("locations", []),
-        )
+                storage_id=storage_id,
+                business_url=business_url,
+                external_url=external_url,
+                summary=existing_summary,
+                final_summary=record.get("finalSummary", ""),
+                locations=record.get("locations", []),
+            )
         # CASE A2 — Summary missing OR rescrape=True → regenerate
         logger.info(
             "[ExternalLink] Summary missing or rescrape=True → regenerating external summary"
@@ -88,24 +96,33 @@ async def process_external_link(
         # CASE B — External link does NOT exist → scrape and add new
         logger.info("[ExternalLink] New external URL → creating new summary entry")
     # STEP 4: SCRAPE the external URL
-    scraper = ScraperService()
-    scrape_result: ScrapeResult = await scraper.scrape(external_url)
+    async with BrowserPool() as pool:
+        limiter = ConcurrencyLimiter()
+        detector = ContentDetector()
+        fetcher = PageFetcher(pool, limiter, detector)
+        scraper = Scraper(fetcher, detector, DataExtractor())
+        scrape_result: ScrapeResult = await scraper.scrape(external_url)
     logger.info(f"[ExternalLink] Scrape success: {scrape_result.success}")
 
     # Handle blocked scrapes
     if not scrape_result.success:
-        error_msg = scrape_result.error.message if scrape_result.error else "Scraper blocked"
+        error_msg = (
+            scrape_result.error.message if scrape_result.error else "Scraper blocked"
+        )
         logger.warning(f"[ExternalLink] Scraping blocked: {error_msg}")
         error_details = {
-            "block_reason": scrape_result.error.type.value if scrape_result.error else "unknown",
+            "block_reason": scrape_result.error.type.value
+            if scrape_result.error
+            else "unknown",
             "url": external_url,
             "warnings": [
-                {"type": w.type.value, "message": w.message} 
+                {"type": w.type.value, "message": w.message}
                 for w in scrape_result.warnings
-            ]
+            ],
         }
-        
+
         from exceptions.custom_exceptions import ScraperException
+
         raise ScraperException(message=error_msg, details=error_details)
 
     scraped_data = scrape_result.data
@@ -167,10 +184,10 @@ async def process_external_link(
         merged_final_summary = record.get("finalSummary", "")
     # STEP 8: RETURN RESPONSE
     return WebsiteSummaryResponse(
-            storage_id=storage_id,
-            business_url=business_url,
-            external_url=external_url,
-            summary=summary_text,
-            final_summary=merged_final_summary,
-            locations=locations,
-        )
+        storage_id=storage_id,
+        business_url=business_url,
+        external_url=external_url,
+        summary=summary_text,
+        final_summary=merged_final_summary,
+        locations=locations,
+    )

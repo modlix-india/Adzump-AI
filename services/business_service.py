@@ -9,7 +9,14 @@ from exceptions.custom_exceptions import (
     InternalServerException,
     ScraperException,
 )
-from services.scraper_service import ScraperService
+from services.browser import (
+    Scraper,
+    BrowserPool,
+    PageFetcher,
+    ContentDetector,
+    DataExtractor,
+    ConcurrencyLimiter,
+)
 from utils import prompt_loader
 from models.business_model import (
     BusinessMetadata,
@@ -220,8 +227,12 @@ class BusinessService:
 
             # STEP 3: SCRAPE WEBSITE
             logger.info(f"Scraping website: {website_url}")
-            scraper = ScraperService()
-            scrape_result: ScrapeResult = await scraper.scrape(website_url)
+            async with BrowserPool() as pool:
+                limiter = ConcurrencyLimiter()
+                detector = ContentDetector()
+                fetcher = PageFetcher(pool, limiter, detector)
+                scraper = Scraper(fetcher, detector, DataExtractor())
+                scrape_result: ScrapeResult = await scraper.scrape(website_url)
 
             if not scrape_result.success:
                 error_msg = (
