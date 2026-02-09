@@ -50,6 +50,7 @@ class LocationRecommendation(BaseModel):
 
 class OptimizationFields(BaseModel):
     age: Optional[List[AgeFieldRecommendation]] = None
+    assets: Optional[List["AssetFieldRecommendation"]] = None
     keywords: Optional[List[KeywordRecommendation]] = None
     negativeKeywords: Optional[List[KeywordRecommendation]] = None
     locationOptimizations: Optional[List[LocationRecommendation]] = None
@@ -69,3 +70,17 @@ class CampaignRecommendation(BaseModel):
 
 class OptimizationResponse(BaseModel):
     recommendations: List[CampaignRecommendation]
+
+
+class AssetFieldRecommendation(BaseModel):
+    ad_group_id: str
+    ad_group_name: str
+    ad_id: str
+    ad_name: str
+    ad_group_ad_asset_resource_name: str
+    asset_id: Optional[str] = None
+    asset_type: Literal["HEADLINE", "DESCRIPTION"]
+    text: str
+    recommendation: Literal["ADD", "REMOVE"]
+    reason: str
+    applied: bool = False

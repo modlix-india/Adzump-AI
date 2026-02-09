@@ -11,6 +11,9 @@ from agents.optimization.keyword_optimization_agent import (
 from agents.optimization.location_optimization_agent import (
     location_optimization_agent,
 )
+from agents.optimization.asset_optimization.orchestrator import (
+    AssetOptimizationOrchestrator,
+)
 
 router = APIRouter(prefix="/api/ds/optimize", tags=["optimization"])
 
@@ -18,6 +21,15 @@ router = APIRouter(prefix="/api/ds/optimize", tags=["optimization"])
 @router.post("/age")
 async def generate_age_optimization():
     result = await age_optimization_agent.generate_recommendations(
+        client_code=auth_context.client_code,
+    )
+    return {"status": "success", "data": result}
+
+
+@router.post("/assets")
+async def generate_asset_optimization():
+    orchestrator = AssetOptimizationOrchestrator()
+    result = await orchestrator.analyze_all_campaigns(
         client_code=auth_context.client_code,
     )
     return {"status": "success", "data": result}
