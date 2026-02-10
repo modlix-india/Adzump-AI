@@ -14,7 +14,7 @@ async def fetch_autocomplete_suggestions(
     seed_keyword: str,
     max_results: int = 5,
     language: str = "en",
-    client: httpx.AsyncClient = None,
+    client: httpx.AsyncClient | None = None,
 ) -> List[str]:
     """Fetch keyword suggestions from Google Autocomplete API."""
     try:
@@ -51,6 +51,8 @@ async def fetch_autocomplete_suggestions(
         )
 
 
+# TODO: Move to adapters/google/autocomplete.py. It's an external Google API call,
+# should follow adapter pattern like keyword_planner.py.
 async def batch_fetch_autocomplete_suggestions(
     seed_keywords: List[str],
     max_results_per_seed: int = 5,
@@ -60,7 +62,7 @@ async def batch_fetch_autocomplete_suggestions(
     logger.info(f"Fetching autocomplete suggestions for {len(seed_keywords)} seeds")
 
     # Get client once for the batch
-    client = await get_httpx_client()
+    client = get_httpx_client()
 
     # Fetch in parallel
     tasks = [
