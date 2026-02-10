@@ -4,8 +4,8 @@ from structlog import get_logger
 
 from adapters.google.optimization.keyword_planner import GoogleKeywordPlannerAdapter
 from core.models.optimization import KeywordRecommendation
-from core.services.keyword_seed_expander import KeywordSeedExpander
-from core.services.keyword_scorer import (
+from core.keyword.seed_expander import KeywordSeedExpander
+from core.keyword.scorer import (
     calculate_semantic_scores,
     score_and_rank_keywords,
 )

@@ -13,7 +13,7 @@ from core.services.recommendation_storage import recommendation_storage_service
 from core.services.metric_performance_evaluator import MetricPerformanceEvaluator
 from core.services.metric_evaluator_config import KEYWORD_CONFIG, group_by_campaign
 from core.services.business_context_service import business_context_service
-from core.services.keyword_idea_service import KeywordIdeaService
+from core.keyword.idea_service import KeywordIdeaService
 
 logger = get_logger(__name__)
 
