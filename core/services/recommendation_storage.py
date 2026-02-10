@@ -84,7 +84,7 @@ class RecommendationStorageService:
             for item in new_items:
                 item["applied"] = False
             existing = fields.get(key, [])
-            # keywords have origin (e.g. SEARCH_TERM, KEYWORD_PLANNER)
+            # keywords have origin (e.g. SEARCH_TERM, KEYWORD)
             # replace only matching origin items, preserve others
             # for non-keyword fields (e.g. age), overwrite entirely
             if key in ("keywords", "negativeKeywords"):

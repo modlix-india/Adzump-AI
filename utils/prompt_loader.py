@@ -34,7 +34,7 @@ def format_prompt(prompt_file: str, **context: Any) -> str:
 
 
 def build_template_variables(template: str, context: Dict[str, Any]) -> Dict[str, Any]:
-    format_dict = {}
+    format_dict: Dict[str, Any] = {}
     for key, value in context.items():
         if value is None:
             continue
