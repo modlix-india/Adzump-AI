@@ -1,7 +1,7 @@
 from typing import Any
 
 from adapters.meta.client import MetaClient
-from core.context import auth_context
+from core.infrastructure.context import auth_context
 from oserver.services.connection import fetch_meta_api_token
 
 
