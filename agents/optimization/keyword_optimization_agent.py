@@ -128,6 +128,7 @@ class KeywordOptimizationAgent:
                     ad_group_id=entry.get("ad_group_id", ""),
                     ad_group_name=entry.get("ad_group_name", ""),
                     criterion_id=entry.get("criterion_id"),
+                    resource_name=entry.get("resource_name"),
                     recommendation="PAUSE",
                     reason=entry.get("reason", ""),
                     metrics=entry.get("metrics"),

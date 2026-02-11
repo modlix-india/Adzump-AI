@@ -20,9 +20,10 @@ Campaign: {campaign_name}
 Prioritize similar match types in your selections.
 </anchor_keywords>
 
-<existing_keywords>
-Current keywords (avoid duplicates): {existing_keywords}
-</existing_keywords>
+<ad_groups>
+Current keywords by ad group (avoid duplicates, assign new keywords to the most relevant ad group):
+{ad_group_keywords}
+</ad_groups>
 
 <candidates>
 Analyze these {suggestions_count} keyword candidates:

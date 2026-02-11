@@ -34,6 +34,70 @@ CROSS_BUSINESS_PENALTY = 0.5
 MINIMUM_SCORE = 40
 
 
+async def assign_ad_groups(
+    new_keywords: list[str], existing_keywords: list[dict]
+) -> dict[str, dict]:
+    # TODO: remove after doing analysis on ad-group level so we don't need to find ad group for new keyword
+    """Assign each suggestion to the ad group with highest embedding similarity."""
+    ad_groups: dict[str, dict] = {}
+    for e in existing_keywords:
+        ag_id = e.get("ad_group_id", "")
+        if ag_id not in ad_groups:
+            ad_groups[ag_id] = {
+                "ad_group_id": ag_id,
+                "ad_group_name": e.get("ad_group_name", ""),
+                "keywords": [],
+            }
+        ad_groups[ag_id]["keywords"].append(e["keyword"])
+
+    if not ad_groups or not new_keywords:
+        return {}
+
+    if len(ad_groups) == 1:
+        ag = next(iter(ad_groups.values()))
+        return {
+            t.lower(): {
+                "ad_group_id": ag["ad_group_id"],
+                "ad_group_name": ag["ad_group_name"],
+            }
+            for t in new_keywords
+        }
+
+    try:
+        all_existing = [kw for ag in ad_groups.values() for kw in ag["keywords"]]
+        new_emb, existing_emb = await asyncio.gather(
+            generate_embeddings(new_keywords),
+            generate_embeddings(all_existing),
+        )
+        sim_matrix = np.dot(np.array(new_emb), np.array(existing_emb).T)
+
+        ag_ranges: dict[str, tuple[int, int]] = {}
+        offset = 0
+        for ag_id, ag_data in ad_groups.items():
+            count = len(ag_data["keywords"])
+            ag_ranges[ag_id] = (offset, offset + count)
+            offset += count
+
+        assignments: dict[str, dict] = {}
+        for i, text in enumerate(new_keywords):
+            best_id, best_score = "", -1.0
+            for ag_id, (start, end) in ag_ranges.items():
+                max_sim = float(sim_matrix[i, start:end].max())
+                if max_sim > best_score:
+                    best_score = max_sim
+                    best_id = ag_id
+            if best_id:
+                ag = ad_groups[best_id]
+                assignments[text.lower()] = {
+                    "ad_group_id": ag["ad_group_id"],
+                    "ad_group_name": ag["ad_group_name"],
+                }
+        return assignments
+    except Exception:
+        logger.warning("ad_group_assignment_failed", exc_info=True)
+        return {}
+
+
 async def calculate_semantic_scores(
     suggestion_texts: list[str], anchor_texts: list[str]
 ) -> dict[str, float]:

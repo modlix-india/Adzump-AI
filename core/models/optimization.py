@@ -30,6 +30,7 @@ class KeywordRecommendation(BaseModel):
     ad_group_id: Optional[str] = None
     ad_group_name: Optional[str] = None
     criterion_id: Optional[str] = None
+    resource_name: Optional[str] = None
     quality_score: Optional[int] = None
 
 

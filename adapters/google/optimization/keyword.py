@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Optional
 
 from structlog import get_logger
@@ -58,12 +59,14 @@ def _build_keyword_query(
         SELECT campaign.id, campaign.name, campaign.advertising_channel_type,
                ad_group.id, ad_group.name,
                ad_group_criterion.criterion_id,
+               ad_group_criterion.resource_name,
                ad_group_criterion.status,
                ad_group_criterion.keyword.text,
                ad_group_criterion.keyword.match_type,
                ad_group_criterion.quality_info.quality_score{metrics_fields}
         FROM keyword_view
         WHERE campaign.status = 'ENABLED'
+            AND campaign.end_date >= '{date.today().strftime("%Y-%m-%d")}'
             AND ad_group.status = 'ENABLED'
             AND ad_group_criterion.status = 'ENABLED'
             {campaign_filter}
@@ -84,6 +87,7 @@ def _transform_row(row: dict) -> dict:
     return {
         "keyword": keyword_info.get("text", "").strip().lower(),
         "criterion_id": str(criterion.get("criterionId", "")),
+        "resource_name": criterion.get("resourceName", ""),
         "match_type": keyword_info.get("matchType", "PHRASE").lower(),
         "ad_group_id": str(ad_group.get("id", "")),
         "ad_group_name": ad_group.get("name", ""),

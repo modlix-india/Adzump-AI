@@ -6,6 +6,7 @@ from adapters.google.optimization.keyword_planner import GoogleKeywordPlannerAda
 from core.models.optimization import KeywordRecommendation
 from core.keyword.seed_expander import KeywordSeedExpander
 from core.keyword.scorer import (
+    assign_ad_groups,
     calculate_semantic_scores,
     score_and_rank_keywords,
 )
@@ -65,6 +66,15 @@ class KeywordIdeaService:
         if not llm_selected:
             return []
 
+        # TODO: do analysis on ad-group level so we don't need to find ad group to assign a new keyword
+        ad_group_map = await assign_ad_groups(
+            [kw.get("keyword", "") for kw in llm_selected], keywords
+        )
+        for kw in llm_selected:
+            ag = ad_group_map.get(kw.get("keyword", "").lower(), {})
+            kw["ad_group_id"] = ag.get("ad_group_id")
+            kw["ad_group_name"] = ag.get("ad_group_name")
+
         return self._build_recommendations(
             llm_selected,
             google_suggestions,
@@ -90,6 +100,8 @@ class KeywordIdeaService:
             KeywordRecommendation(
                 text=kw["keyword"],
                 match_type=kw.get("match_type", "PHRASE"),
+                ad_group_id=kw.get("ad_group_id"),
+                ad_group_name=kw.get("ad_group_name"),
                 reason=kw.get("reason", "High-potential keyword from Keyword Planner"),
                 origin="KEYWORD",
                 metrics={
@@ -98,6 +110,8 @@ class KeywordIdeaService:
                     "competitionIndex": kw.get("competitionIndex", 0),
                     "semantic_score": kw.get("semantic_score", 0),
                 },
+                # TODO: score should include breakdown: volume_score, competition_score,
+                #  business_score, intent_score, semantic_score
                 score=kw.get("final_score"),
             )
             for kw in score_and_rank_keywords(finalized)[:15]
@@ -108,6 +122,7 @@ class KeywordIdeaService:
         suggestions: list[dict],
         campaign_details: dict,
     ) -> list[dict]:
+        # TODO: verify the LLM call and prompt
         """Ask LLM to select best keywords from candidates for this campaign."""
         prompt = self._format_selection_prompt(suggestions, campaign_details)
 
@@ -125,6 +140,16 @@ class KeywordIdeaService:
         parsed = json.loads(response.choices[0].message.content.strip())
         selected = parsed.get("keywords") or parsed.get("selected_keywords") or []
         return selected if isinstance(selected, list) else []
+
+    @staticmethod
+    def _format_ad_group_keywords(entries: list[dict]) -> str:
+        groups: dict[str, list[str]] = {}
+        for e in entries[:50]:
+            key = f"{e.get('ad_group_name', 'Unknown')} (id:{e.get('ad_group_id', '')})"
+            groups.setdefault(key, []).append(e["keyword"])
+        return "\n".join(
+            f"- {name}: {', '.join(kws)}" for name, kws in groups.items()
+        )
 
     def _format_selection_prompt(
         self, suggestions: list[dict], campaign_details: dict
@@ -147,7 +172,7 @@ class KeywordIdeaService:
             unique_features=", ".join(campaign_details.get("unique_features", [])),
             business_summary=campaign_details.get("business_summary", ""),
             campaign_name=campaign_details.get("name", ""),
-            existing_keywords=", ".join(e["keyword"] for e in entries[:50]),
+            ad_group_keywords=self._format_ad_group_keywords(entries),
             suggestions_count=min(len(suggestions), 50),
             suggestions_list="\n".join(
                 f"- {s['keyword']} | Vol: {s.get('volume', 0)} | Comp: {s.get('competition', 'UNKNOWN')} "

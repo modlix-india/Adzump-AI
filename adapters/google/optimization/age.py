@@ -1,3 +1,5 @@
+from datetime import date
+
 from structlog import get_logger
 from core.infrastructure.context import auth_context
 from adapters.google.client import GoogleAdsClient
@@ -25,6 +27,7 @@ class GoogleAgeAdapter:
         FROM age_range_view
         WHERE {duration_clause}
           AND campaign.status = 'ENABLED'
+          AND campaign.end_date >= '{date.today().strftime("%Y-%m-%d")}'
           AND ad_group.status = 'ENABLED'
         """
 

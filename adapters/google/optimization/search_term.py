@@ -1,3 +1,5 @@
+from datetime import date
+
 from structlog import get_logger
 from core.infrastructure.context import auth_context
 from adapters.google.client import GoogleAdsClient
@@ -47,6 +49,7 @@ class GoogleSearchTermAdapter:
             AND search_term_view.status IN ('NONE')
             AND ad_group.status = 'ENABLED'
             AND campaign.status = 'ENABLED'
+            AND campaign.end_date >= '{date.today().strftime("%Y-%m-%d")}'
         """
 
         try:
