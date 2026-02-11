@@ -1,3 +1,4 @@
+# TODO: Remove this file - replaced by prompts/optimization/age_optimization_prompt.txt
 You are an expert in Google Ads audience targeting and optimization.
 
 Your task is to analyze the following campaign dataset and recommend which AGE RANGES should be optimized, excluded, or prioritized for each ad group within each campaign, based on the provided performance metrics.

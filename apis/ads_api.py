@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Header, status, Body, Query
-from services.search_term_pipeline import SearchTermPipeline
+from services.search_term_service import process_search_terms
 from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
 from services.budget_recommendation_service import generate_budget_recommendations
@@ -9,8 +9,10 @@ from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service, chat_service
+# TODO: Remove age optimization import - replaced by api/optimization.py
 from services.age_optimization_service import generate_age_optimizations
 from services.gender_optimization_service import generate_gender_optimizations
+
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -137,6 +139,7 @@ async def generate_campaign(
         )
 
 
+# TODO: Remove after trust in new search term optimization service (api/optimization.py)
 @router.post("/search_term")
 async def analyze_search_terms_route(
     access_token: str = Header(..., alias="accessToken"),
@@ -147,7 +150,7 @@ async def analyze_search_terms_route(
     duration: str = Query(...),
 ):
     try:
-        pipeline = SearchTermPipeline(
+        results = await process_search_terms(
             client_code=client_code,
             customer_id=customer_id,
             login_customer_id=login_customer_id,
@@ -155,8 +158,6 @@ async def analyze_search_terms_route(
             duration=duration,
             access_token=access_token,
         )
-
-        results = await pipeline.run_pipeline()
 
         return {"status": "success", "data": results}
 

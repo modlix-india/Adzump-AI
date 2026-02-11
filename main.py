@@ -1,5 +1,8 @@
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv()  # Load env vars before other imports
+
 from fastapi import FastAPI
 from sqlalchemy import text
 
@@ -7,19 +10,21 @@ from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
 from apis.business_api import router as business_router
-from mlops.performance.prediction_api import router as prediction_router
+from mlops.google_search.performance.prediction_api import router as performance_router
+from mlops.google_search.budget_prediction.api import router as budget_router
 from apis.maps import router as maps_router
 from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
+from core.infrastructure.middleware import AuthContextMiddleware
+from core.infrastructure.http_client import init_http_client, close_http_client
+
+from api.meta import router as meta_ads_router
+from api.optimization import router as optimization_router
 
 from db import db_session
 from config.logging_config import setup_logging
-from services.geo_target_service import GeoTargetService
 from structlog import get_logger  # type: ignore
 
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Setup structlog for JSON structured logging
 setup_logging()
@@ -27,7 +32,7 @@ setup_logging()
 # Get structlog logger
 logger = get_logger(__name__)
 
-
+# TODO: clean up this code later
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     engine = None
@@ -37,6 +42,10 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         logger.info("Database connected", component="db")
+
+        # Initialize shared HTTP client
+        init_http_client()
+        logger.info("HTTP client initialized", component="http")
 
         # Make engine available to routes/services via app.state
         app.state.engine = engine
@@ -60,11 +69,15 @@ async def lifespan(app: FastAPI):
                     error=str(e),
                     exc_info=True,
                 )
-        await GeoTargetService.close_client()
+        await close_http_client()
+        logger.info("HTTP client closed", component="http")
 
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
 
+# Auth context middleware - extracts access-token and clientCode headers into request context.
+# Headers are optional here; endpoints requiring auth should validate via their own logic.
+app.add_middleware(AuthContextMiddleware)
 
 @app.get("/health")
 async def health_check():
@@ -77,8 +90,12 @@ app.include_router(chat_router)
 app.include_router(assets_router)
 app.include_router(business_router)
 app.include_router(maps_router)
-app.include_router(prediction_router)
+app.include_router(performance_router)
+app.include_router(budget_router)
 
 app.include_router(feedback_router)
+
+app.include_router(meta_ads_router)
+app.include_router(optimization_router)
 
 setup_exception_handlers(app)

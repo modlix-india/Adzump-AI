@@ -8,21 +8,32 @@ from oserver.models.storage_request_model import (
 )
 from oserver.models.storage_response_model import StorageResponse
 from oserver.services.base_api_service import BaseAPIService
+from core.infrastructure.context import auth_context
 
 
 class StorageService:
+    """Storage service that reads auth from context lazily if not provided explicitly."""
+
     def __init__(
         self,
-        access_token: str,
-        client_code: str,
+        access_token: Optional[str] = None,
+        client_code: Optional[str] = None,
         x_forwarded_host: Optional[str] = None,
         x_forwarded_port: Optional[str] = None,
     ):
-        self.access_token = access_token
-        self.client_code = client_code
+        self._access_token = access_token
+        self._client_code = client_code
         self.x_forwarded_host = x_forwarded_host
         self.x_forwarded_port = x_forwarded_port
         self.client = BaseAPIService()
+
+    @property
+    def access_token(self) -> str:
+        return self._access_token or auth_context.access_token
+
+    @property
+    def client_code(self) -> str:
+        return self._client_code or auth_context.client_code
 
     def _headers(self):
         return {
