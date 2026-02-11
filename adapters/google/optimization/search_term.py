@@ -1,22 +1,12 @@
+from datetime import date
+
 from structlog import get_logger
 from core.infrastructure.context import auth_context
 from adapters.google.client import GoogleAdsClient
-from utils.date_utils import format_duration_clause
-from utils.helpers import micros_to_rupees
+from utils.google_dateutils import format_date_range
+from adapters.google.optimization._metrics import build_metrics
 
 logger = get_logger(__name__)
-
-
-def _build_metrics(raw: dict) -> dict:
-    return {
-        "impressions": int(raw.get("impressions", 0)),
-        "clicks": int(raw.get("clicks", 0)),
-        "conversions": float(raw.get("conversions", 0)),
-        "cost": micros_to_rupees(raw.get("costMicros", 0)),
-        "ctr": round(float(raw.get("ctr", 0)) * 100, 2),
-        "average_cpc": micros_to_rupees(raw.get("averageCpc", 0)),
-        "cost_per_conversion": micros_to_rupees(raw.get("costPerConversion", 0)),
-    }
 
 
 class GoogleSearchTermAdapter:
@@ -34,7 +24,7 @@ class GoogleSearchTermAdapter:
             "metrics": {"impressions", "clicks", "conversions", "cost",
                 "ctr", "average_cpc", "cost_per_conversion"}}]
         """
-        duration_clause = format_duration_clause(self.DEFAULT_DURATION)
+        duration_clause = format_date_range(self.DEFAULT_DURATION)
 
         query = f"""
         SELECT
@@ -55,10 +45,11 @@ class GoogleSearchTermAdapter:
             metrics.cost_per_conversion
         FROM search_term_view
         WHERE
-            segments.date {duration_clause}
+            {duration_clause}
             AND search_term_view.status IN ('NONE')
             AND ad_group.status = 'ENABLED'
             AND campaign.status = 'ENABLED'
+            AND campaign.end_date >= '{date.today().strftime("%Y-%m-%d")}'
         """
 
         try:
@@ -77,6 +68,7 @@ class GoogleSearchTermAdapter:
             )
             return []
 
+    # TODO: Replace with pydantic model when adapter models are finalized
     def _transform_results(self, results: list) -> list:
         """Transform raw API results into structured search term data."""
         transformed = []
@@ -98,7 +90,7 @@ class GoogleSearchTermAdapter:
                 "search_term": search_term,
                 "status": search_term_view.get("status"),
                 "match_type": entry.get("segments", {}).get("searchTermMatchType"),
-                "metrics": _build_metrics(entry.get("metrics", {})),
+                "metrics": build_metrics(entry.get("metrics", {})),
             })
 
         return transformed

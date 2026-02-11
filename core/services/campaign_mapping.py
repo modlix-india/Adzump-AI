@@ -51,7 +51,7 @@ class CampaignMappingService:
         records = self._extract_records(response.result)
         return self._build_mapping_with_summary(records)
 
-    #TODO: Handle in StorageReadResponse
+    # TODO: Handle in StorageReadResponse
     def _extract_records(self, result: list) -> list:
         """Extract content records from nested response."""
         return result[0].get("result", {}).get("result", {}).get("content", [])
@@ -68,15 +68,20 @@ class CampaignMappingService:
         return mapping
 
     def _build_mapping_with_summary(self, records: list) -> dict[str, dict]:
-        """Build campaign_id → {product_id, summary} mapping."""
+        """Build campaign_id → {product_id, summary, business_url} mapping."""
         mapping = {}
         for record in records:
             product_id = record.get("_id")
             summary = record.get("finalSummary", "")
+            business_url = record.get("businessUrl", "")
             for campaign in record.get("campaigns", []):
                 campaign_id = str(campaign.get("campaignId", ""))
                 if campaign_id:
-                    mapping[campaign_id] = {"product_id": product_id, "summary": summary}
+                    mapping[campaign_id] = {
+                        "product_id": product_id,
+                        "summary": summary,
+                        "business_url": business_url,
+                    }
         return mapping
 
 
