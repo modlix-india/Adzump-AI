@@ -25,7 +25,6 @@ from db import db_session
 from config.logging_config import setup_logging
 from structlog import get_logger  # type: ignore
 
-
 # Setup structlog for JSON structured logging
 setup_logging()
 

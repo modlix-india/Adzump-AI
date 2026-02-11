@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 from structlog import get_logger  # type: ignore
 
@@ -25,7 +25,7 @@ class BusinessMetadata(BaseModel):
             logger.warning(f"Expected dict, got {type(data)}. Using defaults.")
             return cls()
 
-        valid_data = {}
+        valid_data: dict[str, Any] = {}
 
         # String fields
         for field in ["brand_name", "business_type", "primary_location"]:

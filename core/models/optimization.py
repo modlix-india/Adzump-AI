@@ -21,11 +21,17 @@ class SearchTermAnalysis(BaseModel):
 class KeywordRecommendation(BaseModel):
     text: str
     match_type: str
-    recommendation: Literal["ADD"] = "ADD"
+    recommendation: Literal["ADD", "PAUSE"] = "ADD"
     reason: str
-    origin: Literal["SEARCH_TERM"] = "SEARCH_TERM"
-    metrics: dict
-    analysis: SearchTermAnalysis
+    origin: Optional[Literal["SEARCH_TERM", "KEYWORD"]] = None
+    metrics: Optional[dict] = None
+    analysis: Optional[SearchTermAnalysis] = None
+    score: Optional[float] = None
+    ad_group_id: Optional[str] = None
+    ad_group_name: Optional[str] = None
+    criterion_id: Optional[str] = None
+    resource_name: Optional[str] = None
+    quality_score: Optional[int] = None
 
 
 class OptimizationFields(BaseModel):

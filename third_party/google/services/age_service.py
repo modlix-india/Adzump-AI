@@ -3,7 +3,7 @@ from fastapi import HTTPException
 import httpx
 import os
 
-from utils.date_utils import format_duration_clause
+from utils import google_dateutils as date_utils
 
 
 # ---------------------- Fetch Campaign Metrics ----------------------
@@ -29,7 +29,7 @@ async def fetch_age_metrics(
         "Content-Type": "application/json",
     }
 
-    duration_clause = format_duration_clause(duration)
+    duration_clause = date_utils.format_date_range(duration)
 
     query = f"""
     SELECT campaign.id,
@@ -43,7 +43,7 @@ async def fetch_age_metrics(
            metrics.conversions,
            metrics.cost_micros
     FROM age_range_view
-    WHERE segments.date {duration_clause}
+    WHERE {duration_clause}
       AND campaign.id = {campaign_id}
       AND ad_group.status = 'ENABLED'
     """

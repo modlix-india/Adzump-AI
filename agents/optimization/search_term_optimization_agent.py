@@ -10,7 +10,7 @@ from core.models.optimization import (
 )
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.search_term import GoogleSearchTermAdapter
-from core.services.search_term_analyzer import SearchTermAnalyzer
+from core.search_term.analyzer import SearchTermAnalyzer
 from core.services.recommendation_storage import recommendation_storage_service
 
 logger = get_logger(__name__)
