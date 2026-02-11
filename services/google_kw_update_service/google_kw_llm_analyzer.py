@@ -1,3 +1,4 @@
+# TODO: remove after verifying new flow (core/keyword/idea_service.py) is working
 from typing import List, Dict, Union, Any
 import json
 import structlog

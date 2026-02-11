@@ -1,3 +1,4 @@
+# TODO: remove after verifying new flow (agents/optimization/keyword_optimization_agent.py) is working
 from typing import List, Dict, Tuple
 import asyncio
 import structlog

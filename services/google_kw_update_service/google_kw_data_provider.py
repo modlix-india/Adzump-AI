@@ -1,3 +1,4 @@
+# TODO: remove after verifying new flow (adapters/google/optimization/ + BusinessContextService) is working
 from typing import List, Dict, Optional
 import asyncio
 import structlog

@@ -172,6 +172,7 @@ async def analyze_search_terms_route(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# TODO: remove after verifying new flow (api/optimization.py → KeywordOptimizationAgent) is working
 @router.post("/keywords/analyze-update")
 async def analyze_update_keywords(
     request: UpdateKeywordsStrategyRequest,

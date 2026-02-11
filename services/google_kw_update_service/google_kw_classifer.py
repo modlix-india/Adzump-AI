@@ -1,3 +1,4 @@
+# TODO: remove after verifying new flow (core/keyword/scorer.py + MetricPerformanceEvaluator) is working
 from typing import List, Dict, Tuple
 import structlog
 from third_party.google.models.keyword_model import Keyword

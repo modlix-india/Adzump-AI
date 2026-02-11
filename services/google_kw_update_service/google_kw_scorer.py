@@ -1,3 +1,4 @@
+# TODO: remove after verifying new flow (core/keyword/scorer.py) is working
 from typing import List, Dict
 import structlog
 import numpy as np

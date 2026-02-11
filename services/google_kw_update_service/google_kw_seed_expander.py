@@ -1,3 +1,4 @@
+# TODO: remove after verifying new flow (core/keyword/seed_expander.py) is working
 import asyncio
 import json
 from typing import Dict, List, Optional, Set
