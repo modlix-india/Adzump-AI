@@ -1,18 +1,18 @@
 import os
 from contextlib import asynccontextmanager
-
 from dotenv import load_dotenv
+
 load_dotenv()  # Load env vars before other imports
 
 from config.logging_config import setup_logging
+
 setup_logging()
 
 from structlog import get_logger  # type: ignore
-logger = get_logger(__name__)
 
+logger = get_logger(__name__)
 from fastapi import FastAPI
 from sqlalchemy import text
-
 from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
@@ -25,11 +25,10 @@ from feedback.keyword.api import router as feedback_router
 from core.infrastructure.middleware import AuthContextMiddleware
 from core.infrastructure.request_logging_middleware import RequestLoggingMiddleware
 from core.infrastructure.http_client import init_http_client, close_http_client
-
 from api.meta import router as meta_ads_router
 from api.optimization import router as optimization_router
-
 from db import db_session
+
 
 # TODO: clean up this code later
 @asynccontextmanager
@@ -82,6 +81,7 @@ app.add_middleware(AuthContextMiddleware)
 # end-to-end across services using the same key.
 app.add_middleware(RequestLoggingMiddleware)
 
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "ds-service"}
@@ -97,7 +97,6 @@ if not os.getenv("SKIP_ML_MODELS"):
     app.include_router(budget_router)
 
 app.include_router(feedback_router)
-
 app.include_router(meta_ads_router)
 app.include_router(optimization_router)
 
