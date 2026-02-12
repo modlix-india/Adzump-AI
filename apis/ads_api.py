@@ -16,9 +16,7 @@ from third_party.google.models.keyword_model import UpdateKeywordsStrategyReques
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service, chat_service
-from services.locations_optimization import optimize_locations_for_client , init_http_client , close_http_client
-
-
+from services.locations_optimization import optimize_locations_for_client, init_http_client, close_http_client
 
 # TODO: Remove age optimization import - replaced by api/optimization.py
 from services.age_optimization_service import generate_age_optimizations
@@ -214,6 +212,8 @@ async def generate_age_optimization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# TODO: Remove after trust in new location optimization service (api/optimization.py)
 @router.post("/optimize/locations")
 async def optimize_locations(
     clientCode: str = Header(..., alias="clientCode"),
@@ -221,46 +221,14 @@ async def optimize_locations(
 ):
     try:
         await init_http_client()
-
         result = await optimize_locations_for_client(
             client_code=clientCode,
             login_customer_id=loginCustomerId,
         )
-
-        return {
-            "status": "success",
-            "data": result,
-        }
-
-    #Preserve service / Google Ads errors
-    except HTTPException as e:
-        raise HTTPException(
-            status_code=e.status_code,
-            detail=e.detail,
-        )
-
-    #Validation / business errors
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "source": "router_validation",
-                "message": str(e),
-            },
-        )
-
-    #Unexpected system errors
+        return {"status": "success", "data": result}
+    except HTTPException:
+        raise
     except Exception as e:
-        print("ERROR:", repr(e))
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "source": "location_optimization_router",
-                "type": "internal_error",
-                "message": str(e),
-            },
-        )
-
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         await close_http_client()

@@ -3,7 +3,9 @@ from statistics import median
 
 import structlog
 
-from core.services.metric_evaluator_config import MetricEvaluatorConfig, KEYWORD_CONFIG
+# TODO: Think and implement a common performance evaluator across optimization domains
+#       (keyword, location, age, search_term). Currently each domain has its own evaluator.
+from core.keyword.metric_evaluator_config import MetricEvaluatorConfig, KEYWORD_CONFIG
 
 logger = structlog.get_logger(__name__)
 

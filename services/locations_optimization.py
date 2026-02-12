@@ -3,7 +3,10 @@ import os
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from fastapi import HTTPException
+from structlog import get_logger
 from oserver.services.connection import fetch_google_api_token_simple
+
+logger = get_logger(__name__)
 
 
 GOOGLE_ADS_API_VERSION = "v22"
@@ -50,7 +53,7 @@ def resolve_google_ads_credentials(client_code: str) -> Dict[str, str]:
         raise ValueError("client_code is required")
 
     developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-    access_token = fetch_google_api_token_simple(client_code)
+    access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
 
     if not developer_token or not access_token:
         raise RuntimeError("Failed to resolve Google Ads credentials")
@@ -341,6 +344,7 @@ async def optimize_locations_for_client(
     child_customer_ids = await fetch_direct_child_customers(
         login_customer_id, context
     )
+    logger.info("Child accounts found", count=len(child_customer_ids), ids=child_customer_ids)
 
     optimization_results = []
 
@@ -351,12 +355,14 @@ async def optimize_locations_for_client(
                 child_customer_id, context
             )
         )
+        logger.info("Campaign targets", customer_id=child_customer_id, campaigns=len(campaign_targets))
 
         campaign_metrics = (
             await fetch_location_performance_metrics(
                 child_customer_id, context
             )
         )
+        logger.info("Campaign metrics", customer_id=child_customer_id, campaigns_with_metrics=len(campaign_metrics))
 
         all_geo_constants = list(
             {
@@ -384,6 +390,15 @@ async def optimize_locations_for_client(
                     campaign_data,
                     campaign_metrics[campaign_id],
                 )
+            )
+            logger.info(
+                "Evaluation result",
+                customer_id=child_customer_id,
+                campaign_id=campaign_id,
+                targeted=len(campaign_data["targeted_locations"]),
+                geo_metrics=len(campaign_metrics[campaign_id]),
+                to_remove=len(optimize_list),
+                to_add=len(recommend_list),
             )
 
             location_actions = []

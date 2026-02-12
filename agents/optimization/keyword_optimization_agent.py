@@ -10,8 +10,8 @@ from core.models.optimization import (
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.keyword import GoogleKeywordAdapter
 from core.services.recommendation_storage import recommendation_storage_service
-from core.services.metric_performance_evaluator import MetricPerformanceEvaluator
-from core.services.metric_evaluator_config import KEYWORD_CONFIG, group_by_campaign
+from core.keyword.metric_performance_evaluator import MetricPerformanceEvaluator
+from core.keyword.metric_evaluator_config import KEYWORD_CONFIG, group_by_campaign
 from core.services.business_context_service import business_context_service
 from core.keyword.idea_service import KeywordIdeaService
 
