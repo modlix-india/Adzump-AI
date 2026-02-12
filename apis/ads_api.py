@@ -22,27 +22,22 @@ from services.ads_service import AdAssetsGenerator
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
+ad_assets_generator = AdAssetsGenerator()
+
 
 @router.post("/generate/ad-assets")
 async def create_ad_assets(
     summary: str = Body(...), positive_keywords: List[Dict[str, Any]] = Body(...)
 ):
-    try:
-        generator = AdAssetsGenerator()
-        result = await generator.generate(summary, positive_keywords)
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-        result = {
-            "headlines": result.get("headlines", []),
-            "descriptions": result.get("descriptions", []),
-            "audience": {
-                "gender": result.get("audience", {}).get("gender", []),
-                "age_range": result.get("audience", {}).get("age_range", []),
-            },
-        }
-        return success_response(result)
-    except Exception as e:
-        return error_response(str(e))
+    result = await ad_assets_generator.generate(summary, positive_keywords)
+    return success_response({
+        "headlines": result.get("headlines", []),
+        "descriptions": result.get("descriptions", []),
+        "audience": {
+            "gender": result.get("audience", {}).get("gender", []),
+            "age_range": result.get("audience", {}).get("age_range", []),
+        },
+    })
 
 
 gks = GoogleKeywordService()

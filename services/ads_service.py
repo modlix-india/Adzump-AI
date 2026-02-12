@@ -41,7 +41,9 @@ class AdAssetsGenerator:
             config = self._get_attempt_config(attempt_num)
 
             logger.info(
-                f"[AdAssets] Starting attempt {attempt_num + 1}/{self.max_attempts}",
+                "[AdAssets] Starting attempt",
+                attempt=attempt_num + 1,
+                max_attempts=self.max_attempts,
                 temperature=config["temp"],
                 similarity_headlines=config["sim_h"],
                 similarity_descriptions=config["sim_d"],
@@ -63,7 +65,8 @@ class AdAssetsGenerator:
                 d_count = len(filtered["descriptions"])
 
                 logger.info(
-                    f"[AdAssets] Attempt {attempt_num + 1} filtered results",
+                    "[AdAssets] Attempt filtered results",
+                    attempt=attempt_num + 1,
                     headlines=h_count,
                     descriptions=d_count,
                     success=(
@@ -75,21 +78,24 @@ class AdAssetsGenerator:
                 # Check if requirements met
                 if h_count >= self.min_headlines and d_count >= self.min_descriptions:
                     logger.info(
-                        f"[AdAssets] ✓ Success on attempt {attempt_num + 1}",
+                        "[AdAssets] Success",
+                        attempt=attempt_num + 1,
                         headlines=h_count,
                         descriptions=d_count,
                     )
                     return filtered
 
                 logger.warning(
-                    f"[AdAssets] Attempt {attempt_num + 1} insufficient - will retry",
+                    "[AdAssets] Attempt insufficient - will retry",
+                    attempt=attempt_num + 1,
                     headlines_shortage=max(0, self.min_headlines - h_count),
                     descriptions_shortage=max(0, self.min_descriptions - d_count),
                 )
 
             except Exception as e:
                 logger.error(
-                    f"[AdAssets] Attempt {attempt_num + 1} exception",
+                    "[AdAssets] Attempt exception",
+                    attempt=attempt_num + 1,
                     error=str(e),
                     error_type=type(e).__name__,
                 )
@@ -132,7 +138,7 @@ class AdAssetsGenerator:
                 unique_items.append(item)
 
         # Second pass: remove semantically similar items
-        final_items = []
+        final_items: list[str] = []
         for item in unique_items:
             is_similar = False
             for existing in final_items:
@@ -198,68 +204,58 @@ class AdAssetsGenerator:
     async def _generate_single_attempt(
         self, summary, positive_keywords, config: dict
     ) -> dict:
-        try:
-            prompt = prompt_loader.format_prompt(
-                "ad_assets_prompt.txt",
-                summary_json=json.dumps(summary, indent=2),
-                positive_keywords_json=json.dumps(positive_keywords, indent=2),
-            )
+        prompt = prompt_loader.format_prompt(
+            "ad_assets_prompt.txt",
+            summary_json=json.dumps(summary, indent=2),
+            positive_keywords_json=json.dumps(positive_keywords, indent=2),
+        )
 
-            response = await chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                model="gpt-4o-mini",
+        response = await chat_completion(
+            messages=[{"role": "user", "content": prompt}],
+            model="gpt-4o-mini",
+            temperature=config["temp"],
+        )
+
+        if response.usage:
+            logger.info(
+                "[AdAssets] Token usage",
+                prompt_tokens=response.usage.prompt_tokens,
+                completion_tokens=response.usage.completion_tokens,
+                total_tokens=response.usage.total_tokens,
                 temperature=config["temp"],
             )
 
-            if response.usage:
-                logger.info(
-                    "[AdAssets] Token usage",
-                    prompt_tokens=response.usage.prompt_tokens,
-                    completion_tokens=response.usage.completion_tokens,
-                    total_tokens=response.usage.total_tokens,
-                    temperature=config["temp"],
-                )
+        raw_output = response.choices[0].message.content.strip()
+        parsed = safe_json_parse(raw_output)
 
-            raw_output = response.choices[0].message.content.strip()
-            parsed = safe_json_parse(raw_output)
-
-            if not parsed:
-                return {
-                    "filtered": {"headlines": [], "descriptions": [], "audience": {}},
-                    "raw_headlines": [],
-                    "raw_descriptions": [],
-                }
-
-            raw_headlines = parsed.get("headlines", [])
-            raw_descriptions = parsed.get("descriptions", [])
-
-            logger.info(
-                "[AdAssets] Raw items from LLM",
-                headlines_count=len(raw_headlines),
-                descriptions_count=len(raw_descriptions),
-            )
-
-            # Apply filtering
-            filtered_headlines = self._filter_headlines(raw_headlines, config)
-            filtered_descriptions = self._filter_descriptions(raw_descriptions, config)
-
-            return {
-                "filtered": {
-                    "headlines": filtered_headlines,
-                    "descriptions": filtered_descriptions,
-                    "audience": parsed.get("audience", {}),
-                },
-                "raw_headlines": raw_headlines,
-                "raw_descriptions": raw_descriptions,
-            }
-
-        except Exception as e:
-            logger.error("[AdAssets] Generation attempt failed", error=str(e))
+        if not parsed:
             return {
                 "filtered": {"headlines": [], "descriptions": [], "audience": {}},
                 "raw_headlines": [],
                 "raw_descriptions": [],
             }
+
+        raw_headlines = parsed.get("headlines", [])
+        raw_descriptions = parsed.get("descriptions", [])
+
+        logger.info(
+            "[AdAssets] Raw items from LLM",
+            headlines_count=len(raw_headlines),
+            descriptions_count=len(raw_descriptions),
+        )
+
+        filtered_headlines = self._filter_headlines(raw_headlines, config)
+        filtered_descriptions = self._filter_descriptions(raw_descriptions, config)
+
+        return {
+            "filtered": {
+                "headlines": filtered_headlines,
+                "descriptions": filtered_descriptions,
+                "audience": parsed.get("audience", {}),
+            },
+            "raw_headlines": raw_headlines,
+            "raw_descriptions": raw_descriptions,
+        }
 
     def _rescue_pool_fallback(
         self, all_headlines: list[str], all_descriptions: list[str]
