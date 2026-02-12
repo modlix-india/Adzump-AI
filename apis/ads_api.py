@@ -16,7 +16,6 @@ from third_party.google.models.keyword_model import UpdateKeywordsStrategyReques
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service, chat_service
-
 # TODO: Remove age optimization import - replaced by api/optimization.py
 from services.age_optimization_service import generate_age_optimizations
 
@@ -209,3 +208,4 @@ async def generate_age_optimization(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
