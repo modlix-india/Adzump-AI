@@ -75,19 +75,33 @@ class GenderOptimizationAgent:
             )
             return []
 
-        return await self._analyze_google_metrics(
-            linked_metrics, account_id, parent_account_id
+        grouped_by_adgroup = defaultdict(list)
+        for metric_entry in linked_metrics:
+            ad_group_id = str(metric_entry.get("ad_group", {}).get("id"))
+            grouped_by_adgroup[ad_group_id].append(metric_entry)
+
+        results = await asyncio.gather(
+            *[
+                self._analyze_google_metrics(
+                    adgroup_metrics,
+                    account_id,
+                    parent_account_id,
+                )
+                for adgroup_metrics in grouped_by_adgroup.values()
+            ]
         )
+
+        return [rec for sublist in results for rec in sublist]
 
     def _filter_linked_google_campaigns(
         self, metrics: list, campaign_product_map: dict
     ) -> list:
         linked = []
-        for m in metrics:
-            campaign_id = str(m.get("campaign", {}).get("id"))
+        for metric_entry in metrics:
+            campaign_id = str(metric_entry.get("campaign", {}).get("id"))
             if campaign_id in campaign_product_map:
-                m["product_id"] = campaign_product_map[campaign_id]
-                linked.append(m)
+                metric_entry["product_id"] = campaign_product_map[campaign_id]
+                linked.append(metric_entry)
         return linked
 
     async def _analyze_google_metrics(
@@ -123,18 +137,18 @@ class GenderOptimizationAgent:
 
             # Group gender recommendations by ad_group_id
             grouped_by_adgroup = defaultdict(list)
-            for g in gender_recos:
-                grouped_by_adgroup[g.ad_group_id].append(g)
+            for gender_entry in gender_recos:
+                grouped_by_adgroup[gender_entry.ad_group_id].append(gender_entry)
+
+            blocked_adgroups = set()
 
             for ad_group_id, recos in grouped_by_adgroup.items():
-                genders_present = {r.gender for r in recos}
+                if all(r.recommendation == "REMOVE" for r in recos):
+                    blocked_adgroups.add(ad_group_id)
 
-                # Rule: same ad_group_id must contain all three genders
-                if genders_present == {"MALE", "FEMALE", "UNDETERMINED"}:
-                    # Rule: all three recommendations are REMOVE
-                    if all(r.recommendation == "REMOVE" for r in recos):
-                        for r in recos:
-                            r.recommendation = ""
+            campaign.fields.gender = [
+                g for g in gender_recos if g.ad_group_id not in blocked_adgroups
+            ]
 
         return parsed.recommendations
 

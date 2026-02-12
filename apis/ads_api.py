@@ -209,26 +209,3 @@ async def generate_age_optimization(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/optimize/gender")
-async def generate_gender_optimization(
-    clientCode: str = Header(...),
-    loginCustomerId: str = Header(...),
-    customerId: str = Header(...),
-    campaignId: str = Query(...),
-    duration: str = Query(...),
-):
-    try:
-        result = await generate_gender_optimizations(
-            customer_id=customerId,
-            login_customer_id=loginCustomerId,
-            campaign_id=campaignId,
-            client_code=clientCode,
-            duration=duration,
-        )
-        return {"status": "success", "data": result}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
