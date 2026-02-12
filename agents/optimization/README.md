@@ -6,7 +6,7 @@ All optimization agents share: `api/optimization.py` entry point, `CampaignRecom
 
 | File | Purpose |
 |------|---------|
-| `api/optimization.py` | API routes (`/api/ds/optimize/{age,search-terms,keywords}`) |
+| `api/optimization.py` | API routes (`/api/ds/optimize/{age,search-terms,keywords,locations}`) |
 | `adapters/google/accounts.py` | Fetch accessible accounts for a client |
 | `core/models/optimization.py` | `CampaignRecommendation`, `KeywordRecommendation`, `OptimizationFields` |
 | `core/services/recommendation_storage.py` | Store recommendations, merge by origin |
@@ -252,6 +252,72 @@ sequenceDiagram
 
 ---
 
+## 4. Location Optimization
+
+`POST /api/ds/optimize/locations` → `LocationOptimizationAgent`
+
+### Flow
+
+```mermaid
+sequenceDiagram
+    participant API
+    participant AGT as LocationOptimizationAgent
+    participant ADP as GoogleLocationAdapter
+    participant EVL as LocationEvaluator
+    participant EXT as Google Ads API
+
+    API->>AGT: generate_recommendations(client_code)
+
+    AGT->>EXT: Fetch accounts
+
+    loop Per Account (parallel)
+        AGT->>ADP: fetch_campaign_location_targets() [GAQL]
+        AGT->>ADP: fetch_location_performance() [GAQL]
+        AGT->>ADP: fetch_geo_target_details() [GAQL]
+
+        loop Per Campaign
+            AGT->>EVL: evaluate_campaign(targeted_locations, metrics, details)
+            EVL->>EVL: Apply thresholds → ADD or REMOVE
+            EVL-->>AGT: LocationRecommendation[]
+        end
+    end
+
+    AGT->>AGT: Store all recommendations
+    AGT-->>API: {recommendations}
+```
+
+### File Map
+
+| File | Purpose |
+|------|---------|
+| `agents/optimization/location_optimization_agent.py` | Orchestrator — accounts, campaigns, evaluation |
+| `core/services/location_evaluator.py` | Rule-based evaluation (thresholds for ADD/REMOVE) |
+| `adapters/google/optimization/location.py` | 3 GAQL queries: targets, performance, geo details |
+
+### How It Works
+
+- Fetches current location targets, last-30-day location performance, and geo target metadata (3 GAQL queries per account)
+- `LocationEvaluator` applies purely programmatic thresholds — **zero LLM calls**
+- Recommendations: ADD (target converting non-targeted locations) or REMOVE (exclude non-converting high-spend locations)
+- ADD recommendations with unknown location names are filtered out
+
+### Evaluation Thresholds
+
+| Recommendation | Condition | Reason |
+|----------------|-----------|--------|
+| **REMOVE** | Targeted location with clicks ≥ 50, spend > ₹10, conversions = 0 | High spend & clicks but zero conversions |
+| **ADD** | Non-targeted location with conversions > 0 | Conversions from non-targeted location |
+
+### LLM Calls
+
+None — entirely rule-based.
+
+### Metrics Collected
+
+Impressions, clicks, conversions, cost (INR), CTR (%), avg CPC (INR), CPL (INR), conversion rate (%).
+
+---
+
 ## Architecture Overview
 
 ```mermaid
@@ -259,10 +325,12 @@ graph TD
     API[api/optimization.py] --> KW[KeywordOptimizationAgent]
     API --> ST[SearchTermOptimizationAgent]
     API --> AGE[AgeOptimizationAgent]
+    API --> LOC[LocationOptimizationAgent]
 
     KW --> ACC[GoogleAccountsAdapter]
     ST --> ACC
     AGE --> ACC
+    LOC --> ACC
 
     KW --> KWA[GoogleKeywordAdapter]
     KW --> EVL[MetricPerformanceEvaluator]
@@ -278,9 +346,13 @@ graph TD
 
     AGE --> AGA[GoogleAgeAdapter]
 
+    LOC --> LCA[GoogleLocationAdapter]
+    LOC --> LCE[LocationEvaluator]
+
     KW --> STR[RecommendationStorage]
     ST --> STR
     AGE --> STR
+    LOC --> STR
 
     SE --> OAI[OpenAI / Embeddings]
     KIS --> OAI
