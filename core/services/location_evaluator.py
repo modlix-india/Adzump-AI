@@ -14,7 +14,7 @@ class LocationEvaluator:
     def evaluate_campaign(
         self,
         campaign_id: str,
-        targeted_locations: set,
+        targeted_locations: dict[str, str],
         geo_metrics: dict[str, dict],
         geo_details: dict[str, dict],
     ) -> list[LocationRecommendation]:
@@ -26,17 +26,18 @@ class LocationEvaluator:
 
             is_targeted = geo_constant in targeted_locations
             recommendation, reason = self._evaluate_location(metrics, is_targeted)
-            if not recommendation:
-                continue
 
             geo = geo_details.get(geo_constant, {})
             location_name = geo.get("location_name", "Unknown")
+
+            if not recommendation:
+                continue
 
             if recommendation == "ADD" and (not location_name or location_name == "Unknown"):
                 continue
 
             recommendations.append(LocationRecommendation(
-                resource_name=geo_constant,
+                resource_name=targeted_locations.get(geo_constant) if is_targeted else None,
                 geo_target_constant=geo_constant,
                 location_name=location_name,
                 country_code=geo.get("country_code"),

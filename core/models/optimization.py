@@ -35,7 +35,7 @@ class KeywordRecommendation(BaseModel):
 
 
 class LocationRecommendation(BaseModel):
-    resource_name: str
+    resource_name: Optional[str] = None
     geo_target_constant: str
     location_name: str
     country_code: Optional[str] = None

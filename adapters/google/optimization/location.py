@@ -20,6 +20,7 @@ class GoogleLocationAdapter:
         today = date.today().isoformat()
         query = f"""
         SELECT campaign.id, campaign.name, campaign.advertising_channel_type,
+               campaign_criterion.resource_name,
                campaign_criterion.location.geo_target_constant
         FROM campaign_criterion
         WHERE campaign.status = 'ENABLED'
@@ -104,17 +105,15 @@ class GoogleLocationAdapter:
                     "campaign_id": campaign_id,
                     "campaign_name": campaign.get("name"),
                     "campaign_type": campaign.get("advertisingChannelType"),
-                    "targeted_locations": set(),
+                    "targeted_locations": {},
                 },
             )
 
-            geo_constant = (
-                row.get("campaignCriterion", {})
-                .get("location", {})
-                .get("geoTargetConstant")
-            )
+            criterion = row.get("campaignCriterion", {})
+            geo_constant = criterion.get("location", {}).get("geoTargetConstant")
+            criterion_resource_name = criterion.get("resourceName")
             if geo_constant:
-                campaigns[campaign_id]["targeted_locations"].add(geo_constant)
+                campaigns[campaign_id]["targeted_locations"][geo_constant] = criterion_resource_name
 
         return campaigns
 
