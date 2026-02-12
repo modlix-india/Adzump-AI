@@ -6,22 +6,25 @@ import httpx
 from structlog import get_logger  # type: ignore
 
 from third_party.google.services import ads_service
+from structlog import get_logger  # type: ignore
+import requests
+from third_party.google.services import ads_service, keywords_service
 from services.search_term_analyzer import analyze_search_term_performance
 from services.openai_client import chat_completion
+from utils import google_dateutils as date_utils
 from oserver.services.connection import fetch_google_api_token_simple
 from services.json_utils import safe_json_parse
-import utils.date_utils as date_utils
+from utils.google_dateutils import format_date_range
 from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
 
-
-# Prompt loader
 def load_search_term_prompt(file_name: str) -> str:
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prompt_path = os.path.join(root_dir, "prompts", "search_term", file_name)
     with open(prompt_path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 
 # Pipeline
@@ -180,7 +183,7 @@ class SearchTermPipeline:
             "Content-Type": "application/json",
         }
 
-        duration_clause = date_utils.format_duration_clause(self.duration)
+        duration_clause = format_date_range(self.duration)
 
         query = f"""
         SELECT

@@ -1,18 +1,24 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Header, status, Body, Query
+from services.google_kw_update_service.google_keywords_update_service import (
+    GoogleAdsKeywordUpdateService,
+)
 from services.search_term_service import process_search_terms
 from services.google_keywords_service import GoogleKeywordService
 from services.ads_service import generate_ad_assets
 from services.budget_recommendation_service import generate_budget_recommendations
 from services.create_campaign_service import CampaignServiceError
-from models.keyword_model import KeywordResearchRequest, GoogleNegativeKwReq
+from models.keyword_model import (
+    KeywordResearchRequest,
+    GoogleNegativeKwReq,
+)
+from third_party.google.models.keyword_model import UpdateKeywordsStrategyRequest
 from utils.response_helpers import error_response, success_response
 from models.search_campaign_data_model import GenerateCampaignRequest
 from services import create_campaign_service, chat_service
 # TODO: Remove age optimization import - replaced by api/optimization.py
 from services.age_optimization_service import generate_age_optimizations
 from services.gender_optimization_service import generate_gender_optimizations
-
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -40,6 +46,7 @@ async def create_ad_assets(
 
 
 gks = GoogleKeywordService()
+gs_update = GoogleAdsKeywordUpdateService()
 
 
 @router.post("/gks/positive")
@@ -163,6 +170,17 @@ async def analyze_search_terms_route(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# TODO: remove after verifying new flow (api/optimization.py → KeywordOptimizationAgent) is working
+@router.post("/keywords/analyze-update")
+async def analyze_update_keywords(
+    request: UpdateKeywordsStrategyRequest,
+):
+    result = await gs_update.analyze_and_update_campaign_keywords(
+        keyword_update_request=request,
+    )
+    return success_response(data=result.model_dump())
 
 
 @router.get("/get-basic-details/{session_id}")

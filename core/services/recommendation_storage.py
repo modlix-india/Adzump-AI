@@ -84,9 +84,10 @@ class RecommendationStorageService:
             for item in new_items:
                 item["applied"] = False
             existing = fields.get(key, [])
-            # keywords have origin (e.g. SEARCH_TERM, KEYWORD_PLANNER)
+            # keywords have origin (e.g. SEARCH_TERM, KEYWORD)
             # replace only matching origin items, preserve others
             # for non-keyword fields (e.g. age), overwrite entirely
+            # TODO: handle duplicate text across origins (e.g. SEARCH_TERM and KEYWORD suggest same keyword)
             if key in ("keywords", "negativeKeywords"):
                 origins = {item.get("origin") for item in new_items if item.get("origin")}
                 kept = [item for item in existing if item.get("origin") not in origins]

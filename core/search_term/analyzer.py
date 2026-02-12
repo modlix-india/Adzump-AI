@@ -6,10 +6,9 @@ from structlog import get_logger
 from services.openai_client import chat_completion
 from services.json_utils import safe_json_parse
 from utils.prompt_loader import load_prompt
-from agents.optimization.config import SEARCH_TERM_COST_PER_CONVERSION_THRESHOLD
-
 logger = get_logger(__name__)
 
+SEARCH_TERM_COST_PER_CONVERSION_THRESHOLD = 4000.0
 PROMPT_DIR = "optimization/search_term"
 
 MATCH_LEVEL_TO_STRENGTH = {
