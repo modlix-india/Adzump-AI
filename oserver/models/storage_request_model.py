@@ -29,10 +29,22 @@ class StorageFilter(BaseModel):
     field: str = Field(..., description="Field name to filter records by")
     value: Any = Field(..., description="Value to match for the given field")
 
+class FilterCondition(BaseModel):
+    field: str
+    operator: str = "EQUALS"
+    value: Any = None
+    negate: bool = False
+
+class ComplexCondition(BaseModel):
+    operator: str = "AND"
+    conditions: List[FilterCondition] = []
+    negate: bool = False
+
 class StorageReadRequest(BaseModel):
     storageName: str = Field(..., description="Name of the storage to read from")
     appCode: str = Field(default="marketingai", description="App code in NCLC")
     clientCode: str = Field(..., description="Client code for tenant identification")
     eager: bool = Field(default=False, description="Whether to eagerly load related data")
     eagerFields: List[str] = Field(default_factory=list, description="List of fields to eagerly load")
-    filter: Optional[StorageFilter] = Field(None, description="Optional filter condition for fetching specific records")
+    filter: Optional[StorageFilter | ComplexCondition] = Field(None, description="Filter condition - simple StorageFilter or ComplexCondition for multiple filters")
+    size: Optional[int] = Field(None, description="Number of records per page")
