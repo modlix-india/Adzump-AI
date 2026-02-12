@@ -37,7 +37,7 @@ STRICT VISUAL RULES (NON-NEGOTIABLE)
 - NO readable text of any kind
 - NO graphic design elements or overlays
 - NO posters, banners, or floating UI
-- Screens (laptops, phones, monitors) are allowed ONLY as abstract, non-readable elements
+- Screens are allowed only if the business is SaaS, App, or Software, and must be blurred and non-readable
 - If screens appear, they must show blurred or generic content with no text or logos
 - Lighting, scale, perspective, and materials must be physically realistic
 - Background must be natural and softly defocused

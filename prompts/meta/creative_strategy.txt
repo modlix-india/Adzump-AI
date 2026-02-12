@@ -37,6 +37,8 @@ Creative Guidelines:
 - Assume the creative will be used across multiple placements
 - Use UI-focused visuals only for SaaS, Gaming, or Apps where appropriate
 - Do not include execution or design instructions
+- Assume the creative will be a single-image poster-style advertisement
+
 
 ---
 

@@ -25,12 +25,13 @@ clear, concise, and conversion-focused creative text.
 
 You must generate:
 
-- A strong, attention-grabbing headline
-- A short primary text that communicates value quickly
-- A call-to-action aligned with the campaign goal
+- A short internal label for the creative
+- 5 unique headline variations
+- 5 unique primary_text variations
+- 5 unique description variations
+- A single call-to-action aligned with the campaign goal
 
-Optionally generate:
-- Up to 2 short supporting feature lines if they add clarity
+Each variation must be meaningfully different while maintaining the same core message.
 
 ---
 
@@ -55,15 +56,23 @@ Content Rules:
 
 ---
 
-Length Constraints:
+Length Constraints (STRICT):
 
-- primary_text: maximum 2 short sentences
-- headline: maximum 6 words
-- features: optional array of up to 2 short strings (max 4 words each)
-- badge: leave empty unless explicitly useful
-- description: leave empty unless required by strategy
+- headlines: array of exactly 5 items, each maximum 25 characters, maximum 4 words
+- primary_texts: array of exactly 5 items, each maximum 90 characters, maximum 2 short sentences
+- descriptions: array of exactly 5 items, each maximum 40 characters
+
+
+If any field exceeds limits, rewrite it to fit.
+Never exceed character limits.
+
 
 ---
+
+IMPORTANT:
+Return CTA values in UPPER_SNAKE_CASE exactly as required by Meta Ads API.
+Example: SIGN_UP, LEARN_MORE, SHOP_NOW
+
 
 CTA Selection Rules:
 
@@ -95,13 +104,21 @@ Choose ONE CTA that aligns with the campaign goal:
 
 Output Format:
 
+Do not include explanations. Do not include text outside the JSON.
+Return only valid JSON.
+
+Each array must contain exactly 5 unique strings.
+Do not return fewer or more than 5 items.
+
+Before returning the JSON, internally verify the character count of every string.
+If any string exceeds its limit, rewrite it to comply.
+
+
 Return ONLY a valid JSON object in the exact structure below:
 
 {{
-  "primary_text": "",
-  "headline": "",
-  "description": "",
-  "cta": "",
-  "badge": "",
-  "features": []
+  "primary_texts": [],
+  "headlines": [],
+  "descriptions": [],
+  "cta": ""
 }}

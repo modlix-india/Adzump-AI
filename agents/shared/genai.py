@@ -1,6 +1,7 @@
 from functools import lru_cache
 import os
 from typing import List
+
 from google import genai
 from google.genai import types
 
@@ -8,14 +9,17 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 
 @lru_cache(maxsize=1)
-def get_client():
+def get_client() -> genai.Client:
     return genai.Client(api_key=GEMINI_API_KEY)
 
 
 async def text_completion(
     prompt: str,
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-2.0-flash",
 ) -> str:
+    """
+    Generate text completion using Gemini text model.
+    """
     client = get_client()
 
     response = client.models.generate_content(
@@ -29,13 +33,12 @@ async def text_completion(
 async def generate_images(
     prompt: str,
     n: int = 1,
-    model: str = "gemini-2.5-flash-image"
+    model: str = "gemini-2.5-flash-image",
 ) -> List[bytes]:
     """
     Generate images using Gemini image model.
     Returns raw image BYTES.
     """
-
     client = get_client()
 
     response = client.models.generate_content(
@@ -53,7 +56,7 @@ async def generate_images(
 
     for candidate in response.candidates:
         if not candidate.content or not candidate.content.parts:
-            continue 
+            continue
 
         for part in candidate.content.parts:
             if (
