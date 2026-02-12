@@ -1,4 +1,5 @@
 import os
+import time
 
 import httpx
 import structlog
@@ -14,6 +15,11 @@ from exceptions.custom_exceptions import (
 
 logger = structlog.get_logger(__name__)
 
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+_cached_google_api_token: str | None = None
+_google_api_token_expiry: float = 0
+
 
 class GoogleAdsClient:
     BASE_URL = "https://googleads.googleapis.com"
@@ -23,22 +29,20 @@ class GoogleAdsClient:
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
     async def get(self, endpoint: str, client_code: str) -> dict:
-        """Execute a GET request against the Google Ads REST API."""
-        token = self._get_token(client_code)
+        token = self._get_google_api_token(client_code)
         url = f"{self.BASE_URL}/{self.API_VERSION}/{endpoint}"
         response = await http_request(
             "GET",
             url,
-            headers=self._headers(token),
-            error_handler=_handle_google_error,
+            headers=self._build_auth_headers(token),
+            error_handler=_raise_google_error,
         )
         return response.json()
 
     async def search_stream(
         self, query: str, customer_id: str, login_customer_id: str, client_code: str
     ) -> list:
-        """Execute GAQL query via searchStream."""
-        token = self._get_token(client_code)
+        token = self._get_google_api_token(client_code)
         url = f"{self.BASE_URL}/{self.API_VERSION}/customers/{customer_id}/googleAds:searchStream"
 
         # TODO: Use httpx stream reading (client.stream + aiter_lines) to process
@@ -46,19 +50,19 @@ class GoogleAdsClient:
         response = await http_request(
             "POST",
             url,
-            headers=self._headers(token, login_customer_id),
+            headers=self._build_auth_headers(token, login_customer_id),
             json={"query": query},
-            error_handler=_handle_google_error,
-            retry_delay_parser=_parse_google_retry_delay,
+            error_handler=_raise_google_error,
+            retry_delay_parser=_extract_retry_delay,
         )
         return self._parse_stream(response.json())
 
-    def _get_token(self, client_code: str) -> str:
-        return os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(
-            client_code
-        )
+    def _get_google_api_token(self, client_code: str) -> str:
+        return _get_oauth_token() or fetch_google_api_token_simple(client_code)
 
-    def _headers(self, access_token: str, login_customer_id: str | None = None) -> dict:
+    def _build_auth_headers(
+        self, access_token: str, login_customer_id: str | None = None
+    ) -> dict:
         if not self.developer_token or not access_token:
             raise GoogleAPIException(
                 message="Missing Google Ads credentials",
@@ -86,7 +90,48 @@ class GoogleAdsClient:
         return response_json.get("results", [])
 
 
-def _handle_google_error(response: httpx.Response) -> None:
+def _get_oauth_token() -> str | None:
+    global _cached_google_api_token, _google_api_token_expiry
+    refresh_token = os.getenv("GOOGLE_ADS_REFRESH_TOKEN")
+    if not refresh_token:
+        return None
+
+    if _cached_google_api_token and time.time() < _google_api_token_expiry:
+        return _cached_google_api_token
+
+    try:
+        response = httpx.post(
+            GOOGLE_TOKEN_URL,
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": os.getenv("GOOGLE_ADS_CLIENT_ID"),
+                "client_secret": os.getenv("GOOGLE_ADS_CLIENT_SECRET"),
+            },
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError:
+        error_body = response.text
+        logger.error(
+            "Local OAuth token refresh failed",
+            component="google-auth",
+            status=response.status_code,
+            error=error_body,
+        )
+        raise GoogleAdsAuthException(
+            message="Google OAuth token refresh failed. Check GOOGLE_ADS_REFRESH_TOKEN, CLIENT_ID, and CLIENT_SECRET in .env",
+            details={"status": response.status_code, "error": error_body},
+        )
+
+    token_data = response.json()
+    _cached_google_api_token = token_data["access_token"]
+    _google_api_token_expiry = time.time() + token_data.get("expires_in", 3600) - 60
+    logger.info("Google OAuth token refreshed", component="google-auth")
+
+    return _cached_google_api_token
+
+
+def _raise_google_error(response: httpx.Response) -> None:
     if response.status_code in (401, 403):
         raise GoogleAdsAuthException(
             message=f"Google Ads API authentication failed ({response.status_code})",
@@ -103,7 +148,7 @@ def _handle_google_error(response: httpx.Response) -> None:
     )
 
 
-def _parse_google_retry_delay(response: httpx.Response, default_delay: float) -> float:
+def _extract_retry_delay(response: httpx.Response, default_delay: float) -> float:
     try:
         hint = (
             response.json()

@@ -6,8 +6,8 @@ from core.infrastructure.context import auth_context
 from core.infrastructure.http_client import http_request
 from adapters.google.client import (
     GoogleAdsClient,
-    _handle_google_error,
-    _parse_google_retry_delay,
+    _raise_google_error,
+    _extract_retry_delay,
 )
 
 logger = get_logger(__name__)
@@ -60,8 +60,8 @@ class GoogleKeywordPlannerAdapter:
                 endpoint,
                 headers=headers,
                 json=payload,
-                error_handler=_handle_google_error,
-                retry_delay_parser=_parse_google_retry_delay,
+                error_handler=_raise_google_error,
+                retry_delay_parser=_extract_retry_delay,
             )
 
             for idea in response.json().get("results", []):

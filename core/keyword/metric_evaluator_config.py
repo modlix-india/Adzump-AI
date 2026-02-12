@@ -19,8 +19,6 @@ class MetricEvaluatorConfig:
 
 
 KEYWORD_CONFIG = MetricEvaluatorConfig()
-SEARCH_TERM_CONFIG = MetricEvaluatorConfig(ctr_threshold=1.5, critical_cost_threshold=1500.0)
-AGE_CONFIG = MetricEvaluatorConfig(ctr_threshold=1.0, min_clicks_for_conversions=25)
 
 
 # TODO: group_by_campaign may not belong here. Extracted from metric_performance_evaluator
