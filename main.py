@@ -2,12 +2,14 @@ import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # Load env vars before other imports
 
 from config.logging_config import setup_logging
+
 setup_logging()
 
 from structlog import get_logger  # type: ignore
+
 logger = get_logger(__name__)
 from fastapi import FastAPI
 from sqlalchemy import text
