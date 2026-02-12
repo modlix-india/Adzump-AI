@@ -4,7 +4,6 @@ from typing import Optional
 import requests
 from structlog import get_logger
 
-from core.context import auth_context
 from oserver.utils.helpers import get_base_url
 from exceptions.custom_exceptions import CoreTokenException
 
@@ -23,9 +22,6 @@ def fetch_oauth_token(
     headers = {
         "appcode": resolved_appcode,
         "clientcode": client_code,
-        "authorization": auth_context.access_token,
-        "X-Forwarded-Host": auth_context.x_forwarded_host,
-        "X-Forwarded-Port": auth_context.x_forwarded_port,
     }
 
     try:
