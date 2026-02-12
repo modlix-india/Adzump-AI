@@ -39,8 +39,8 @@ class GoogleKeywordPlannerAdapter:
         by keyword text, keeping the entry with the highest search volume.
         """
         location_ids = location_ids or self.DEFAULT_LOCATION_IDS
-        token = self.client._get_token(auth_context.client_code)
-        headers = self.client._headers(token, login_customer_id)
+        token = self.client._get_google_api_token(auth_context.client_code)
+        headers = self.client._build_auth_headers(token, login_customer_id)
         endpoint = (
             f"{self.client.BASE_URL}/{self.client.API_VERSION}"
             f"/customers/{customer_id}:generateKeywordIdeas"
