@@ -24,17 +24,6 @@ class CriterionTargetingBuilder:
     ) -> List[Dict[str, Any]]:
         operations = []
         for age_recommendation in recommendations:
-            # Validate age range type
-            error = self.validator.validate_age_range(age=age_recommendation)
-            if error:
-                logger.error(
-                    "Age range validation failed",
-                    error=error,
-                    age_range=age_recommendation.age_range,
-                    ad_group_id=age_recommendation.ad_group_id,
-                )
-                continue  # Skip invalid age range
-
             if age_recommendation.recommendation == "ADD":
                 operations.append(
                     {
@@ -69,17 +58,6 @@ class CriterionTargetingBuilder:
     ) -> List[Dict[str, Any]]:
         operations = []
         for gender_recommendation in recommendations:
-            # Validate gender type
-            error = self.validator.validate_gender_type(gender=gender_recommendation)
-            if error:
-                logger.error(
-                    "Gender type validation failed",
-                    error=error,
-                    gender_type=gender_recommendation.gender_type,
-                    ad_group_id=gender_recommendation.ad_group_id,
-                )
-                continue  # Skip invalid gender type
-
             if gender_recommendation.recommendation == "ADD":
                 operations.append(
                     {
@@ -221,14 +199,9 @@ class CriterionTargetingBuilder:
                             "create": {
                                 parent_key: f"customers/{context.account_id}/{parent_key}s/{parent_id}",
                                 **criterion,
-                            }
+                            },
                         }
                     }
-                )
-                logger.info(
-                    "Built proximity ADD operation",
-                    radius=prox_rec.radius,
-                    level=prox_rec.level,
                 )
             elif prox_rec.recommendation == "REMOVE":
                 if not prox_rec.resource_name:

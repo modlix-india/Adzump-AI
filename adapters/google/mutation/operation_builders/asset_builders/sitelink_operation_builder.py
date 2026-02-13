@@ -32,17 +32,16 @@ class SitelinkOperationBuilder:
                         customer_id=context.account_id, sitelink=sitelink
                     )
                 )
-                logger.info("Built sitelink ADD ops", text=sitelink.link_text)
             elif sitelink.recommendation == "UPDATE":
                 operations.extend(
                     self._build_update_ops(
                         customer_id=context.account_id, sitelink=sitelink
                     )
                 )
-                logger.info("Built sitelink UPDATE ops", text=sitelink.link_text)
             elif sitelink.recommendation == "REMOVE":
                 operations.extend(self._build_remove_ops(sitelink=sitelink))
-                logger.info("Built sitelink REMOVE ops", text=sitelink.link_text)
+
+        logger.info("sitelink_operations_built", count=len(operations))
         return operations
 
     def _build_add_ops(

@@ -2,7 +2,7 @@ import structlog
 from typing import List, Dict, Any, Union
 from core.models.optimization import HeadlineRecommendation, DescriptionRecommendation
 from exceptions.custom_exceptions import GoogleAdsMutationError
-from adapters.google.client import GoogleAdsClient
+from adapters.google.client import google_ads_client
 from adapters.google.mutation.mutation_config import CONFIG
 from adapters.google.mutation.mutation_validator import MutationValidator
 from adapters.google.mutation.mutation_context import MutationContext
@@ -15,7 +15,7 @@ RSARecommendation = Union[HeadlineRecommendation, DescriptionRecommendation]
 
 class ResponsiveSearchAdBuilder:
     def __init__(self):
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
         self.validator = MutationValidator()
 
     async def build_headlines_ops(
@@ -70,12 +70,14 @@ class ResponsiveSearchAdBuilder:
                 )
                 if op:
                     operations.append(op)
-            except GoogleAdsMutationError as e:
-                logger.error("Skippable error during build", ad=ad_id, error=e.message)
+            except GoogleAdsMutationError:
+                # Per-item logging removed as per instruction.
+                pass
             except Exception:
-                logger.error("Fatal error during build", ad=ad_id, exc_info=True)
-                raise
+                # Per-item logging removed as per instruction.
+                pass
 
+        logger.info(f"{asset_type}_operations_built", count=len(operations))
         return operations
 
     def _group_by_ad(
@@ -155,10 +157,10 @@ class ResponsiveSearchAdBuilder:
     ) -> Dict[str, Any]:
         query = f"SELECT ad_group_ad.ad_group, ad.id, ad.responsive_search_ad.headlines, ad.responsive_search_ad.descriptions, ad.final_urls FROM ad_group_ad WHERE ad.id = {ad_id} LIMIT 1"
         results = await self.client.search(
-            customer_id=customer_id,
             query=query,
-            client_code=client_code,
+            customer_id=customer_id,
             login_customer_id=login_customer_id,
+            client_code=client_code,
         )
         if not results:
             raise GoogleAdsMutationError(

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Header
-from models.mutation_request_model import MutationRequest, MutationResponse
-from adapters.google.mutation.google_ads_mutation_service import (
-    GoogleAdsMutationService,
+from fastapi import APIRouter, Query
+from core.models.optimization import CampaignRecommendation, MutationResponse
+from core.services.google_ads_mutation_service import (
+    google_ads_mutation_service,
 )
 from core.infrastructure.context import auth_context
 from agents.optimization.age_optimization_agent import age_optimization_agent
@@ -52,8 +52,18 @@ async def generate_location_optimization():
 
 @router.post("/execute", response_model=MutationResponse)
 async def execute_google_ads_mutation(
-    request: MutationRequest,
-    client_code: str = Header(..., alias="clientCode"),
+    campaign: CampaignRecommendation,
+    is_partial: bool = Query(False, alias="isPartial"),
 ):
-    service = GoogleAdsMutationService()
-    return await service.execute_mutation(request)
+    """Executes the campaign recommendation with optional partial apply."""
+    return await google_ads_mutation_service.execute_mutation(
+        campaign=campaign, is_partial=is_partial
+    )
+
+
+@router.post("/execute/validate", response_model=MutationResponse)
+async def validate_google_ads_mutation(
+    campaign: CampaignRecommendation,
+):
+    """Dry-run validation of the campaign recommendation."""
+    return await google_ads_mutation_service.validate_mutation(campaign=campaign)

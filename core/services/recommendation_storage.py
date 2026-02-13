@@ -137,12 +137,21 @@ class RecommendationStorageService:
     ) -> CampaignRecommendation:
         """Mark items as applied locally, handle completion status, and sync with storage."""
         # Mark fields as applied locally for the response
-        updated_fields_obj = self.mark_fields_as_applied_locally(recommendation.fields)
+        fields = recommendation.fields
+        updated_data = {
+            name: [
+                item.model_copy(update={"applied": True})
+                for item in getattr(fields, name)
+            ]
+            for name in fields.model_fields.keys()
+            if getattr(fields, name)
+        }
+        updated_fields_obj = fields.model_copy(update=updated_data)
 
         # Update completion status based on isPartial flag
         new_completed = not is_partial
 
-        updated_recommendation = recommendation.copy(
+        updated_recommendation = recommendation.model_copy(
             update={"fields": updated_fields_obj, "completed": new_completed}
         )
 
@@ -151,17 +160,6 @@ class RecommendationStorageService:
             await self.sync_mutation_result(updated_recommendation, is_partial)
 
         return updated_recommendation
-
-    def mark_fields_as_applied_locally(self, fields):
-        """Helper to mark all passed recommendations as applied."""
-        updated_data = {
-            name: [
-                item.copy(update={"applied": True}) for item in getattr(fields, name)
-            ]
-            for name in fields.model_fields.keys()
-            if getattr(fields, name)
-        }
-        return fields.copy(update=updated_data)
 
     def _merge_applied_status(
         self, existing_fields: dict, incoming_applied_fields: dict

@@ -44,9 +44,6 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built keyword ADD operation", text=keyword_recommendation.text
-                )
             elif keyword_recommendation.recommendation == "PAUSE":
                 operations.append(
                     {
@@ -59,11 +56,9 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built keyword PAUSE operation",
-                    resource=keyword_recommendation.resource_name,
-                )
             elif keyword_recommendation.recommendation == "REMOVE":
+                # NOTE: Currently unreachable — KeywordRecommendation only allows "ADD" | "PAUSE".
+                # Kept for future support when REMOVE is added to the model.
                 operations.append(
                     {
                         "adGroupCriterionOperation": {
@@ -71,10 +66,8 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built keyword REMOVE operation",
-                    resource=keyword_recommendation.resource_name,
-                )
+
+        logger.info("keyword_operations_built", count=len(operations))
         return operations
 
     async def build_negative_keywords_ops(
@@ -82,6 +75,7 @@ class KeywordOperationBuilder:
         recommendations: List[KeywordRecommendation],
         context: MutationContext,
     ) -> List[Dict[str, Any]]:
+        # TODO: Refactor to reduce duplication with build_keywords_ops
         operations = []
         for keyword_recommendation in recommendations:
             if keyword_recommendation.recommendation == "ADD":
@@ -115,11 +109,9 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built negative keyword ADD operation",
-                    text=keyword_recommendation.text,
-                )
             elif keyword_recommendation.recommendation == "REMOVE":
+                # NOTE: Currently unreachable — KeywordRecommendation only allows "ADD" | "PAUSE".
+                # Kept for future support when REMOVE is added to the model.
                 operations.append(
                     {
                         "adGroupCriterionOperation": {
@@ -127,8 +119,6 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built negative keyword REMOVE operation",
-                    resource=keyword_recommendation.resource_name,
-                )
+
+        logger.info("negative_keyword_operations_built", count=len(operations))
         return operations

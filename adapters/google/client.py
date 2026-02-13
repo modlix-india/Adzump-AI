@@ -41,10 +41,10 @@ class GoogleAdsClient:
 
     async def search(
         self,
-        customer_id: str,
         query: str,
+        customer_id: str,
+        login_customer_id: str,
         client_code: str,
-        login_customer_id: str | None = None,
     ) -> list:
         """Execute GAQL query via googleAds:search."""
         token = self._get_google_api_token(client_code)
@@ -200,3 +200,7 @@ def _extract_retry_delay(response: httpx.Response, default_delay: float) -> floa
     except (KeyError, ValueError, IndexError):
         pass
     return default_delay
+
+
+# Singleton instance for shared use
+google_ads_client = GoogleAdsClient()

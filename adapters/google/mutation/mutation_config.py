@@ -1,5 +1,16 @@
 from dataclasses import dataclass, field
 from typing import FrozenSet
+from core.models.optimization import (
+    HEADLINE_MAX_LENGTH,
+    DESCRIPTION_MAX_LENGTH,
+    SITELINK_TEXT_MAX_LENGTH,
+    SITELINK_DESCRIPTION_MAX_LENGTH,
+    KEYWORD_MAX_LENGTH,
+    URL_MAX_LENGTH,
+    AGE_RANGE_VALUES,
+    GENDER_RANGE_VALUES,
+    MATCH_TYPE_VALUES,
+)
 
 # Source for System limits: https://developers.google.com/google-ads/api/docs/best-practices/system-limits
 
@@ -10,7 +21,7 @@ class _HeadlineConfig:
 
     # Source1:https://support.google.com/google-ads/answer/7684791
     # Source2: https://support.google.com/google-ads/answer/1704389
-    MAX_LENGTH: int = 30
+    MAX_LENGTH: int = HEADLINE_MAX_LENGTH
     MIN_COUNT: int = 3
     MAX_COUNT: int = 15
 
@@ -21,7 +32,7 @@ class _DescriptionConfig:
 
     # Source1:https://support.google.com/google-ads/answer/7684791
     # Source2: https://support.google.com/google-ads/answer/1704389
-    MAX_LENGTH: int = 90
+    MAX_LENGTH: int = DESCRIPTION_MAX_LENGTH
     MIN_COUNT: int = 2
     MAX_COUNT: int = 4
 
@@ -32,8 +43,8 @@ class _SitelinkConfig:
 
     # Source1: https://developers.google.com/google-ads/api/reference/rpc/v23/SitelinkAsset
     # Source2: https://support.google.com/google-ads/answer/2375416
-    LINK_TEXT_MAX_LENGTH: int = 25
-    DESCRIPTION_MAX_LENGTH: int = 35
+    LINK_TEXT_MAX_LENGTH: int = SITELINK_TEXT_MAX_LENGTH
+    DESCRIPTION_MAX_LENGTH: int = SITELINK_DESCRIPTION_MAX_LENGTH
     MIN_COUNT: int = 2
     MAX_DISPLAY_DESKTOP: int = 6
     MAX_DISPLAY_MOBILE: int = 8
@@ -59,18 +70,7 @@ class _AgeConfig:
 
     # Source: https://developers.google.com/google-ads/api/reference/rpc/v21/AgeRangeTypeEnum.AgeRangeType
     VALID_RANGES: FrozenSet[str] = field(
-        default_factory=lambda: frozenset(
-            {
-                "AGE_RANGE_18_24",
-                "AGE_RANGE_25_34",
-                "AGE_RANGE_35_44",
-                "AGE_RANGE_45_54",
-                "AGE_RANGE_55_64",
-                "AGE_RANGE_65_UP",
-                "AGE_RANGE_UNDETERMINED",
-                # Note: UNSPECIFIED and UNKNOWN are system values, not used for targeting
-            }
-        )
+        default_factory=lambda: frozenset(AGE_RANGE_VALUES)
     )
 
 
@@ -80,14 +80,7 @@ class _GenderConfig:
 
     # Source: https://developers.google.com/google-ads/api/reference/rpc/v21/GenderTypeEnum.GenderType
     VALID_TYPES: FrozenSet[str] = field(
-        default_factory=lambda: frozenset(
-            {
-                "MALE",
-                "FEMALE",
-                "UNDETERMINED",
-                # Note: UNSPECIFIED and UNKNOWN are system values, not used for targeting
-            }
-        )
+        default_factory=lambda: frozenset(GENDER_RANGE_VALUES)
     )
 
 
@@ -96,16 +89,9 @@ class _KeywordConfig:
     """Constraints for Keyword criteria."""
 
     # Source: https://developers.google.com/google-ads/api/reference/rpc/v23/KeywordInfo
-    MAX_LENGTH: int = 80
+    MAX_LENGTH: int = KEYWORD_MAX_LENGTH
     VALID_MATCH_TYPES: FrozenSet[str] = field(
-        default_factory=lambda: frozenset(
-            {
-                "EXACT",
-                "PHRASE",
-                "BROAD",
-                # Note: UNSPECIFIED and UNKNOWN are system values
-            }
-        )
+        default_factory=lambda: frozenset(MATCH_TYPE_VALUES)
     )
 
 
@@ -121,7 +107,7 @@ class GoogleAdsMutationConfig:
     AGE: _AgeConfig = field(default_factory=_AgeConfig)
     GENDER: _GenderConfig = field(default_factory=_GenderConfig)
 
-    URL_MAX_LENGTH: int = 2048
+    URL_MAX_LENGTH: int = URL_MAX_LENGTH
     ASSET_FIELD_TYPE_SITELINK: str = "SITELINK"
 
 
