@@ -44,28 +44,38 @@ class MetaAdSetAgent:
                 "Missing summary in product data. Please complete website analysis."
             )
 
-        meta_locales = await self.adset_adapter.fetch_available_languages()
 
-        available_locales = [
-            {"id": locale["id"], "name": locale["name"]}
-            for locale in meta_locales
-        ]
+        business_type = product_data.get("businessType") or ""
 
         llm_output = await self._generate_payload_from_llm(
             summary=summary,
-            available_locales=available_locales,
+            business_type=business_type,
         )
-        return llm_output.model_dump(mode="json")
+
+
+        resolved_locales = []
+
+        for language in llm_output.languages:
+            locale = await self.adset_adapter.resolve_locale_by_name(language)
+            if locale:
+                resolved_locales.append(locale)
+
+        return {
+            "genders": llm_output.genders,
+            "age_min": llm_output.age_min,
+            "age_max": llm_output.age_max,
+            "locales": resolved_locales,
+        }
 
     async def _generate_payload_from_llm(
         self,
         summary: str,
-        available_locales: List[dict],
+        business_type: str,
     ) -> AdSetSuggestion:
         template = load_prompt("meta/adset.txt")
         prompt = template.format(
             summary=summary,
-            available_locales=json.dumps(available_locales, indent=2),
+            business_type=business_type,
         )
 
         messages = [
@@ -74,8 +84,6 @@ class MetaAdSetAgent:
                 "content": (
                     "You are a Meta Ads targeting assistant. "
                     "Return ONLY valid JSON. "
-                    "Choose locale IDs ONLY from the provided list. "
-                    "Do NOT invent locale IDs or language names."
                 ),
             },
             {"role": "user", "content": prompt},

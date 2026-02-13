@@ -4,6 +4,8 @@ import structlog
 
 from adapters.meta.client import MetaClient
 
+logger = structlog.get_logger()
+
 
 class MetaAdSetAdapter:
     def _get_client(self) -> MetaClient:
@@ -13,49 +15,40 @@ class MetaAdSetAdapter:
     def _normalize_ad_account_id(self, ad_account_id: str) -> str:
         return ad_account_id.removeprefix("act_")
 
-
-    async def fetch_available_languages(
-        self,
-        ad_account_id: str = None,
-        queries: List[str] = None,
-    ) -> List[dict]:
-        """
-        Fetch all available languages from Meta using the /search endpoint.
-        
-        The /search endpoint with type='adlocale' returns all supported locales
-        with their short 'key' IDs (e.g., 1001 for English (All), 46 for Hindi).
-        
-        Note: ad_account_id and queries parameters are kept for backwards compatibility
-        but are not used since /search returns all locales globally.
-        """
-        
-        logger = structlog.get_logger()
+    async def resolve_locale_by_name(self, language_name: str) -> dict | None:
         client = self._get_client()
 
         try:
             response = await client.get(
                 "/search",
-                params={"type": "adlocale", "q": ""},
+                params={"type": "adlocale", "q": language_name},
             )
+
             data = response.get("data", [])
-            
-            available_locales = [
-                {
-                    "id": item.get("key"),
-                    "name": item.get("name"),
-                }
-                for item in data
-                if item.get("key") and item.get("name")
-            ]
-            
-            logger.info("Fetched all locales from /search", count=len(available_locales))
-            return available_locales
-            
+            requested = language_name.strip().lower()
+
+            for item in data:
+                meta_name = item.get("name", "").lower()
+
+                if requested in meta_name:
+                    return {
+                        "id": item.get("key"),
+                        "name": item.get("name"),
+                    }
+
+            logger.warning(
+                "Locale not found in Meta",
+                language=language_name,
+            )
+            return None
+
         except Exception as e:
-            logger.error("Failed to fetch locales from /search", error=str(e))
-
-            return []
-
+            logger.error(
+                "Failed to resolve locale",
+                language=language_name,
+                error=str(e),
+            )
+            return None
 
 
     async def create(

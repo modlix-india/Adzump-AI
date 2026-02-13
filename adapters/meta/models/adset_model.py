@@ -3,10 +3,10 @@ from typing import List
 
 
 class AdSetSuggestion(BaseModel):
-    genders: List[int]
+    genders: List[str]
     age_min: int
     age_max: int
-    locales: List[int]
+    languages: List[str]
 
 class CreateAdSetRequest(BaseModel):
     ad_account_id: str = Field(..., alias="adAccountId")
