@@ -11,8 +11,11 @@ from agents.optimization.keyword_optimization_agent import (
 from agents.optimization.location_optimization_agent import (
     location_optimization_agent,
 )
-from agents.optimization.asset_optimization.orchestrator import (
-    AssetOptimizationOrchestrator,
+from agents.optimization.headline_optimization_agent import (
+    headline_optimization_agent,
+)
+from agents.optimization.description_optimization_agent import (
+    description_optimization_agent,
 )
 
 router = APIRouter(prefix="/api/ds/optimize", tags=["optimization"])
@@ -21,15 +24,6 @@ router = APIRouter(prefix="/api/ds/optimize", tags=["optimization"])
 @router.post("/age")
 async def generate_age_optimization():
     result = await age_optimization_agent.generate_recommendations(
-        client_code=auth_context.client_code,
-    )
-    return {"status": "success", "data": result}
-
-
-@router.post("/assets")
-async def generate_asset_optimization():
-    orchestrator = AssetOptimizationOrchestrator()
-    result = await orchestrator.analyze_all_campaigns(
         client_code=auth_context.client_code,
     )
     return {"status": "success", "data": result}
@@ -54,6 +48,22 @@ async def generate_keyword_optimization():
 @router.post("/locations")
 async def generate_location_optimization():
     result = await location_optimization_agent.generate_recommendations(
+        client_code=auth_context.client_code,
+    )
+    return {"status": "success", "data": result}
+
+
+@router.post("/headlines")
+async def generate_headline_optimization():
+    result = await headline_optimization_agent.generate_recommendations(
+        client_code=auth_context.client_code,
+    )
+    return {"status": "success", "data": result}
+
+
+@router.post("/descriptions")
+async def generate_description_optimization():
+    result = await description_optimization_agent.generate_recommendations(
         client_code=auth_context.client_code,
     )
     return {"status": "success", "data": result}

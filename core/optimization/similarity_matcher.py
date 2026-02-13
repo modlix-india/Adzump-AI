@@ -8,8 +8,6 @@ logger = structlog.get_logger(__name__)
 
 
 class SimilarityMatcher:
-    """Matches low-performing assets with similar high-performing examples."""
-
     async def find_similar_assets(
         self,
         low_asset_text: str,

@@ -4,9 +4,10 @@ logger = structlog.get_logger(__name__)
 
 
 class AssetCategorizer:
-    """Categorizes assets into performance tiers (LOW, GOOD/BEST, LEARNING/PENDING, OTHER)."""
+    def categorize_assets(
+        self, performance_data: list, asset_details: dict, asset_type: str | None = None
+    ) -> dict:
 
-    def categorize_assets(self, performance_data: list, asset_details: dict) -> dict:
         low_assets = []
         tier_1 = []  # GOOD/BEST
         tier_2 = []  # LEARNING/PENDING
@@ -18,7 +19,12 @@ class AssetCategorizer:
             asset_resource = item.get("adGroupAdAssetView", {}).get("asset", "")
             asset_id = asset_resource.split("/")[-1]
 
-            asset_type = item.get("adGroupAdAssetView", {}).get("fieldType")
+            item_asset_type = item.get("adGroupAdAssetView", {}).get("fieldType")
+
+            # Filter by asset_type if specified
+            if asset_type and item_asset_type != asset_type:
+                continue
+
             impressions = int(item.get("metrics", {}).get("impressions", 0))
 
             # Extract ad ID - API returns id directly
@@ -32,7 +38,7 @@ class AssetCategorizer:
 
             asset_obj = {
                 "asset_id": asset_id,
-                "asset_type": asset_type,
+                "asset_type": item_asset_type,
                 "text": text,
                 "impressions": impressions,
                 "label": label or "UNKNOWN",

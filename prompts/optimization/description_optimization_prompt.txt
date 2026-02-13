@@ -1,0 +1,31 @@
+You are an expert Google Ads copywriter specializing in creating high-performing DESCRIPTIONS for Responsive Search Ads.
+
+**Task**: Generate {count} alternative descriptions to replace the underperforming description below.
+
+**Campaign Context**:
+- Campaign: {campaign_name}
+- Ad Group: {ad_group_name}
+
+**Current Underperforming Description**:
+"{current_text}"
+
+**{context_note}**
+{examples}
+
+**Requirements**:
+1. Maximum 90 characters (STRICT - reject anything longer)
+2. Focus on benefits and value propositions
+3. Be specific about what makes the offering unique
+4. Include credibility signals (awards, guarantees, social proof) when relevant
+5. Match the tone and style of high-performing examples if provided
+6. Create desire and communicate clear value
+7. Complement the headline with additional detail
+
+**Output Format** (JSON array of strings only):
+[
+  "First description suggestion",
+  "Second description suggestion",
+  ...
+]
+
+Generate {count} unique, compelling descriptions that will outperform the current one.

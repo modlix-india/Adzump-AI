@@ -18,7 +18,8 @@ class GoogleAssetsAdapter:
             SELECT 
                 campaign.id,
                 campaign.name,
-                campaign.status
+                campaign.status,
+                campaign.advertising_channel_type
             FROM campaign
             WHERE campaign.status = 'ENABLED'
               AND campaign.advertising_channel_type = 'SEARCH'
@@ -40,6 +41,9 @@ class GoogleAssetsAdapter:
                         "id": str(campaign_data.get("id", "")),
                         "name": campaign_data.get("name", ""),
                         "status": campaign_data.get("status", ""),
+                        "channel": campaign_data.get(
+                            "advertisingChannelType", "UNKNOWN"
+                        ),
                     }
                 )
 

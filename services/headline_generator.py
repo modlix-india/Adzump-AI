@@ -3,14 +3,12 @@ import structlog
 from services.openai_client import chat_completion
 from services.json_utils import safe_json_parse
 from utils import prompt_loader
-from .similarity_matcher import SimilarityMatcher
+from core.optimization.similarity_matcher import SimilarityMatcher
 
 logger = structlog.get_logger(__name__)
 
 
-class SuggestionGenerator:
-    """Generates and validates asset optimization suggestions using LLM."""
-
+class HeadlineGenerator:
     async def generate_suggestions(
         self,
         low_asset: dict,
@@ -19,10 +17,6 @@ class SuggestionGenerator:
         campaign_name: str,
         ad_group_name: str,
     ) -> list:
-        asset_type = (
-            "HEADLINE" if low_asset["asset_type"] == "HEADLINE" else "DESCRIPTION"
-        )
-
         # Build examples text based on source tier
         if similar_assets:
             examples_text = "\n".join(
@@ -45,25 +39,24 @@ class SuggestionGenerator:
                 f"- Campaign: {campaign_name}\n"
                 f"- Ad Group: {ad_group_name}\n"
                 f"- Keywords to use: {', '.join(keywords)}\n\n"
-                f"Create compelling {asset_type.lower()}s incorporating these keywords naturally."
+                f"Create compelling headlines incorporating these keywords naturally."
             )
             context_note = "Campaign context:"
 
         else:
             examples_text = (
                 "NO CAMPAIGN CONTEXT AVAILABLE.\n"
-                f"Generate general best-practice {asset_type.lower()}s that:\n"
-                f"- Are action-oriented and compelling\n"
-                f"- Have broad appeal\n"
-                f"- Follow Google Ads best practices\n"
-                f"- Are clear and concise"
+                "Generate general best-practice headlines that:\n"
+                "- Are action-oriented and compelling\n"
+                "- Have broad appeal\n"
+                "- Follow Google Ads best practices\n"
+                "- Are clear and concise"
             )
             context_note = "General best practices:"
 
         prompt = prompt_loader.format_prompt(
-            "asset_optimization_prompt.txt",
+            "optimization/headline_optimization_prompt.txt",
             count=5,  # Generate 5 options, pick best 1 after validation
-            asset_type=asset_type,
             campaign_name=campaign_name,
             ad_group_name=ad_group_name,
             current_text=low_asset.get("text", ""),
@@ -81,33 +74,3 @@ class SuggestionGenerator:
         suggestions = safe_json_parse(raw_output)
 
         return suggestions if isinstance(suggestions, list) else []
-
-    def validate_suggestions(self, suggestions: list, asset_type: str) -> list:
-        max_length = 30 if asset_type == "HEADLINE" else 90
-
-        valid = []
-        seen = set()
-
-        for suggestion in suggestions:
-            if not isinstance(suggestion, str):
-                continue
-
-            # Check length
-            if len(suggestion) > max_length:
-                logger.warning(
-                    "Rejected suggestion (too long)",
-                    text=suggestion,
-                    length=len(suggestion),
-                    max=max_length,
-                )
-                continue
-
-            # Check duplicates
-            normalized = suggestion.lower().strip()
-            if normalized in seen:
-                continue
-
-            seen.add(normalized)
-            valid.append({"text": suggestion, "character_count": len(suggestion)})
-
-        return valid  # Return all valid, we'll pick best 1 in orchestrator
