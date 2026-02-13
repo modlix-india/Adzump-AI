@@ -100,6 +100,7 @@ class MetaAPIException(BaseAppException):
         super().__init__(message, status.HTTP_502_BAD_GATEWAY)
 
 
+<<<<<<< Updated upstream
 class GoogleAdsException(BaseAppException):
     """Google Ads API communication error."""
 
@@ -156,6 +157,8 @@ class GoogleAutocompleteException(BaseAppException):
         super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
 
 
+=======
+>>>>>>> Stashed changes
 class GoogleAPIException(BaseAppException):
     """Google Ads API error."""
 

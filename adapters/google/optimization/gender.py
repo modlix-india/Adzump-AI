@@ -1,7 +1,7 @@
 from structlog import get_logger
 from core.infrastructure.context import auth_context
 from adapters.google.client import GoogleAdsClient
-from utils.google_dateutils import format_duration_clause
+from utils.google_dateutils import format_date_range
 from adapters.google.optimization._metrics import build_metrics
 from datetime import date
 
@@ -19,7 +19,7 @@ class GoogleGenderAdapter:
         account_id: str,
         parent_account_id: str,
     ) -> list:
-        duration_clause = format_duration_clause(self.DEFAULT_DURATION)
+        duration_clause = format_date_range(self.DEFAULT_DURATION)
         today = date.today().strftime("%Y-%m-%d")
 
         # Performance Metrics (gender_view)
@@ -37,7 +37,7 @@ class GoogleGenderAdapter:
             metrics.conversions,
             metrics.cost_micros
         FROM gender_view
-        WHERE segments.date {duration_clause}
+        WHERE {duration_clause}
           AND campaign.status = 'ENABLED'
           AND ad_group.status = 'ENABLED'
           AND campaign.end_date >= '{today}'

@@ -1,4 +1,4 @@
-from structlog import get_logger    #type: ignore
+from structlog import get_logger  # type: ignore
 from typing import Optional
 from fastapi import HTTPException
 from playwright.async_api import async_playwright
@@ -12,14 +12,16 @@ from oserver.models.storage_request_model import (
     StorageFilter,
     StorageReadRequest,
     StorageUpdateWithPayload,
-    StorageRequestWithPayload
+    StorageRequestWithPayload,
 )
 
 logger = get_logger(__name__)
 
-class ScreenshotService:
 
-    def __init__(self, access_token: str, client_code: str, xh: Optional[str], xp: Optional[str]):
+class ScreenshotService:
+    def __init__(
+        self, access_token: str, client_code: str, xh: Optional[str], xp: Optional[str]
+    ):
         self.access_token = access_token
         self.client_code = client_code
         self.xh = xh
@@ -29,14 +31,14 @@ class ScreenshotService:
             access_token=access_token,
             client_code=client_code,
             x_forwarded_host=xh,
-            x_forwarded_port=xp
+            x_forwarded_port=xp,
         )
 
         self.file_storage = StorageFileService(
             access_token=access_token,
             client_code=client_code,
             x_forwarded_host=xh,
-            x_forwarded_port=xp
+            x_forwarded_port=xp,
         )
 
         logger.info("[ScreenshotService] Initialized")
@@ -62,7 +64,7 @@ class ScreenshotService:
         upload = await self.file_storage.upload_file(
             image_bytes=screenshot_bytes,
             filename=generate_filename_from_url(url),
-            folder_name="screenshots"
+            folder_name="screenshots",
         )
 
         if not upload.success:
@@ -73,13 +75,17 @@ class ScreenshotService:
         return upload.result.get("url")
 
     # MAIN PROCESS FLOW
-    async def process(self, business_url: str, url: str, retake: bool) -> ScreenshotResponse:
+    async def process(
+        self, business_url: str, url: str, retake: bool
+    ) -> ScreenshotResponse:
         business_url = normalize_url(business_url)
         url = normalize_url(url)
 
-        is_external = (url != business_url)
+        is_external = url != business_url
 
-        logger.info(f"[ScreenshotService] Process Start | business={business_url}, url={url}, retake={retake}, external={is_external}")
+        logger.info(
+            f"[ScreenshotService] Process Start | business={business_url}, url={url}, retake={retake}, external={is_external}"
+        )
 
         # 1. Read storage record
         logger.info("[ScreenshotService] Reading AISuggestedData record...")
@@ -87,20 +93,30 @@ class ScreenshotService:
             storageName="AISuggestedData",
             appCode="marketingai",
             clientCode=self.client_code,
-            filter=StorageFilter(field="businessUrl", value=business_url)
+            filter=StorageFilter(field="businessUrl", value=business_url),
         )
 
         read_res = await self.storage.read_page_storage(read_req)
-        content = read_res.result[0].get("result", {}).get("result", {}).get("content", []) if read_res.success else []
+        content = (
+            read_res.result[0].get("result", {}).get("result", {}).get("content", [])
+            if read_res.success
+            else []
+        )
         record = content[0] if content else None
         storage_id = record["_id"] if record else None
 
-        logger.info(f"[ScreenshotService] Storage record found: {bool(record)} | storageId={storage_id}")
+        logger.info(
+            f"[ScreenshotService] Storage record found: {bool(record)} | storageId={storage_id}"
+        )
 
         # 2. External screenshot requires existing record
         if is_external and not record:
-            logger.warning("[ScreenshotService] External URL with no parent record → invalid")
-            raise BusinessValidationException("External screenshot requires existing business record")
+            logger.warning(
+                "[ScreenshotService] External URL with no parent record → invalid"
+            )
+            raise BusinessValidationException(
+                "External screenshot requires existing business record"
+            )
 
         # 3. Check existing screenshot
         existing_screenshot = None
@@ -113,15 +129,15 @@ class ScreenshotService:
                     existing_screenshot = l.get("screenshot")
                     break
 
-        logger.info(f"[ScreenshotService] Existing screenshot found: {bool(existing_screenshot)}")
+        logger.info(
+            f"[ScreenshotService] Existing screenshot found: {bool(existing_screenshot)}"
+        )
 
         # 4. Cached path
         if existing_screenshot and not retake:
             logger.info("[ScreenshotService] Returning cached screenshot")
             return ScreenshotResponse(
-                url=url,
-                storage_id=storage_id,
-                screenshot=existing_screenshot
+                url=url, storage_id=storage_id, screenshot=existing_screenshot
             )
 
         # 5. New screenshot required
@@ -138,18 +154,19 @@ class ScreenshotService:
                 dataObject={
                     "businessUrl": business_url,
                     "screenshot": screenshot_url,
-                    "externalLinks": []
-                }
+                    "externalLinks": [],
+                },
             )
             create_response = await self.storage.write_storage(req)
             storage_id = None
-            logger.info(f"[ScreenshotService] New record created with ID: {create_response.result[0]["result"]["result"]["_id"]}")
+            logger.info(
+                f"[ScreenshotService] New record created with ID: {create_response.result[0]['result']['result']['_id']}"
+            )
+
             if create_response.success:
                 storage_id = create_response.result[0]["result"]["result"]["_id"]
             return ScreenshotResponse(
-                url=url,
-                screenshot=screenshot_url,
-                storage_id=storage_id
+                url=url, screenshot=screenshot_url, storage_id=storage_id
             )
         # 7. Update existing record
         if not is_external:
@@ -159,7 +176,7 @@ class ScreenshotService:
                 clientCode=self.client_code,
                 appCode="marketingai",
                 dataObjectId=storage_id,
-                dataObject={"screenshot": screenshot_url}
+                dataObject={"screenshot": screenshot_url},
             )
             await self.storage.update_storage(update)
         else:
@@ -181,13 +198,11 @@ class ScreenshotService:
                 clientCode=self.client_code,
                 appCode="marketingai",
                 dataObjectId=storage_id,
-                dataObject={"externalLinks": links}
+                dataObject={"externalLinks": links},
             )
             await self.storage.update_storage(update)
 
         logger.info("[ScreenshotService] Screenshot flow completed successfully")
         return ScreenshotResponse(
-            url=url,
-            storage_id=storage_id,
-            screenshot=screenshot_url
+            url=url, storage_id=storage_id, screenshot=screenshot_url
         )

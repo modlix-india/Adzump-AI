@@ -9,6 +9,11 @@ from config.logging_config import setup_logging
 setup_logging()
 
 from structlog import get_logger  # type: ignore
+<<<<<<< Updated upstream
+=======
+
+logger = get_logger(__name__)
+>>>>>>> Stashed changes
 
 logger = get_logger(__name__)
 from fastapi import FastAPI
@@ -72,14 +77,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
-
-# Auth context middleware - extracts access-token and clientCode headers into request context.
-# Headers are optional here; endpoints requiring auth should validate via their own logic.
-app.add_middleware(AuthContextMiddleware)
-# TODO: Add debugKey middleware — accept a client-supplied debug key via header,
-# bind it to structlog contextvars (like request_id), so logs can be traced
-# end-to-end across services using the same key.
-app.add_middleware(RequestLoggingMiddleware)
 
 
 @app.get("/health")
