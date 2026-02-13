@@ -176,3 +176,15 @@ class CoreTokenException(BaseAppException):
         details: Optional[dict] = None,
     ):
         super().__init__(message, status.HTTP_401_UNAUTHORIZED, details)
+
+
+class GoogleAdsMutationError(BaseAppException):
+    """Google Ads Mutation logic error."""
+
+    def __init__(
+        self,
+        message: str = "Google Ads mutation failed",
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status_code, details)

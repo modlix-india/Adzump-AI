@@ -1,5 +1,8 @@
-from fastapi import APIRouter
-
+from fastapi import APIRouter, Header
+from models.mutation_request_model import MutationRequest, MutationResponse
+from adapters.google.mutation.google_ads_mutation_service import (
+    GoogleAdsMutationService,
+)
 from core.infrastructure.context import auth_context
 from agents.optimization.age_optimization_agent import age_optimization_agent
 from agents.optimization.search_term_optimization_agent import (
@@ -45,3 +48,12 @@ async def generate_location_optimization():
         client_code=auth_context.client_code,
     )
     return {"status": "success", "data": result}
+
+
+@router.post("/execute", response_model=MutationResponse)
+async def execute_google_ads_mutation(
+    request: MutationRequest,
+    client_code: str = Header(..., alias="clientCode"),
+):
+    service = GoogleAdsMutationService()
+    return await service.execute_mutation(request)

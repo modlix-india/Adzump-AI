@@ -39,6 +39,44 @@ class GoogleAdsClient:
         )
         return response.json()
 
+    async def search(
+        self,
+        customer_id: str,
+        query: str,
+        client_code: str,
+        login_customer_id: str | None = None,
+    ) -> list:
+        """Execute GAQL query via googleAds:search."""
+        token = self._get_google_api_token(client_code)
+        url = f"{self.BASE_URL}/{self.API_VERSION}/customers/{customer_id}/googleAds:search"
+        response = await http_request(
+            "POST",
+            url,
+            headers=self._build_auth_headers(token, login_customer_id),
+            json={"query": query},
+            error_handler=_raise_google_error,
+        )
+        return response.json().get("results", [])
+
+    async def mutate(
+        self,
+        customer_id: str,
+        mutate_payload: dict,
+        client_code: str,
+        login_customer_id: str | None = None,
+    ) -> dict:
+        """Execute mutate operations via googleAds:mutate."""
+        token = self._get_google_api_token(client_code)
+        url = f"{self.BASE_URL}/{self.API_VERSION}/customers/{customer_id}/googleAds:mutate"
+        response = await http_request(
+            "POST",
+            url,
+            headers=self._build_auth_headers(token, login_customer_id),
+            json=mutate_payload,
+            error_handler=_raise_google_error,
+        )
+        return response.json()
+
     async def search_stream(
         self, query: str, customer_id: str, login_customer_id: str, client_code: str
     ) -> list:
