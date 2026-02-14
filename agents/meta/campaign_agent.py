@@ -5,7 +5,7 @@ import structlog
 from pydantic import ValidationError
 
 from adapters.meta import MetaCampaignAdapter
-from adapters.meta.models import (
+from adapters.meta.models.campaign_model import (
     CampaignPayload,
     CreateCampaignRequest,
     CreateCampaignResponse,
