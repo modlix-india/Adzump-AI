@@ -73,6 +73,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
 
+# Auth context middleware - extracts access-token and clientCode headers into request context.
+# Headers are optional here; endpoints requiring auth should validate via their own logic.
+app.add_middleware(AuthContextMiddleware)
+# TODO: Add debugKey middleware — accept a client-supplied debug key via header,
+# bind it to structlog contextvars (like request_id), so logs can be traced
+# end-to-end across services using the same key.
+app.add_middleware(RequestLoggingMiddleware)
+
 
 @app.get("/health")
 async def health_check():

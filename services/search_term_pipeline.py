@@ -1,14 +1,14 @@
 # TODO: Remove after trust in new search term optimization service (core/services/search_term_analyzer.py)
-from __future__ import annotations
-
 import os
 import json
 import asyncio
 import httpx
-from typing import Optional
 from structlog import get_logger  # type: ignore
 
 from third_party.google.services import ads_service
+from structlog import get_logger  # type: ignore
+import requests
+from third_party.google.services import ads_service, keywords_service
 from services.search_term_analyzer import analyze_search_term_performance
 from services.openai_client import chat_completion
 from utils import google_dateutils as date_utils
@@ -19,7 +19,6 @@ from utils.helpers import micros_to_rupees
 
 logger = get_logger(__name__)
 
-
 def load_search_term_prompt(file_name: str) -> str:
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prompt_path = os.path.join(root_dir, "prompts", "search_term", file_name)
@@ -27,6 +26,8 @@ def load_search_term_prompt(file_name: str) -> str:
         return f.read()
 
 
+
+# Pipeline
 class SearchTermPipeline:
     OPENAI_MODEL = "gpt-4o-mini"
 
@@ -45,11 +46,13 @@ class SearchTermPipeline:
         self.campaign_id = campaign_id
         self.duration = duration.strip()
         self.access_token = access_token
+
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
         self.google_ads_access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(
             client_code=client_code
         )
 
+    # LLM Caller (no silent failures)
     async def _call_llm(self, system_msg: str, user_msg: str, label: str) -> dict:
         try:
             messages = [
@@ -74,6 +77,7 @@ class SearchTermPipeline:
             logger.exception("LLM call failed", label=label, error=str(e))
             return {}
 
+    # Normalizers (schema enforcement)
     @staticmethod
     def normalize_brand(resp: dict) -> dict:
         if isinstance(resp, dict) and "brand" in resp:
@@ -115,6 +119,7 @@ class SearchTermPipeline:
             }
         }
 
+    # Relevance checks
     async def check_brand_relevance(self, summary: str, search_term: str) -> dict:
         system_msg = load_search_term_prompt("brand_relevancy_prompt.txt")
         user_msg = f"PROJECT SUMMARY:{summary}\nSEARCH TERM:{search_term}"
@@ -167,12 +172,13 @@ class SearchTermPipeline:
         )
         return await self._call_llm(system_msg, user_msg, "overall")
 
-    async def fetch_search_terms(self, customer_id: Optional[str] = None) -> list:
+    # Fetch search terms
+    async def fetch_search_terms(self, customer_id: str = None) -> list:
         target_customer_id = customer_id or self.customer_id
         endpoint = f"https://googleads.googleapis.com/v20/customers/{target_customer_id}/googleAds:search"
         headers = {
             "Authorization": f"Bearer {self.google_ads_access_token}",
-            "developer-token": self.developer_token or "",
+            "developer-token": self.developer_token,
             "login-customer-id": self.login_customer_id,
             "Content-Type": "application/json",
         }
@@ -251,6 +257,7 @@ class SearchTermPipeline:
 
         return results
 
+    #  Full pipeline
     async def run_pipeline(self) -> dict:
         ads_data = await ads_service.fetch_ads(
             client_code=self.client_code,
@@ -285,7 +292,7 @@ class SearchTermPipeline:
         classified_terms = await analyze_search_term_performance(search_terms)
 
         async def process_term(term_data: dict):
-            search_term: str = term_data.get("term") or term_data.get("searchterm") or ""
+            search_term = term_data.get("term") or term_data.get("searchterm")
             performances = term_data.pop("performances", {})
 
             brand_eval = await self.check_brand_relevance(summary, search_term)
