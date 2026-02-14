@@ -1,0 +1,8 @@
+.env
+.env.*
+.idea
+DS.iml
+__pycache__
+*.py[cod]
+venv/
+.vscode/

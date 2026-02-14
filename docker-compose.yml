@@ -1,0 +1,41 @@
+version: "3.9"
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/service/Dockerfile
+    image: ds-service:latest
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=INFO
+    volumes:
+      - "./logs:/logs"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    build: ./docker/postgres
+    container_name: postgres_container
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: rag
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d rag"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
