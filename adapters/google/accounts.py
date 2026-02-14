@@ -1,5 +1,5 @@
 from structlog import get_logger
-from adapters.google.client import GoogleAdsClient
+from adapters.google.client import google_ads_client
 
 logger = get_logger(__name__)
 
@@ -11,8 +11,9 @@ class GoogleAccountsAdapter:
     WHERE customer_client.status = 'ENABLED'
       AND customer_client.manager = false
     """
+
     def __init__(self) -> None:
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
 
     async def fetch_accessible_accounts(self, client_code: str) -> list:
         """Fetch all accessible accounts, expanding manager accounts to sub-accounts."""
@@ -26,19 +27,27 @@ class GoogleAccountsAdapter:
                 for acc in await self._list_sub_accounts(client_code, cid):
                     if acc["customer_id"] not in seen_ids:
                         seen_ids.add(acc["customer_id"])
-                        all_accounts.append({
-                            "customer_id": acc["customer_id"],
-                            "login_customer_id": cid,
-                        })
+                        all_accounts.append(
+                            {
+                                "customer_id": acc["customer_id"],
+                                "login_customer_id": cid,
+                            }
+                        )
             else:
                 if cid not in seen_ids:
                     seen_ids.add(cid)
-                    all_accounts.append({
-                        "customer_id": cid,
-                        "login_customer_id": cid,
-                    })
+                    all_accounts.append(
+                        {
+                            "customer_id": cid,
+                            "login_customer_id": cid,
+                        }
+                    )
 
-        logger.info("Fetched accessible accounts", client_code=client_code, count=len(all_accounts))
+        logger.info(
+            "Fetched accessible accounts",
+            client_code=client_code,
+            count=len(all_accounts),
+        )
         return all_accounts
 
     async def _list_customer_ids(self, client_code: str) -> list[str]:
@@ -74,10 +83,12 @@ class GoogleAccountsAdapter:
         accounts = []
         for result in results:
             client_info = result.get("customerClient", {})
-            accounts.append({
-                "customer_id": str(client_info.get("id")),
-                "name": client_info.get("descriptiveName"),
-            })
+            accounts.append(
+                {
+                    "customer_id": str(client_info.get("id")),
+                    "name": client_info.get("descriptiveName"),
+                }
+            )
 
         logger.info("Found sub-accounts", manager_id=manager_id, count=len(accounts))
         return accounts

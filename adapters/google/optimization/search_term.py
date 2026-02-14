@@ -2,7 +2,7 @@ from datetime import date
 
 from structlog import get_logger
 from core.infrastructure.context import auth_context
-from adapters.google.client import GoogleAdsClient
+from adapters.google.client import google_ads_client
 from utils.google_dateutils import format_date_range
 from adapters.google.optimization._metrics import build_metrics
 
@@ -13,11 +13,9 @@ class GoogleSearchTermAdapter:
     DEFAULT_DURATION = "LAST_30_DAYS"
 
     def __init__(self):
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
 
-    async def fetch_search_terms(
-        self, account_id: str, parent_account_id: str
-    ) -> list:
+    async def fetch_search_terms(self, account_id: str, parent_account_id: str) -> list:
         """
         Returns: [{"campaign_id", "campaign_name", "campaign_type", "ad_group_id",
             "ad_group_name", "search_term", "status", "match_type",
@@ -81,17 +79,18 @@ class GoogleSearchTermAdapter:
             if not search_term:
                 continue
 
-            transformed.append({
-                "campaign_id": str(campaign.get("id")),
-                "campaign_name": campaign.get("name"),
-                "campaign_type": campaign.get("advertisingChannelType"),
-                "ad_group_id": str(ad_group.get("id")),
-                "ad_group_name": ad_group.get("name"),
-                "search_term": search_term,
-                "status": search_term_view.get("status"),
-                "match_type": entry.get("segments", {}).get("searchTermMatchType"),
-                "metrics": build_metrics(entry.get("metrics", {})),
-            })
+            transformed.append(
+                {
+                    "campaign_id": str(campaign.get("id")),
+                    "campaign_name": campaign.get("name"),
+                    "campaign_type": campaign.get("advertisingChannelType"),
+                    "ad_group_id": str(ad_group.get("id")),
+                    "ad_group_name": ad_group.get("name"),
+                    "search_term": search_term,
+                    "status": search_term_view.get("status"),
+                    "match_type": entry.get("segments", {}).get("searchTermMatchType"),
+                    "metrics": build_metrics(entry.get("metrics", {})),
+                }
+            )
 
         return transformed
-

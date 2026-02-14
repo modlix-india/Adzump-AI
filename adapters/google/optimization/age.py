@@ -2,7 +2,7 @@ from datetime import date
 
 from structlog import get_logger
 from core.infrastructure.context import auth_context
-from adapters.google.client import GoogleAdsClient
+from adapters.google.client import google_ads_client
 from utils.helpers import micros_to_rupees
 from utils.google_dateutils import format_date_range
 
@@ -13,7 +13,7 @@ class GoogleAgeAdapter:
     DEFAULT_DURATION = "LAST_30_DAYS"
 
     def __init__(self):
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
 
     async def fetch_age_metrics(self, account_id: str, parent_account_id: str) -> list:
         """Fetch age metrics for a Google Ads account with calculated performance metrics."""
