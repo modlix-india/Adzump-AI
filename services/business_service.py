@@ -2,6 +2,7 @@ from structlog import get_logger  # type: ignore
 from fastapi import HTTPException
 import json
 from typing import List
+
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
@@ -23,8 +24,8 @@ from oserver.models.storage_request_model import (
     StorageRequestWithPayload,
     StorageUpdateWithPayload,
 )
-from services.openai_client import chat_completion
 from oserver.services.storage_service import StorageService
+from services.openai_client import chat_completion
 from services.geo_target_service import GeoTargetService
 from utils.helpers import normalize_url
 
@@ -192,10 +193,10 @@ class BusinessService:
                                     "area_location"
                                 ),
                                 product_location=existing_location_data.get(
-                                    "product_location", ""
+                                    "product_location"
                                 ),
-                                interested_locations=existing_location_data.get(
-                                    "interested_locations", []
+                                product_coordinates=existing_location_data.get(
+                                    "product_coordinates"
                                 ),
                             )
                 except Exception as e:
@@ -262,16 +263,14 @@ class BusinessService:
             location_data = parsed.get("location", {})
             location_info = (
                 LocationInfo(
-                    area_location=location_data.get("area_location"),
-                    product_location=location_data.get("product_location", ""),
-                    interested_locations=location_data.get("interested_locations", []),
+                    area_location=location_data.get("area_location", ""),
                 )
                 if location_data
                 else None
             )
 
             # STEP 5: SUGGEST GEO TARGETS
-            logger.info("Suggesting geo targets from coordinates and locations")
+            logger.info("Suggesting geo targets from coordinates and area location...")
             geo_service = GeoTargetService(client_code=client_code)
 
             # Extract coordinates from first map embed
@@ -282,15 +281,14 @@ class BusinessService:
 
             geo_result = await geo_service.suggest_geo_targets(
                 coordinates=coordinates,
-                interested_locations=location_info.interested_locations
-                if location_info
-                else [],
                 area_location=location_info.area_location if location_info else None,
+                radius_km=15,
             )
 
-            # Update product_location from reverse geocoding if available
-            if geo_result.product_location and location_info:
+            # Update location info with resolved product details
+            if location_info:
                 location_info.product_location = geo_result.product_location
+                location_info.product_coordinates = geo_result.product_coordinates
 
             # Convert geo targets to storable format
             suggested_geo_targets = [
@@ -325,10 +323,10 @@ class BusinessService:
                             else None,
                             "product_location": location_info.product_location
                             if location_info
-                            else "",
-                            "interested_locations": location_info.interested_locations
+                            else None,
+                            "product_coordinates": location_info.product_coordinates
                             if location_info
-                            else [],
+                            else None,
                         },
                         "suggestedGeoTargets": suggested_geo_targets,
                     },
@@ -367,10 +365,10 @@ class BusinessService:
                         else None,
                         "product_location": location_info.product_location
                         if location_info
-                        else "",
-                        "interested_locations": location_info.interested_locations
+                        else None,
+                        "product_coordinates": location_info.product_coordinates
                         if location_info
-                        else [],
+                        else None,
                     },
                     "suggestedGeoTargets": suggested_geo_targets,
                 },

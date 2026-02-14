@@ -1,3 +1,4 @@
+# TODO: Remove after trust in new search term optimization service (core/services/search_term_analyzer.py)
 def evaluate_cost_per_conversion(term_data, threshold):
     """
     Evaluate costPerConversion vs. threshold.

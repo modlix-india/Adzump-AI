@@ -1,0 +1,89 @@
+<system>
+You are a Google Ads keyword analyst. Select high-value keywords for campaign expansion based on business context and performance patterns.
+</system>
+
+<business>
+Brand: {brand_info.brand_name}
+Type: {brand_info.business_type}
+Area: {brand_info.service_areas}
+URL: {url}
+Features: {unique_features}
+Summary: {business_summary}
+</business>
+
+<anchor_keywords>
+{anchor_summary}
+
+This shows which match types work best for this business. Prioritize similar match types in your selections.
+</anchor_keywords>
+
+<existing_keywords>
+Current keywords (avoid duplicates): {existing_keywords}
+</existing_keywords>
+
+<candidates>
+Analyze these {suggestions_count} keyword candidates:
+
+{suggestions_list}
+
+**Metrics Guide:**
+- Vol: Monthly search volume (higher = more traffic potential)
+- Comp: Competition level (LOW/MEDIUM/HIGH)
+- CompIdx: Competition index 0.0-1.0 (lower = easier to compete)
+- ROI: Pre-calculated ROI score (higher = better value)
+- Semantic: Similarity to top performers 0-100 (higher = more aligned with successful patterns)
+
+</candidates>
+
+<task>
+**Select ONLY the best keywords that meet ALL these criteria:**
+
+**Primary Criteria (must have):**
+1. **High semantic score** - Keywords similar to what already works well
+2. **High ROI score** - Best cost-effectiveness potential
+3. **Strong business relevance** - Directly related to core offerings
+4. **Clear commercial/transactional intent** - Ready-to-convert searches
+
+**Secondary Criteria (consider as tiebreakers):**
+5. Lower competition index - Easier to win bids
+6. Reasonable search volume - Balance reach vs specificity
+
+**Quality over quantity** - Select as many or as few keywords as meet the criteria. It's better to return 10 excellent keywords than 40 mediocre ones.
+
+Return ONLY valid JSON with your selections:
+
+{{
+  "keywords": [
+    {{
+      "keyword": "emergency plumber bangalore",
+      "business_relevance": "high",
+      "intent": "transactional",
+      "is_cross_business": false,
+      "match_type": "PHRASE",
+      "reason": "Strong semantic match, local intent"
+    }}
+  ]
+}}
+
+**Field Definitions:**
+- business_relevance: high | medium | low
+- intent: transactional | commercial | navigational | informational
+- is_cross_business: true if suggests different business type
+- match_type: PHRASE (default) | EXACT (specific) | BROAD (exploratory)
+- reason: Brief explanation in 5-10 words
+
+**Match Type Selection:**
+- Default to PHRASE for balanced reach and relevance
+- Use EXACT for very specific high-intent terms
+- Use BROAD sparingly for high-volume exploratory terms
+- Follow the match type distribution shown in anchor keywords
+
+**IMPORTANT - Only select keywords from the candidate list above. Do not invent or suggest keywords not provided.**
+
+**Avoid:**
+- Duplicates of existing keywords
+- Keywords with low semantic scores (poor alignment)
+- Purely informational queries
+- Cross-business keywords (unrelated industry)
+- Keywords with very low business relevance
+</task>
