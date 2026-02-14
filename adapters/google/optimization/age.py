@@ -22,13 +22,16 @@ class GoogleAgeAdapter:
         query = f"""
         SELECT campaign.id, campaign.name, campaign.advertising_channel_type,
                ad_group.id, ad_group.name,
+               ad_group_criterion.resource_name,
                ad_group_criterion.age_range.type,
+               ad_group_criterion.status,
                metrics.impressions, metrics.clicks, metrics.conversions, metrics.cost_micros
         FROM age_range_view
         WHERE {duration_clause}
           AND campaign.status = 'ENABLED'
           AND campaign.end_date >= '{date.today().strftime("%Y-%m-%d")}'
           AND ad_group.status = 'ENABLED'
+          AND ad_group_criterion.status != 'REMOVED'
         """
 
         try:

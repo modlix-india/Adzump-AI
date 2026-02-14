@@ -39,6 +39,7 @@ class AgeFieldRecommendation(BaseModel):
     age_range: AgeRangeType
     recommendation: Literal["ADD", "REMOVE"]
     reason: str
+    resource_name: Optional[str] = None
     applied: bool = False
 
 
@@ -48,6 +49,7 @@ class GenderFieldRecommendation(BaseModel):
     gender_type: GenderType
     recommendation: Literal["ADD", "REMOVE"]
     reason: str
+    resource_name: Optional[str] = None
     applied: bool = False
 
 
