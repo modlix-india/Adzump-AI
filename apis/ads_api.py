@@ -18,7 +18,7 @@ from services import create_campaign_service, chat_service
 
 # TODO: Remove age optimization import - replaced by api/optimization.py
 from services.age_optimization_service import generate_age_optimizations
-from services.gender_optimization_service import generate_gender_optimizations
+from services.ads_service import AdAssetsGenerator
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])

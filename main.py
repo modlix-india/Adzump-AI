@@ -9,11 +9,6 @@ from config.logging_config import setup_logging
 setup_logging()
 
 from structlog import get_logger  # type: ignore
-<<<<<<< Updated upstream
-=======
-
-logger = get_logger(__name__)
->>>>>>> Stashed changes
 
 logger = get_logger(__name__)
 from fastapi import FastAPI
