@@ -123,7 +123,7 @@ class ResponsiveSearchAdBuilder:
         ad_data = await self._fetch_existing_ad(
             customer_id=context.account_id,
             ad_id=ad_id,
-            login_id=context.parent_account_id,
+            login_customer_id=context.parent_account_id,
             client_code=context.client_code,
         )
         rsa = ad_data.get("responsiveSearchAd", {})
