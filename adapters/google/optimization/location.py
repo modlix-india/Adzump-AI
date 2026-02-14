@@ -2,7 +2,7 @@ from datetime import date
 
 from structlog import get_logger
 from core.infrastructure.context import auth_context
-from adapters.google.client import GoogleAdsClient
+from adapters.google.client import google_ads_client
 from adapters.google.optimization._metrics import build_metrics
 
 logger = get_logger(__name__)
@@ -12,7 +12,7 @@ class GoogleLocationAdapter:
     DEFAULT_DURATION = "LAST_30_DAYS"
 
     def __init__(self):
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
 
     async def fetch_campaign_location_targets(
         self, account_id: str, parent_account_id: str
@@ -113,7 +113,9 @@ class GoogleLocationAdapter:
             geo_constant = criterion.get("location", {}).get("geoTargetConstant")
             criterion_resource_name = criterion.get("resourceName")
             if geo_constant:
-                campaigns[campaign_id]["targeted_locations"][geo_constant] = criterion_resource_name
+                campaigns[campaign_id]["targeted_locations"][geo_constant] = (
+                    criterion_resource_name
+                )
 
         return campaigns
 
