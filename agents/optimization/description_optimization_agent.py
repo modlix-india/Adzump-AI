@@ -76,7 +76,7 @@ class DescriptionOptimizationAgent:
         campaign_product_map: dict,
         client_code: str,
     ) -> list[CampaignRecommendation]:
-        """Process a single Google Ads account."""
+        """Process a single Google Ads account with bulk asset fetching."""
         account_id = account["customer_id"]
         parent_account_id = account["login_customer_id"]
 
@@ -86,39 +86,85 @@ class DescriptionOptimizationAgent:
             account_id=account_id,
         )
 
-        # Fetch all campaigns for this account
-        campaigns = await self.assets_adapter.fetch_all_campaigns(
+        # Fetch ALL asset performance data for the account at once
+        all_performance_data = await self.assets_adapter.fetch_asset_performance(
+            customer_id=account_id,
+            login_customer_id=parent_account_id,
+            client_code=client_code,
+            campaign_id=None,  # Account-level fetch
+        )
+
+        if not all_performance_data:
+            logger.info("No asset performance data for account", account_id=account_id)
+            return []
+
+        # Extract campaigns from performance data and filter for linked ones
+        linked_campaigns = {}
+        for item in all_performance_data:
+            campaign = item.get("campaign", {})
+            campaign_id_str = str(campaign.get("id", ""))
+
+            if campaign_id_str in campaign_product_map:
+                if campaign_id_str not in linked_campaigns:
+                    linked_campaigns[campaign_id_str] = {
+                        "id": campaign_id_str,
+                        "name": campaign.get("name", ""),
+                        "product_id": campaign_product_map[campaign_id_str],
+                    }
+                    logger.info(
+                        f"Campaign Linking Status: {campaign.get('name')} ({campaign_id_str})",
+                        client_code=client_code,
+                        is_linked=True,
+                    )
+
+        if not linked_campaigns:
+            logger.info(
+                "No linked campaigns for account",
+                account_id=account_id,
+            )
+            return []
+
+        # Extract all unique asset IDs
+        all_asset_ids = list(
+            set(
+                item.get("adGroupAdAssetView", {}).get("asset", "").split("/")[-1]
+                for item in all_performance_data
+            )
+        )
+
+        # Fetch all asset text at once
+        all_asset_details = await self.assets_adapter.fetch_asset_text(
+            asset_ids=all_asset_ids,
             customer_id=account_id,
             login_customer_id=parent_account_id,
             client_code=client_code,
         )
 
-        if not campaigns:
-            logger.info("No campaigns found for account", account_id=account_id)
-            return []
+        # Group performance data by campaign
+        campaign_performance = {}
+        for item in all_performance_data:
+            campaign_id_str = str(item.get("campaign", {}).get("id", ""))
+            if campaign_id_str in linked_campaigns:
+                if campaign_id_str not in campaign_performance:
+                    campaign_performance[campaign_id_str] = []
+                campaign_performance[campaign_id_str].append(item)
 
-        # Process each campaign
+        # Process each linked campaign with pre-fetched data
         results = []
-        for campaign in campaigns:
-            campaign_id_str = str(campaign["id"]).strip()
-            is_linked = campaign_id_str in campaign_product_map
-
-            logger.info(
-                f"Campaign Linking Status: {campaign['name']} ({campaign['id']})",
-                client_code=client_code,
-                is_linked=is_linked,
-            )
-
-            if not is_linked:
+        for campaign_id_str, campaign_info in linked_campaigns.items():
+            performance_data = campaign_performance.get(campaign_id_str, [])
+            if not performance_data:
                 continue
 
             try:
-                rec = await self._analyze_campaign(
+                rec = await self._analyze_campaign_with_data(
                     customer_id=account_id,
-                    campaign_id=campaign["id"],
-                    campaign_name=campaign["name"],
+                    campaign_id=campaign_info["id"],
+                    campaign_name=campaign_info["name"],
                     login_customer_id=parent_account_id,
-                    product_id=campaign_product_map.get(campaign_id_str, ""),
+                    product_id=campaign_info["product_id"],
+                    performance_data=performance_data,
+                    asset_details=all_asset_details,
                     client_code=client_code,
                 )
                 if rec:
@@ -126,18 +172,9 @@ class DescriptionOptimizationAgent:
             except Exception as e:
                 logger.error(
                     "Failed to analyze campaign",
-                    campaign_id=campaign["id"],
+                    campaign_id=campaign_info["id"],
                     error=str(e),
                 )
-
-        if not results and not any(
-            str(c["id"]).strip() in campaign_product_map for c in campaigns
-        ):
-            logger.info(
-                "No linked campaigns for account",
-                account_id=account_id,
-                total_campaigns=len(campaigns),
-            )
 
         return results
 
@@ -150,13 +187,13 @@ class DescriptionOptimizationAgent:
         product_id: str,
         client_code: str,
     ) -> CampaignRecommendation | None:
-        """Analyze a single campaign for description optimization opportunities."""
+        """Legacy method - fetches data and delegates to _analyze_campaign_with_data."""
         # Fetch asset performance data
         performance_data = await self.assets_adapter.fetch_asset_performance(
             customer_id=customer_id,
-            campaign_id=campaign_id,
             login_customer_id=login_customer_id,
             client_code=client_code,
+            campaign_id=campaign_id,
         )
 
         if not performance_data:
@@ -178,6 +215,30 @@ class DescriptionOptimizationAgent:
             login_customer_id=login_customer_id,
             client_code=client_code,
         )
+
+        return await self._analyze_campaign_with_data(
+            customer_id=customer_id,
+            campaign_id=campaign_id,
+            campaign_name=campaign_name,
+            login_customer_id=login_customer_id,
+            product_id=product_id,
+            performance_data=performance_data,
+            asset_details=asset_details,
+            client_code=client_code,
+        )
+
+    async def _analyze_campaign_with_data(
+        self,
+        customer_id: str,
+        campaign_id: str,
+        campaign_name: str,
+        login_customer_id: str,
+        product_id: str,
+        performance_data: list[dict],
+        asset_details: dict[str, str],
+        client_code: str,
+    ) -> CampaignRecommendation | None:
+        """Analyze a campaign with pre-fetched performance and asset data."""
 
         # Categorize assets (DESCRIPTIONS only)
         categorized = self.categorizer.categorize_assets(

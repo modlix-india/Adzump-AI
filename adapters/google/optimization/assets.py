@@ -65,11 +65,12 @@ class GoogleAssetsAdapter:
     async def fetch_asset_performance(
         self,
         customer_id: str,
-        campaign_id: str,
         login_customer_id: str,
         client_code: str,
+        campaign_id: str | None = None,
     ) -> list[dict]:
-        """Fetch asset performance data for a specific campaign."""
+        campaign_filter = f"AND campaign.id = {campaign_id}" if campaign_id else ""
+
         query = f"""
             SELECT 
                 campaign.id, campaign.name,
@@ -87,7 +88,7 @@ class GoogleAssetsAdapter:
             FROM ad_group_ad_asset_view
             WHERE ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD'
               AND segments.date DURING LAST_30_DAYS
-              AND campaign.id = {campaign_id}
+              {campaign_filter}
               AND ad_group_ad_asset_view.field_type IN ('HEADLINE', 'DESCRIPTION')
         """
 
@@ -99,8 +100,9 @@ class GoogleAssetsAdapter:
                 client_code=client_code,
             )
 
+            scope = f"campaign {campaign_id}" if campaign_id else "account"
             logger.info(
-                "Fetched asset performance data",
+                f"Fetched asset performance data for {scope}",
                 customer_id=customer_id,
                 campaign_id=campaign_id,
                 results_count=len(results),
