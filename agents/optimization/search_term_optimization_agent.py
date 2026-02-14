@@ -91,9 +91,10 @@ class SearchTermOptimizationAgent:
 
         keywords, negative_keywords = [], []
         for t, r in zip(terms, results):
+            match_type = _normalize_match_type(t["match_type"])
             rec = KeywordRecommendation(
                 text=r["text"],
-                match_type=t["match_type"],
+                match_type=match_type,
                 reason=r["reason"],
                 metrics=r["metrics"],
                 analysis=SearchTermAnalysis(**r["analysis"]),
@@ -117,5 +118,21 @@ class SearchTermOptimizationAgent:
             group["terms"].append(term)
         return campaigns
 
+
+_SEARCH_TERM_TO_KEYWORD_MATCH: dict[str, str] = {
+    "EXACT": "EXACT",
+    "NEAR_EXACT": "EXACT",
+    "PHRASE": "PHRASE",
+    "NEAR_PHRASE": "PHRASE",
+    "BROAD": "BROAD",
+    "AI_MAX": "BROAD",
+    "PERFORMANCE_MAX": "BROAD",
+    "UNKNOWN": "BROAD",
+    "UNSPECIFIED": "BROAD",
+}
+
+
+def _normalize_match_type(search_term_match_type: str | None) -> str:
+    return _SEARCH_TERM_TO_KEYWORD_MATCH.get(search_term_match_type or "", "BROAD")
 
 search_term_optimization_agent = SearchTermOptimizationAgent()

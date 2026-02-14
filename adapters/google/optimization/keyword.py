@@ -90,7 +90,7 @@ def _transform_row(row: dict) -> dict:
         "keyword": keyword_info.get("text", "").strip().lower(),
         "criterion_id": str(criterion.get("criterionId", "")),
         "resource_name": criterion.get("resourceName", ""),
-        "match_type": keyword_info.get("matchType", "PHRASE").lower(),
+        "match_type": keyword_info.get("matchType", "PHRASE"),
         "ad_group_id": str(ad_group.get("id", "")),
         "ad_group_name": ad_group.get("name", ""),
         "campaign_id": str(campaign.get("id", "")),
