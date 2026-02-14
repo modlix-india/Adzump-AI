@@ -70,7 +70,7 @@ class SearchTermOptimizationAgent:
                 product_id=mapping["product_id"],
                 campaign_id=cid,
                 campaign_name=data["name"],
-                campaign_type=data["type"],
+                campaign_type="SEARCH",
                 completed=False,
                 fields=OptimizationFields(
                     keywords=keywords or None,
