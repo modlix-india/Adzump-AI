@@ -7,6 +7,7 @@ from core.models.optimization import (
     OptimizationFields,
     KeywordRecommendation,
     SearchTermAnalysis,
+    KEYWORD_MAX_LENGTH,
 )
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.search_term import GoogleSearchTermAdapter
@@ -91,9 +92,13 @@ class SearchTermOptimizationAgent:
 
         keywords, negative_keywords = [], []
         for t, r in zip(terms, results):
+            text = r["text"]
+            if len(text) > KEYWORD_MAX_LENGTH:
+                logger.info("Skipping long search term", text=text[:50], length=len(text))
+                continue
             match_type = _normalize_match_type(t["match_type"])
             rec = KeywordRecommendation(
-                text=r["text"],
+                text=text,
                 match_type=match_type,
                 reason=r["reason"],
                 metrics=r["metrics"],
