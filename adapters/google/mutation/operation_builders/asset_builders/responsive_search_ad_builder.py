@@ -57,6 +57,13 @@ class ResponsiveSearchAdBuilder:
     ) -> List[Dict[str, Any]]:
         ad_updates = self._group_by_ad(recommendations, max_length, asset_type)
         operations = []
+        add_count = 0
+        remove_count = 0
+
+        # Count individual recommendations being processed
+        for changes in ad_updates.values():
+            add_count += len(changes.get("add", []))
+            remove_count += len(changes.get("remove", []))
 
         for ad_id, changes in ad_updates.items():
             try:
@@ -77,7 +84,12 @@ class ResponsiveSearchAdBuilder:
                 # Per-item logging removed as per instruction.
                 pass
 
-        logger.info(f"{asset_type}_operations_built", count=len(operations))
+        logger.info(
+            f"{asset_type}_operations_built",
+            adds=add_count,
+            removes=remove_count,
+            total_operations=len(operations),
+        )
         return operations
 
     def _group_by_ad(

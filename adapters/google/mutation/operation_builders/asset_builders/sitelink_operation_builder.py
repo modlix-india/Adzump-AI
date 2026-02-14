@@ -20,6 +20,10 @@ class SitelinkOperationBuilder:
         context: MutationContext,
     ) -> List[Dict[str, Any]]:
         operations = []
+        add_count = 0
+        remove_count = 0
+        update_count = 0
+
         for sitelink in recommendations:
             error = self.validator.validate_sitelink(sl=sitelink)
             if error:
@@ -32,16 +36,25 @@ class SitelinkOperationBuilder:
                         customer_id=context.account_id, sitelink=sitelink
                     )
                 )
+                add_count += 1
             elif sitelink.recommendation == "UPDATE":
                 operations.extend(
                     self._build_update_ops(
                         customer_id=context.account_id, sitelink=sitelink
                     )
                 )
+                update_count += 1
             elif sitelink.recommendation == "REMOVE":
                 operations.extend(self._build_remove_ops(sitelink=sitelink))
+                remove_count += 1
 
-        logger.info("sitelink_operations_built", count=len(operations))
+        logger.info(
+            "sitelink_operations_built",
+            adds=add_count,
+            removes=remove_count,
+            updates=update_count,
+            total_operations=len(operations),
+        )
         return operations
 
     def _build_add_ops(

@@ -23,6 +23,9 @@ class CriterionTargetingBuilder:
         context: MutationContext,
     ) -> List[Dict[str, Any]]:
         operations = []
+        add_count = 0
+        remove_count = 0
+
         for age_recommendation in recommendations:
             if age_recommendation.recommendation == "ADD":
                 operations.append(
@@ -36,7 +39,7 @@ class CriterionTargetingBuilder:
                         }
                     }
                 )
-                logger.info("Built age ADD operation", age=age_recommendation.age_range)
+                add_count += 1
             elif age_recommendation.recommendation == "REMOVE":
                 operations.append(
                     {
@@ -45,10 +48,15 @@ class CriterionTargetingBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built age REMOVE operation",
-                    resource=age_recommendation.resource_name,
-                )
+                remove_count += 1
+
+        if operations:
+            logger.info(
+                "age_operations_built",
+                adds=add_count,
+                removes=remove_count,
+                total_operations=len(operations),
+            )
         return operations
 
     async def build_gender_ops(
@@ -57,6 +65,9 @@ class CriterionTargetingBuilder:
         context: MutationContext,
     ) -> List[Dict[str, Any]]:
         operations = []
+        add_count = 0
+        remove_count = 0
+
         for gender_recommendation in recommendations:
             if gender_recommendation.recommendation == "ADD":
                 operations.append(
@@ -70,10 +81,7 @@ class CriterionTargetingBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built gender ADD operation",
-                    gender=gender_recommendation.gender_type,
-                )
+                add_count += 1
             elif gender_recommendation.recommendation == "REMOVE":
                 operations.append(
                     {
@@ -82,10 +90,15 @@ class CriterionTargetingBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built gender REMOVE operation",
-                    resource=gender_recommendation.resource_name,
-                )
+                remove_count += 1
+
+        if operations:
+            logger.info(
+                "gender_operations_built",
+                adds=add_count,
+                removes=remove_count,
+                total_operations=len(operations),
+            )
         return operations
 
     async def build_location_ops(
@@ -94,6 +107,9 @@ class CriterionTargetingBuilder:
         context: MutationContext,
     ) -> List[Dict[str, Any]]:
         operations = []
+        add_count = 0
+        remove_count = 0
+
         for loc_rec in recommendations:
             if loc_rec.recommendation == "ADD":
                 if not loc_rec.geo_target_constant:
@@ -135,11 +151,7 @@ class CriterionTargetingBuilder:
                         }
                     }
                 )
-                logger.info(
-                    "Built location ADD op",
-                    geo=loc_rec.geo_target_constant,
-                    level=loc_rec.level,
-                )
+                add_count += 1
             elif loc_rec.recommendation == "REMOVE":
                 if not loc_rec.resource_name:
                     logger.error(
@@ -152,10 +164,15 @@ class CriterionTargetingBuilder:
                     else "adGroupCriterionOperation"
                 )
                 operations.append({op_key: {"remove": loc_rec.resource_name}})
-                logger.info(
-                    "Built location REMOVE op",
-                    resource=loc_rec.resource_name,
-                )
+                remove_count += 1
+
+        if operations:
+            logger.info(
+                "location_operations_built",
+                adds=add_count,
+                removes=remove_count,
+                total_operations=len(operations),
+            )
         return operations
 
     async def build_proximity_ops(
@@ -165,6 +182,9 @@ class CriterionTargetingBuilder:
     ) -> List[Dict[str, Any]]:
         """Build proximity (radius) targeting operations."""
         operations = []
+        add_count = 0
+        remove_count = 0
+
         for prox_rec in recommendations:
             if prox_rec.recommendation == "ADD":
                 if not self.validator.validate_radius(proximity=prox_rec):
@@ -203,6 +223,7 @@ class CriterionTargetingBuilder:
                         }
                     }
                 )
+                add_count += 1
             elif prox_rec.recommendation == "REMOVE":
                 if not prox_rec.resource_name:
                     logger.error("Proximity REMOVE operation missing the resource_name")
@@ -213,10 +234,15 @@ class CriterionTargetingBuilder:
                     else "adGroupCriterionOperation"
                 )
                 operations.append({op_key: {"remove": prox_rec.resource_name}})
-                logger.info(
-                    "Built proximity REMOVE operation",
-                    resource=prox_rec.resource_name,
-                )
+                remove_count += 1
+
+        if operations:
+            logger.info(
+                "proximity_operations_built",
+                adds=add_count,
+                removes=remove_count,
+                total_operations=len(operations),
+            )
         return operations
 
     def _build_proximity_info(

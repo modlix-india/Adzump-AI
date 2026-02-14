@@ -17,6 +17,10 @@ class KeywordOperationBuilder:
         context: MutationContext,
     ) -> List[Dict[str, Any]]:
         operations = []
+        add_count = 0
+        pause_count = 0
+        remove_count = 0
+
         for keyword_recommendation in recommendations:
             if keyword_recommendation.recommendation == "ADD":
                 # Validate keyword text and match type
@@ -44,6 +48,7 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
+                add_count += 1
             elif keyword_recommendation.recommendation == "PAUSE":
                 operations.append(
                     {
@@ -56,6 +61,7 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
+                pause_count += 1
             elif keyword_recommendation.recommendation == "REMOVE":
                 # NOTE: Currently unreachable — KeywordRecommendation only allows "ADD" | "PAUSE".
                 # Kept for future support when REMOVE is added to the model.
@@ -66,8 +72,15 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
+                remove_count += 1
 
-        logger.info("keyword_operations_built", count=len(operations))
+        logger.info(
+            "keyword_operations_built",
+            adds=add_count,
+            removes=remove_count,
+            pauses=pause_count,
+            total_operations=len(operations),
+        )
         return operations
 
     async def build_negative_keywords_ops(
@@ -77,6 +90,9 @@ class KeywordOperationBuilder:
     ) -> List[Dict[str, Any]]:
         # TODO: Refactor to reduce duplication with build_keywords_ops
         operations = []
+        add_count = 0
+        remove_count = 0
+
         for keyword_recommendation in recommendations:
             if keyword_recommendation.recommendation == "ADD":
                 # Default match type to BROAD for negative keywords if not provided
@@ -109,6 +125,7 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
+                add_count += 1
             elif keyword_recommendation.recommendation == "REMOVE":
                 # NOTE: Currently unreachable — KeywordRecommendation only allows "ADD" | "PAUSE".
                 # Kept for future support when REMOVE is added to the model.
@@ -119,6 +136,12 @@ class KeywordOperationBuilder:
                         }
                     }
                 )
+                remove_count += 1
 
-        logger.info("negative_keyword_operations_built", count=len(operations))
+        logger.info(
+            "negative_keyword_operations_built",
+            adds=add_count,
+            removes=remove_count,
+            total_operations=len(operations),
+        )
         return operations
