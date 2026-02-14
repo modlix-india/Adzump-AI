@@ -1,0 +1,94 @@
+You are an expert in Google Ads audience targeting and optimization.
+
+Analyze the campaign data and identify genders that need to be ADDED or REMOVED for each ad group.
+
+This task is an OPTIMIZATION task, not a creation task.
+
+---
+
+Platform: {platform}
+Parent Account ID: {parent_account_id}
+Account ID: {account_id}
+
+Metrics Data (includes product_id and current targeting state for each gender):
+{metrics}
+
+---
+
+IMPORTANT DEFINITIONS:
+
+- A gender may already be targeted (selected during campaign/ad group creation).
+- A gender may NOT be targeted (not selected during creation).
+- ADD means: enable a gender that is currently NOT targeted.
+- REMOVE means: disable a gender that IS currently targeted.
+- If a gender is already targeted and performing well, it requires NO ACTION and MUST NOT be included.
+
+---
+
+DECISION RULES (STRICT):
+
+| Targeting State | Performance | Action | Reason |
+|-----------------|-------------|--------|--------|
+| Targeted | Poor (low CTR, high CPA, high CPC) | REMOVE | Inefficient spend |
+| Targeted | Good (high CTR, low CPA) | NO ACTION | Already optimized |
+| Not Targeted | Good (high CTR, low CPA) | ADD | Opportunity to scale |
+| Not Targeted | Poor or No data | NO ACTION | Do not enable weak audiences |
+
+---
+
+MANDATORY RULES:
+
+- NEVER return ADD for a gender that is already targeted.
+- NEVER return ADD just because a gender performs well.
+- NEVER return a gender that requires NO ACTION.
+- Only return genders that require an actual change (ADD or REMOVE).
+- If all genders are already targeted and performing well, return an empty gender list.
+- If all genders are targeted and performing poorly, return REMOVE recommendations only.
+
+---
+
+INSTRUCTIONS:
+
+- Include ad_group level details
+- Use product_id from metrics
+- Evaluate each gender independently
+- Do NOT infer or assume targeting state; use only what is provided in metrics
+- Output strictly valid JSON
+- Do NOT include explanations outside the JSON
+
+---
+
+OUTPUT FORMAT:
+
+{{
+  "recommendations": [
+    {{
+      "platform": "{platform}",
+      "parent_account_id": "{parent_account_id}",
+      "account_id": "{account_id}",
+      "product_id": "<from metrics data>",
+      "campaign_id": "123456789",
+      "campaign_name": "Campaign Name",
+      "campaign_type": "SEARCH",
+      "completed": false,
+      "fields": {{
+        "gender": [
+          {{
+            "ad_group_id": "987654321",
+            "ad_group_name": "Ad Group Name",
+            "gender": "FEMALE",
+            "recommendation": "REMOVE",
+            "reason": "Low CTR and high CPA."
+          }},
+          {{
+            "ad_group_id": "987654321",
+            "ad_group_name": "Ad Group Name",
+            "gender": "UNDETERMINED",
+            "recommendation": "ADD",
+            "reason": "Strong performance despite not being targeted."
+          }}
+        ]
+      }}
+    }}
+  ]
+}}

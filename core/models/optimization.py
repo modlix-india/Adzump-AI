@@ -51,6 +51,15 @@ class GenderFieldRecommendation(BaseModel):
     applied: bool = False
 
 
+class GenderFieldRecommendation(BaseModel):
+    resource_name: Optional[str] = None
+    ad_group_id: str
+    ad_group_name: str
+    gender: str
+    recommendation: Literal["ADD", "REMOVE"]
+    reason: str
+
+
 class SearchTermAnalysis(BaseModel):
     brand: dict
     configuration: dict
