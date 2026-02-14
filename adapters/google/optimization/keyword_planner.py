@@ -5,7 +5,7 @@ from structlog import get_logger
 from core.infrastructure.context import auth_context
 from core.infrastructure.http_client import http_request
 from adapters.google.client import (
-    GoogleAdsClient,
+    google_ads_client,
     _raise_google_error,
     _extract_retry_delay,
 )
@@ -22,7 +22,7 @@ class GoogleKeywordPlannerAdapter:
     MAX_KEYWORD_WORDS = 6
 
     def __init__(self):
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
 
     async def generate_keyword_ideas(
         self,
