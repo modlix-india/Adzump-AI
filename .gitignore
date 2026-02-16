@@ -6,3 +6,6 @@ __pycache__
 *.py[cod]
 venv/
 .vscode/
+.claude/
+.mypy_cache/
+/logs/
