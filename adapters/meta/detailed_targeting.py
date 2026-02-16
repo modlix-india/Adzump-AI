@@ -59,12 +59,16 @@ class MetaDetailedTargetingAdapter:
                 continue
 
             item = data[0]
-            
 
             resolved_items.append(
                 {
-                    "id": item["id"],
-                    "name": item["name"],
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "type": item.get("type"),
+                    "path": item.get("path"),
+                    "audience_size_lower_bound": item.get("audience_size_lower_bound"),
+                    "audience_size_upper_bound": item.get("audience_size_upper_bound"),
+                    "description": item.get("description"),
                 }
             )
 
@@ -90,13 +94,7 @@ class MetaDetailedTargetingAdapter:
             if resolved_interests:
                 flexible_spec.append(
                     {
-                        "interests": [
-                            {
-                                "id": item["id"],
-                                "name": item["name"],
-                            }
-                            for item in resolved_interests
-                        ]
+                        "interests": resolved_interests
                     }
                 )
 
@@ -111,13 +109,7 @@ class MetaDetailedTargetingAdapter:
             if resolved_behaviors:
                 flexible_spec.append(
                     {
-                        "behaviors": [
-                            {
-                                "id": item["id"],
-                                "name": item["name"],
-                            }
-                            for item in resolved_behaviors
-                        ]
+                        "behaviors": resolved_behaviors
                     }
                 )
 
@@ -132,13 +124,7 @@ class MetaDetailedTargetingAdapter:
             if resolved_demographics:
                 flexible_spec.append(
                     {
-                        "demographics": [
-                            {
-                                "id": item["id"],
-                                "name": item["name"],
-                            }
-                            for item in resolved_demographics
-                        ]
+                        "demographics": resolved_demographics
                     }
                 )
 
