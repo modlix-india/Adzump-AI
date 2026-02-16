@@ -8,6 +8,9 @@ from adapters.meta.models.adset_model import CreateAdSetRequest
 
 import json
 
+from agents.meta.detailed_targeting_agent import meta_detailed_targeting_agent
+
+
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
 
 
@@ -40,5 +43,21 @@ async def generate_adset(
 # async def create_adset(create_adset_request: CreateAdSetRequest):
 #     result = await meta_adset_agent.create_adset(create_adset_request)
 #     return success_response(data=result.model_dump(mode="json"))
+
+
+
+@router.post("/adset/detailed-targeting/generate")
+async def generate_detailed_targeting(
+    session_id: str = Query(..., alias="sessionId"),
+    ad_account_id: str = Query(..., alias="adAccountId"),
+):
+    result = await meta_detailed_targeting_agent.create_payload(
+        session_id=session_id,
+        ad_account_id=ad_account_id,
+    )
+
+    return success_response(data=result)
+
+
 
 

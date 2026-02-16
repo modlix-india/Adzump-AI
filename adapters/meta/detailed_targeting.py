@@ -1,0 +1,146 @@
+from typing import List, Dict, Any
+import os
+
+from adapters.meta.client import MetaClient
+
+
+class MetaDetailedTargetingAdapter:
+    """Adapter for Meta Detailed Targeting operations."""
+
+    def _get_client(self) -> MetaClient:
+        meta_token = os.getenv("META_ACCESS_TOKEN", "")
+        return MetaClient(meta_token)
+
+    def _normalize_ad_account_id(self, ad_account_id: str) -> str:
+        return ad_account_id.removeprefix("act_")
+
+    async def _search(
+        self,
+        ad_account_id: str,
+        search_type: str,
+        query: str,
+    ) -> List[Dict[str, Any]]:
+
+        client = self._get_client()
+        account_id = self._normalize_ad_account_id(ad_account_id)
+
+        response = await client.get(
+            f"/act_{account_id}/targetingsearch",
+            params={
+                "type": search_type,
+                "q": query,
+                "limit": 5,
+            },
+        )
+
+        return response.get("data", [])
+
+
+    async def _resolve(
+        self,
+        names: List[str],
+        ad_account_id: str,
+        search_type: str,
+    ) -> List[Dict[str, str]]:
+
+        resolved_items = []
+
+        for name in names:
+            if not name:
+                continue
+
+            data = await self._search(
+                ad_account_id=ad_account_id,
+                search_type=search_type,
+                query=name.strip(),
+            )
+
+            if not data:
+                continue
+
+            item = data[0]
+            
+
+            resolved_items.append(
+                {
+                    "id": item["id"],
+                    "name": item["name"],
+                }
+            )
+
+        return resolved_items
+
+    async def build_flexible_spec(
+        self,
+        ad_account_id: str,
+        interests: List[str] | None = None,
+        behaviors: List[str] | None = None,
+        demographics: List[str] | None = None,
+    ) -> List[Dict[str, Any]]:
+
+        flexible_spec = []
+
+        if interests:
+            resolved_interests = await self._resolve(
+                interests,
+                ad_account_id,
+                "adinterest",
+            )
+
+            if resolved_interests:
+                flexible_spec.append(
+                    {
+                        "interests": [
+                            {
+                                "id": item["id"],
+                                "name": item["name"],
+                            }
+                            for item in resolved_interests
+                        ]
+                    }
+                )
+
+
+        if behaviors:
+            resolved_behaviors = await self._resolve(
+                behaviors,
+                ad_account_id,
+                "adbehavior",
+            )
+
+            if resolved_behaviors:
+                flexible_spec.append(
+                    {
+                        "behaviors": [
+                            {
+                                "id": item["id"],
+                                "name": item["name"],
+                            }
+                            for item in resolved_behaviors
+                        ]
+                    }
+                )
+
+
+        if demographics:
+            resolved_demographics = await self._resolve(
+                demographics,
+                ad_account_id,
+                "addemographic",
+            )
+
+            if resolved_demographics:
+                flexible_spec.append(
+                    {
+                        "demographics": [
+                            {
+                                "id": item["id"],
+                                "name": item["name"],
+                            }
+                            for item in resolved_demographics
+                        ]
+                    }
+                )
+
+
+        return flexible_spec
