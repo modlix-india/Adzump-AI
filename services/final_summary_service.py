@@ -1,4 +1,5 @@
 from structlog import get_logger    #type: ignore
+import json
 from http.client import HTTPException
 from oserver.models.storage_request_model import StorageFilter, StorageReadRequest, StorageUpdateWithPayload
 from oserver.services.storage_service import StorageService
@@ -90,7 +91,16 @@ async def generate_final_summary(
         temperature=0.2
     )
 
-    final_summary_text = response.choices[0].message.content.strip()
+    raw_response = response.choices[0].message.content.strip()
+
+    # Parse JSON response and extract finalSummary
+    try:
+        parsed = json.loads(raw_response)
+        final_summary_text = parsed.get("finalSummary", raw_response)
+        logger.info("[FinalSummary] Parsed JSON response successfully.")
+    except json.JSONDecodeError:
+        logger.warning("[FinalSummary] Failed to parse JSON, using raw response")
+        final_summary_text = raw_response
 
     logger.info("[FinalSummary] Final summary generated successfully.")
 

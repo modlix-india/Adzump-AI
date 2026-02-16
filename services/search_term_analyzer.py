@@ -1,3 +1,4 @@
+# TODO: Remove after trust in new search term optimization service (core/services/search_term_analyzer.py)
 from services.search_term_metric_evaluators import evaluate_cost_per_conversion
 
 def get_threshold_values():

@@ -12,44 +12,58 @@ Here are the positive keywords you MUST use in the ad assets:
 
 1. Headlines (KEYWORD REQUIRED IN EACH)
 
+IMPORTANT - Handling Long Keywords (4+ words):
+If a keyword has 4 or more words, you MUST extract meaningful sub-parts from it.
+Split into: location terms, feature terms (like 3BHK, apartments, villa), and brand names.
+
+EXAMPLE of splitting long keywords:
+Original keyword: "luxury 3BHK apartments in Electronic City Bangalore"
+Extract and use these parts:
+- "luxury apartments" (feature)
+- "3BHK apartments" (feature)
+- "Electronic City" (location)
+- "Bangalore homes" (location)
+
 For EACH headline, follow this process:
-Step 1: Pick one keyword from the positive keywords list above
-Step 2: Build a short, catchy headline that naturally contains that keyword
-Step 3: Verify the keyword appears in the headline before adding it
+Step 1: Pick one keyword (or extracted sub-part if keyword is 4+ words)
+Step 2: Build a short, catchy headline that naturally contains that keyword/sub-part
+Step 3: Verify the keyword/sub-part appears in the headline before adding it
 
 Rules:
 - Generate exactly 60 unique headlines
+- ⚠️ CRITICAL: Maximum 30 characters per headline (COUNT CHARACTERS - reject if over 30!)
 - Each headline must be 3 to 4 words long
-- Each headline MUST contain at least one keyword from the list (this is mandatory)
-- Each headline must be completely different from others
+- Each headline MUST contain at least one keyword or extracted sub-part from the list
+- Each headline must be different from others
 - Use variety: statements, calls-to-action
 - Avoid quotation marks, emojis, or special characters
 
-CORRECT EXAMPLES (keyword is part of headline):
-- "Luxury Apartments Available Now" → contains keyword "apartments"
-- "Premium 3BHK Villa Ready" → contains keyword "3BHK"
-- "Bangalore Dream Homes" → contains keyword "Bangalore"
-- "Book Site Visit Today" → contains keyword "site visit"
+CORRECT EXAMPLES (≤30 chars each):
+- "Top Boarding Schools" (20 chars) ✓
+- "Bhopal Schools Open" (19 chars) ✓
+- "Best Schools Bhopal" (19 chars) ✓
+- "Admissions Open Now" (19 chars) ✓
 
-WRONG EXAMPLES (no keyword):
-- "Best Deals Available" → missing keyword ❌
-- "Call Us Today" → missing keyword ❌
+WRONG EXAMPLES:
+- "Experience Top Academics At Boarding School Bhopal" (50 chars) → WAY TOO LONG ❌
+- "Best Boarding Schools in Madhya Pradesh" (39 chars) → too long ❌
+- "Top 10 Boarding Schools Bhopal" (30 chars) → at limit, keep shorter ⚠️
 
 2. Descriptions (KEYWORD REQUIRED IN EACH)
 
-For EACH description, include at least one keyword from the positive keywords list.
+For EACH description, include at least one keyword (or extracted sub-part) from the list.
 
 Rules:
 - Generate exactly 15 unique descriptions
 - Each description must be 12 to 16 words long
-- Each description MUST contain at least one keyword from the list
+- Each description MUST contain at least one keyword or sub-part from the list
 - Focus on value proposition and benefits
 - Complete, grammatically correct sentences
 
 EXAMPLES:
-- "Discover luxury 3BHK apartments in Bangalore with world-class amenities and stunning city views."
-- "Experience premium living with 35+ amenities including swimming pool and modern gym."
-- "Book your site visit today and explore our award-winning gated community near metro."
+- "Discover luxury 3BHK apartments with world-class amenities and stunning views."
+- "Experience premium living with 35+ amenities including pool and modern gym."
+- "Book your site visit today and explore our award-winning gated community."
 
 3. Audience Targeting
 - Suggest the most relevant gender(s) as an array
