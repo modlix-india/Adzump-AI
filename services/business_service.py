@@ -1,3 +1,4 @@
+# TODO: migrate to new architecture — process_website_data should read auth from auth_context directly
 from structlog import get_logger  # type: ignore
 from fastapi import HTTPException
 import json
@@ -130,6 +131,20 @@ class BusinessService:
                 status_code=500, detail="Invalid product data response structure"
             )
         return product_data
+
+    async def fetch_website_data(self, session_id: str):
+        # TODO: drop explicit auth params once process_website_data reads from auth_context
+        from core.infrastructure.context import auth_context
+        from services.session_manager import get_website_url
+
+        website_url = get_website_url(session_id)
+        return await self.process_website_data(
+            website_url=website_url,
+            access_token=auth_context.access_token,
+            client_code=auth_context.client_code,
+            x_forwarded_host=auth_context.x_forwarded_host,
+            x_forwarded_port=auth_context.x_forwarded_port,
+        )
 
     async def process_website_data(
         self,
