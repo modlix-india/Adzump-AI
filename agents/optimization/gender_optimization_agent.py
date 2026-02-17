@@ -4,7 +4,11 @@ from structlog import get_logger
 from collections import defaultdict
 
 from core.services.campaign_mapping import campaign_mapping_service
-from core.models.optimization import OptimizationResponse, CampaignRecommendation
+from core.models.optimization import (
+    GenderFieldRecommendation,
+    CampaignRecommendation,
+    OptimizationFields,
+)
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.gender import GoogleGenderAdapter
 from core.services.recommendation_storage import recommendation_storage_service
@@ -31,7 +35,7 @@ class GenderOptimizationAgent:
 
         results = await asyncio.gather(
             *[
-                self._process_google_account(
+                self._process_account(
                     account=acc,
                     campaign_product_map=campaign_product_map,
                 )
@@ -48,9 +52,9 @@ class GenderOptimizationAgent:
             ]
         )
 
-        return {"recommendations": [r.model_dump() for r in all_recommendations]}
+        return {"recommendations": [rec.model_dump() for rec in all_recommendations]}
 
-    async def _process_google_account(
+    async def _process_account(
         self,
         account: dict,
         campaign_product_map: dict,
@@ -64,9 +68,7 @@ class GenderOptimizationAgent:
         if not metrics:
             return []
 
-        linked_metrics = self._filter_linked_google_campaigns(
-            metrics, campaign_product_map
-        )
+        linked_metrics = self._filter_linked_campaigns(metrics, campaign_product_map)
         if not linked_metrics:
             logger.info(
                 "No linked campaigns for account",
@@ -77,15 +79,12 @@ class GenderOptimizationAgent:
 
         grouped_by_adgroup = defaultdict(list)
         for metric_entry in linked_metrics:
-            ad_group_id = str(metric_entry.get("ad_group", {}).get("id"))
-            grouped_by_adgroup[ad_group_id].append(metric_entry)
+            grouped_by_adgroup[metric_entry["ad_group_id"]].append(metric_entry)
 
         results = await asyncio.gather(
             *[
-                self._analyze_google_metrics(
-                    adgroup_metrics,
-                    account_id,
-                    parent_account_id,
+                self._analyze_adgroup_metrics(
+                    adgroup_metrics, account_id, parent_account_id
                 )
                 for adgroup_metrics in grouped_by_adgroup.values()
             ]
@@ -93,19 +92,11 @@ class GenderOptimizationAgent:
 
         return [rec for sublist in results for rec in sublist]
 
-    def _filter_linked_google_campaigns(
-        self, metrics: list, campaign_product_map: dict
-    ) -> list:
-        linked = []
-        for metric_entry in metrics:
-            campaign_id = str(metric_entry.get("campaign", {}).get("id"))
-            if campaign_id in campaign_product_map:
-                metric_entry["product_id"] = campaign_product_map[campaign_id]
-                linked.append(metric_entry)
-        return linked
-
-    async def _analyze_google_metrics(
-        self, metrics: list, account_id: str, parent_account_id: str
+    async def _analyze_adgroup_metrics(
+        self,
+        metrics: list,
+        account_id: str,
+        parent_account_id: str,
     ) -> list[CampaignRecommendation]:
         prompt = load_prompt("optimization/gender_optimization_prompt.txt")
         formatted = prompt.format(
@@ -123,34 +114,106 @@ class GenderOptimizationAgent:
             model="gpt-4o-mini",
         )
 
-        return self._parse_llm_response(response)
+        active_genders, resource_name_map = _build_targeting_lookups(metrics)
+        gender_recs = self._parse_llm_response(
+            response, active_genders, resource_name_map
+        )
+        if not gender_recs:
+            return []
 
-    def _parse_llm_response(self, response) -> list[CampaignRecommendation]:
+        first = metrics[0]
+        return [
+            CampaignRecommendation(
+                _id=None,
+                platform="google_ads",
+                parent_account_id=parent_account_id,
+                account_id=account_id,
+                product_id=first.get("product_id"),
+                campaign_id=first["campaign_id"],
+                campaign_name=first.get("campaign_name", ""),
+                campaign_type=first.get("campaign_type", ""),
+                fields=OptimizationFields(gender=gender_recs),
+            )
+        ]
+
+    def _parse_llm_response(
+        self,
+        response,
+        active_genders: dict[str, set[str]],
+        resource_name_map: dict[tuple[str, str], str],
+    ) -> list[GenderFieldRecommendation]:
         content = response.choices[0].message.content.strip()
         if content.startswith("```"):
             content = "\n".join(content.splitlines()[1:-1]).strip()
+        data = json.loads(content)
 
-        parsed = OptimizationResponse.model_validate_json(content)
+        recs = [
+            GenderFieldRecommendation.model_validate(rec)
+            for rec in data.get("gender", [])
+        ]
 
-        for campaign in parsed.recommendations:
-            gender_recos = campaign.fields.gender or []
+        for rec in recs:
+            if rec.recommendation == "REMOVE" and not rec.resource_name:
+                rec.resource_name = resource_name_map.get(
+                    (rec.ad_group_id, rec.gender_type)
+                )
 
-            # Group gender recommendations by ad_group_id
-            grouped_by_adgroup = defaultdict(list)
-            for gender_entry in gender_recos:
-                grouped_by_adgroup[gender_entry.ad_group_id].append(gender_entry)
+        return _filter_gender_recs(recs, active_genders)
 
-            blocked_adgroups = set()
+    @staticmethod
+    def _filter_linked_campaigns(metrics: list, campaign_product_map: dict) -> list:
+        linked = []
+        for metric_entry in metrics:
+            campaign_id = metric_entry["campaign_id"]
+            if campaign_id in campaign_product_map:
+                metric_entry["product_id"] = campaign_product_map[campaign_id]
+                linked.append(metric_entry)
+        return linked
 
-            for ad_group_id, recos in grouped_by_adgroup.items():
-                if all(r.recommendation == "REMOVE" for r in recos):
-                    blocked_adgroups.add(ad_group_id)
 
-            campaign.fields.gender = [
-                g for g in gender_recos if g.ad_group_id not in blocked_adgroups
-            ]
+def _build_targeting_lookups(
+    metrics: list,
+) -> tuple[dict[str, set[str]], dict[tuple[str, str], str]]:
+    active_genders: dict[str, set[str]] = {}
+    resource_name_map: dict[tuple[str, str], str] = {}
 
-        return parsed.recommendations
+    for entry in metrics:
+        ad_group_id = entry["ad_group_id"]
+
+        for gender in entry.get("targeted_genders", []):
+            active_genders.setdefault(ad_group_id, set()).add(gender)
+
+        resource_name = entry.get("resource_name")
+        if resource_name:
+            resource_name_map[(ad_group_id, entry["gender_type"])] = resource_name
+
+    return active_genders, resource_name_map
+
+
+def _filter_gender_recs(
+    recs: list[GenderFieldRecommendation],
+    active_genders: dict[str, set[str]],
+) -> list[GenderFieldRecommendation]:
+    by_adgroup: dict[str, list] = defaultdict(list)
+    for rec in recs:
+        by_adgroup[rec.ad_group_id].append(rec)
+
+    all_remove_adgroups = {
+        ad_group_id
+        for ad_group_id, group in by_adgroup.items()
+        if all(rec.recommendation == "REMOVE" for rec in group)
+    }
+
+    return [
+        rec
+        for rec in recs
+        if rec.ad_group_id not in all_remove_adgroups
+        and not (
+            rec.recommendation == "ADD"
+            and rec.gender_type in active_genders.get(rec.ad_group_id, set())
+        )
+        and not (rec.recommendation == "REMOVE" and not rec.resource_name)
+    ]
 
 
 gender_optimization_agent = GenderOptimizationAgent()

@@ -10,7 +10,7 @@ Platform: {platform}
 Parent Account ID: {parent_account_id}
 Account ID: {account_id}
 
-Metrics Data (includes product_id and current targeting state for each gender):
+Metrics Data (includes current targeting state for each gender):
 {metrics}
 
 ---
@@ -49,8 +49,6 @@ MANDATORY RULES:
 
 INSTRUCTIONS:
 
-- Include ad_group level details
-- Use product_id from metrics
 - Evaluate each gender independently
 - Do NOT infer or assume targeting state; use only what is provided in metrics
 - Output strictly valid JSON
@@ -61,34 +59,20 @@ INSTRUCTIONS:
 OUTPUT FORMAT:
 
 {{
-  "recommendations": [
+  "gender": [
     {{
-      "platform": "{platform}",
-      "parent_account_id": "{parent_account_id}",
-      "account_id": "{account_id}",
-      "product_id": "<from metrics data>",
-      "campaign_id": "123456789",
-      "campaign_name": "Campaign Name",
-      "campaign_type": "SEARCH",
-      "completed": false,
-      "fields": {{
-        "gender": [
-          {{
-            "ad_group_id": "987654321",
-            "ad_group_name": "Ad Group Name",
-            "gender": "FEMALE",
-            "recommendation": "REMOVE",
-            "reason": "Low CTR and high CPA."
-          }},
-          {{
-            "ad_group_id": "987654321",
-            "ad_group_name": "Ad Group Name",
-            "gender": "UNDETERMINED",
-            "recommendation": "ADD",
-            "reason": "Strong performance despite not being targeted."
-          }}
-        ]
-      }}
+      "ad_group_id": "987654321",
+      "ad_group_name": "Ad Group Name",
+      "gender_type": "FEMALE",
+      "recommendation": "REMOVE",
+      "reason": "Low CTR and high CPA."
+    }},
+    {{
+      "ad_group_id": "987654321",
+      "ad_group_name": "Ad Group Name",
+      "gender_type": "UNDETERMINED",
+      "recommendation": "ADD",
+      "reason": "Strong performance despite not being targeted."
     }}
   ]
 }}
