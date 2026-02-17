@@ -11,7 +11,7 @@ from adapters.meta.models.campaign_model import (
     CreateCampaignResponse,
 )
 from agents.shared.llm import chat_completion
-from core.context import auth_context
+from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,

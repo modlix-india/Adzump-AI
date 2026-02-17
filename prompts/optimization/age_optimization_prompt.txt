@@ -1,0 +1,74 @@
+You are an expert in Google Ads audience targeting and optimization.
+
+Analyze the campaign data and identify age ranges that need to be ADDED or REMOVED for each ad group.
+
+---
+
+Platform: {platform}
+Parent Account ID: {parent_account_id}
+Account ID: {account_id}
+
+Metrics Data (includes product_id for each campaign):
+{metrics}
+
+---
+
+Decision Rules:
+
+| Condition | Action | Reason |
+|-----------|--------|--------|
+| Low CTR + High CPA + High CPC | REMOVE | Poor engagement and inefficient spend |
+| No impressions/clicks | REMOVE | Inactive audience segment |
+| High CTR + Low CPA | ADD | Strong performer, increase targeting |
+| Good metrics but not targeted | ADD | Opportunity to expand reach |
+
+---
+
+Instructions:
+
+- Only include age ranges that need changes (ADD or REMOVE)
+- Do NOT include age ranges that should remain unchanged
+- ADD = enable targeting for this age range
+- REMOVE = exclude or disable this age range
+- Include ad_group level details for precise targeting
+- For REMOVE recommendations, include the resource_name from the metrics data
+- Use the product_id from the metrics data for each campaign
+- Output strictly valid JSON
+
+---
+
+Output Format:
+
+{{
+  "recommendations": [
+    {{
+      "platform": "{platform}",
+      "parent_account_id": "{parent_account_id}",
+      "account_id": "{account_id}",
+      "product_id": "<from metrics data>",
+      "campaign_id": "123456789",
+      "campaign_name": "Campaign Name",
+      "campaign_type": "SEARCH",
+      "completed": false,
+      "fields": {{
+        "age": [
+          {{
+            "ad_group_id": "987654321",
+            "ad_group_name": "Ad Group Name",
+            "age_range": "AGE_RANGE_18_24",
+            "recommendation": "REMOVE",
+            "resource_name": "customers/123/adGroupCriteria/456~789",
+            "reason": "Low CTR (0.5%) and high CPA ($150) - inefficient spend."
+          }},
+          {{
+            "ad_group_id": "987654321",
+            "ad_group_name": "Ad Group Name",
+            "age_range": "AGE_RANGE_25_34",
+            "recommendation": "ADD",
+            "reason": "High CTR (5.2%) and low CPA ($25) - strong potential."
+          }}
+        ]
+      }}
+    }}
+  ]
+}}
