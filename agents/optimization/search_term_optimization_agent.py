@@ -7,6 +7,7 @@ from core.models.optimization import (
     OptimizationFields,
     KeywordRecommendation,
     SearchTermAnalysis,
+    KEYWORD_MAX_LENGTH,
 )
 from adapters.google.accounts import GoogleAccountsAdapter
 from adapters.google.optimization.search_term import GoogleSearchTermAdapter
@@ -71,7 +72,7 @@ class SearchTermOptimizationAgent:
                 product_id=mapping["product_id"],
                 campaign_id=cid,
                 campaign_name=data["name"],
-                campaign_type=data["type"],
+                campaign_type="SEARCH",
                 completed=False,
                 fields=OptimizationFields(
                     keywords=keywords or None,
@@ -92,9 +93,14 @@ class SearchTermOptimizationAgent:
 
         keywords, negative_keywords = [], []
         for t, r in zip(terms, results):
+            text = r["text"]
+            if len(text) > KEYWORD_MAX_LENGTH:
+                logger.info("Skipping long search term", text=text[:50], length=len(text))
+                continue
+            match_type = _normalize_match_type(t["match_type"])
             rec = KeywordRecommendation(
-                text=r["text"],
-                match_type=t["match_type"],
+                text=text,
+                match_type=match_type,
                 reason=r["reason"],
                 metrics=r["metrics"],
                 analysis=SearchTermAnalysis(**r["analysis"]),
@@ -122,5 +128,21 @@ class SearchTermOptimizationAgent:
             group["terms"].append(term)
         return campaigns
 
+
+_SEARCH_TERM_TO_KEYWORD_MATCH: dict[str, str] = {
+    "EXACT": "EXACT",
+    "NEAR_EXACT": "EXACT",
+    "PHRASE": "PHRASE",
+    "NEAR_PHRASE": "PHRASE",
+    "BROAD": "BROAD",
+    "AI_MAX": "BROAD",
+    "PERFORMANCE_MAX": "BROAD",
+    "UNKNOWN": "BROAD",
+    "UNSPECIFIED": "BROAD",
+}
+
+
+def _normalize_match_type(search_term_match_type: str | None) -> str:
+    return _SEARCH_TERM_TO_KEYWORD_MATCH.get(search_term_match_type or "", "BROAD")
 
 search_term_optimization_agent = SearchTermOptimizationAgent()
