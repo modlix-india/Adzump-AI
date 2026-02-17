@@ -1,23 +1,13 @@
 from datetime import datetime
-from typing import Any
-
 import structlog
 from pydantic import ValidationError
 
 from adapters.meta import MetaCampaignAdapter
-from adapters.meta.models.campaign_model import (
-    CampaignPayload,
-    CreateCampaignRequest,
-    CreateCampaignResponse,
-)
+from core.models.meta import CampaignPayload, CreateCampaignRequest
 from agents.shared.llm import chat_completion
 from core.infrastructure.context import auth_context
-from exceptions.custom_exceptions import (
-    AIProcessingException,
-    BusinessValidationException,
-)
+from exceptions.custom_exceptions import AIProcessingException
 from services.business_service import BusinessService
-from services.session_manager import sessions
 from utils.prompt_loader import load_prompt
 
 logger = structlog.get_logger()
@@ -28,38 +18,21 @@ class MetaCampaignAgent:
         self.business_service = BusinessService()
         self.campaign_adapter = MetaCampaignAdapter()
 
-    async def create_payload(self, session_id: str) -> CampaignPayload:
-        campaign_data = self._get_session_data(session_id)
-        website_url = campaign_data.get("websiteURL")
-        if not website_url:
-            raise BusinessValidationException("Session missing websiteURL")
-
-        response = await self.business_service.process_website_data(
-            website_url=website_url,
-            access_token=auth_context.access_token,
-            client_code=auth_context.client_code,
-            x_forwarded_host=auth_context.x_forwarded_host,
-            x_forwarded_port=auth_context.x_forwarded_port,
-        )
+    async def generate_payload(self, session_id: str) -> CampaignPayload:
+        response = await self.business_service.fetch_website_data(session_id)
 
         logger.info("Generating Meta campaign", session_id=session_id)
         return await self._generate_payload_from_llm(response.final_summary)
 
     async def create_campaign(
         self, create_campaign_request: CreateCampaignRequest
-    ) -> CreateCampaignResponse:
+    ) -> dict:
         result = await self.campaign_adapter.create(
-            create_campaign_request.ad_account_id,
-            create_campaign_request.campaign_payload.model_dump(),
+            client_code=auth_context.client_code,
+            ad_account_id=create_campaign_request.ad_account_id,
+            payload=create_campaign_request.campaign_payload.model_dump(),
         )
-        return CreateCampaignResponse(campaignId=result["id"])
-
-    def _get_session_data(self, session_id: str) -> dict[str, Any]:
-        if session_id not in sessions:
-            raise BusinessValidationException(f"Session not found: {session_id}")
-
-        session = sessions[session_id]
-        return session.get("campaign_data", {})
+        return {"campaignId": result["id"]}
 
     async def _generate_payload_from_llm(self, summary: str) -> CampaignPayload:
         """Generate campaign payload using LLM."""
