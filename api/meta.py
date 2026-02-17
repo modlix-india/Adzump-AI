@@ -48,11 +48,11 @@ async def generate_adset(
 
 @router.post("/adset/detailed-targeting/generate")
 async def generate_detailed_targeting(
-    session_id: str = Query(..., alias="sessionId"),
+    website_url: str = Query(..., alias="websiteUrl"),
     ad_account_id: str = Query(..., alias="adAccountId"),
 ):
     result = await meta_detailed_targeting_agent.create_payload(
-        session_id=session_id,
+        website_url=website_url,
         ad_account_id=ad_account_id,
     )
 

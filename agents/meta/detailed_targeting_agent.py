@@ -9,46 +9,37 @@ from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
 )
-from services.business_service import BusinessService
-from services.session_manager import sessions
+from oserver.models.storage_request_model import (
+    StorageFilter,
+    StorageReadRequest,
+)
+from oserver.services.storage_service import StorageService
 from utils.prompt_loader import load_prompt
+from utils.helpers import normalize_url
 
 logger = structlog.get_logger()
 
 
 class MetaDetailedTargetingAgent:
     def __init__(self):
-        self.business_service = BusinessService()
         self.targeting_adapter = MetaDetailedTargetingAdapter()
 
     async def create_payload(
         self,
-        session_id: str,
+        website_url: str,
         ad_account_id: str,
     ) -> dict:
 
-        campaign_data = self._get_session_data(session_id)
-        website_url = campaign_data.get("websiteURL")
-
-        if not website_url:
-            raise BusinessValidationException("Session missing websiteURL")
-
-        response = await self.business_service.process_website_data(
-            website_url=website_url,
-            access_token=auth_context.access_token,
-            client_code=auth_context.client_code,
-            x_forwarded_host=auth_context.x_forwarded_host,
-            x_forwarded_port=auth_context.x_forwarded_port,
-        )
+        website_url = normalize_url(website_url)
 
         logger.info(
             "Generating Meta detailed targeting",
-            session_id=session_id,
+            website_url=website_url,
         )
 
-        llm_payload = await self._generate_payload_from_llm(
-            response.final_summary
-        )
+        final_summary = await self._get_final_summary_from_storage(website_url)
+
+        llm_payload = await self._generate_payload_from_llm(final_summary)
 
         flexible_spec = await self.targeting_adapter.build_flexible_spec(
             ad_account_id=ad_account_id,
@@ -57,16 +48,59 @@ class MetaDetailedTargetingAgent:
             demographics=llm_payload.demographics,
         )
 
-        return {
-            "flexible_spec": flexible_spec
-        }
+        return {"flexible_spec": flexible_spec}
 
-    def _get_session_data(self, session_id: str) -> dict:
-        if session_id not in sessions:
-            raise BusinessValidationException(f"Session not found: {session_id}")
+    async def _get_final_summary_from_storage(self, website_url: str) -> str:
 
-        session = sessions[session_id]
-        return session.get("campaign_data", {})
+        storage_service = StorageService(
+            access_token=auth_context.access_token,
+            client_code=auth_context.client_code,
+            x_forwarded_host=auth_context.x_forwarded_host,
+            x_forwarded_port=auth_context.x_forwarded_port,
+        )
+
+        website_url = normalize_url(website_url)
+
+        logger.info("Fetching summary from storage", website_url=website_url)
+
+        read_request = StorageReadRequest(
+            storageName="AISuggestedData",
+            appCode="marketingai",
+            clientCode=auth_context.client_code,
+            filter=StorageFilter(field="businessUrl", value=website_url),
+        )
+
+        response = await storage_service.read_page_storage(read_request)
+       
+
+        if not response.success:
+            raise BusinessValidationException("Failed to read business data")
+
+        try:
+            records = (
+                response.result[0]
+                .get("result", {})
+                .get("result", {})
+                .get("content", [])
+            )
+        except Exception:
+            records = []
+
+        if not records:
+            raise BusinessValidationException(
+                "No business summary found. Please generate summary first."
+            )
+
+        final_summary = records[-1].get("finalSummary")
+
+        if not final_summary or not final_summary.strip():
+            raise BusinessValidationException(
+                "Business summary is empty. Please regenerate summary."
+            )
+
+        return final_summary
+
+
 
     async def _generate_payload_from_llm(
         self,
