@@ -20,6 +20,7 @@ from services import create_campaign_service, chat_service
 from services.age_optimization_service import generate_age_optimizations
 from services.ads_service import AdAssetsGenerator
 
+
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
 
 ad_assets_generator = AdAssetsGenerator()

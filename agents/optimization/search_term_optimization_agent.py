@@ -65,6 +65,7 @@ class SearchTermOptimizationAgent:
                 continue
 
             recommendations.append(CampaignRecommendation(
+                _id=None,
                 platform="GOOGLE",
                 parent_account_id=parent_id,
                 account_id=account_id,
@@ -103,6 +104,10 @@ class SearchTermOptimizationAgent:
                 reason=r["reason"],
                 metrics=r["metrics"],
                 analysis=SearchTermAnalysis(**r["analysis"]),
+                ad_group_id=None,
+                ad_group_name=None,
+                criterion_id=None,
+                resource_name=None,
             )
             if r["recommendation_type"] == "positive":
                 keywords.append(rec)
