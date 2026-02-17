@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -30,5 +30,14 @@ class CreateCampaignRequest(BaseModel):
     campaign_payload: CampaignPayload = Field(..., alias="campaignPayload")
 
 
-class CreateCampaignResponse(BaseModel):
+class AdSetPayload(BaseModel):
+    genders: List[Literal["MALE", "FEMALE"]]
+    age_min: int = Field(..., ge=18, le=65)
+    age_max: int = Field(..., ge=18, le=65)
+    languages: List[str]
+
+
+class CreateAdSetRequest(BaseModel):
+    ad_account_id: str = Field(..., alias="adAccountId")
     campaign_id: str = Field(..., alias="campaignId")
+    adset_payload: AdSetPayload = Field(..., alias="adsetPayload")
