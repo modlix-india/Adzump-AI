@@ -7,7 +7,6 @@ from asyncio import Semaphore
 from typing import List, Dict, Optional
 from structlog import get_logger  # type: ignore
 from models.maps_model import TargetPlaceLocation, TargetPlaceResponse
-from adapters.google.client import _get_oauth_token
 from oserver.services.connection import fetch_google_api_token_simple
 from core.infrastructure.http_client import get_http_client
 
@@ -30,10 +29,7 @@ class GeoTargetService:
     def __init__(self, client_code: str) -> None:
         self._google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         self._developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        # self._access_token = fetch_google_api_token_simple(client_code)
-        self._access_token = _get_oauth_token() or fetch_google_api_token_simple(
-            client_code
-        )
+        self._access_token = fetch_google_api_token_simple(client_code)
 
     async def suggest_geo_targets(
         self,
