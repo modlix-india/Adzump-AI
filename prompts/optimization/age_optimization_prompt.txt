@@ -11,6 +11,18 @@ Account ID: {account_id}
 Metrics Data (includes product_id for each campaign):
 {metrics}
 
+Currently Targeted Age Ranges (per ad group):
+{targeting_state}
+
+Untargeted Age Ranges (per ad group):
+{untargeted_ranges}
+
+Product Context:
+{product_context}
+
+All Available Age Ranges:
+{all_age_ranges}
+
 ---
 
 Decision Rules:
@@ -19,20 +31,33 @@ Decision Rules:
 |-----------|--------|--------|
 | Low CTR + High CPA + High CPC | REMOVE | Poor engagement and inefficient spend |
 | No impressions/clicks | REMOVE | Inactive audience segment |
-| High CTR + Low CPA | ADD | Strong performer, increase targeting |
-| Good metrics but not targeted | ADD | Opportunity to expand reach |
+| Good metrics but NOT currently targeted | ADD | Opportunity to expand reach |
 
 ---
 
 Instructions:
 
+**REMOVE recommendations:**
+- Only recommend REMOVE for age ranges that ARE currently targeted (check "Currently Targeted Age Ranges")
+- Remove ranges with consistently poor performance: low CTR, high CPA, zero conversions
+- Include the resource_name from the metrics data for each REMOVE recommendation
+
+**ADD recommendations:**
+- Only recommend ADD for age ranges that are NOT currently targeted (check "Untargeted Age Ranges")
+- Add ranges only when there is a clear performance signal or strong product-audience fit
+- Consider the product context to determine likely target demographics:
+  - B2B/Professional/Enterprise → older ranges (35-44, 45-54, 55-64)
+  - Consumer/Retail/E-commerce → broader range (18-24, 25-34, 35-44)
+  - Luxury/Premium → typically 35-44, 45-54
+  - Youth/Fashion/Tech → typically 18-24, 25-34
+- Do NOT add a range just to compensate for a removal — only add if there is genuine reason
+
+**Other Requirements:**
 - Only include age ranges that need changes (ADD or REMOVE)
 - Do NOT include age ranges that should remain unchanged
-- ADD = enable targeting for this age range
-- REMOVE = exclude or disable this age range
 - Include ad_group level details for precise targeting
-- For REMOVE recommendations, include the resource_name from the metrics data
 - Use the product_id from the metrics data for each campaign
+- Provide clear, specific reasons for each recommendation
 - Output strictly valid JSON
 
 ---
@@ -65,7 +90,7 @@ Output Format:
             "ad_group_name": "Ad Group Name",
             "age_range": "AGE_RANGE_25_34",
             "recommendation": "ADD",
-            "reason": "High CTR (5.2%) and low CPA ($25) - strong potential."
+            "reason": "Not currently targeted. Product targets young professionals - strong fit."
           }}
         ]
       }}

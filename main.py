@@ -2,11 +2,7 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()  # Load env vars before other imports
-
 from config.logging_config import setup_logging
-
-setup_logging()
-
 from fastapi import FastAPI
 from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
@@ -24,6 +20,8 @@ from core.metadata import SERVICE_NAME, APP_TITLE
 from api.meta import router as meta_ads_router
 from api.optimization import router as optimization_router
 
+
+setup_logging()
 
 app = FastAPI(title=APP_TITLE, lifespan=lifespan)
 
