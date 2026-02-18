@@ -1,67 +1,40 @@
-from typing import Any, List
-import os
-import structlog
+from typing import Any
 
-from adapters.meta.client import MetaClient
-
-logger = structlog.get_logger()
+from adapters.meta.client import meta_client
 
 
 class MetaAdSetAdapter:
-    def _get_client(self) -> MetaClient:
-        meta_token = os.getenv("META_ACCESS_TOKEN", "")
-        return MetaClient(meta_token)
-
-    def _normalize_ad_account_id(self, ad_account_id: str) -> str:
-        return ad_account_id.removeprefix("act_")
-
-    async def resolve_locale_by_name(self, language_name: str) -> dict | None:
-        client = self._get_client()
-
-        try:
-            response = await client.get(
-                "/search",
-                params={"type": "adlocale", "q": language_name},
-            )
-
-            data = response.get("data", [])
-            requested = language_name.strip().lower()
-
-            for item in data:
-                meta_name = item.get("name", "").lower()
-
-                if requested in meta_name:
-                    return {
-                        "id": item.get("key"),
-                        "name": item.get("name"),
-                    }
-
-            logger.warning(
-                "Locale not found in Meta",
-                language=language_name,
-            )
-            return None
-
-        except Exception as e:
-            logger.error(
-                "Failed to resolve locale",
-                language=language_name,
-                error=str(e),
-            )
-            return None
-
+    async def search_ad_locale(
+        self,
+        client_code: str,
+        language_name: str,
+    ) -> dict | None:
+        response = await meta_client.get(
+            "/search",
+            client_code=client_code,
+            params={"type": "adlocale", "q": language_name},
+        )
+        requested = language_name.strip().lower()
+        for item in response.get("data", []):
+            if item.get("name", "").lower().startswith(requested):
+                return {"id": item.get("key"), "name": item.get("name")}
+        return None
 
     async def create(
         self,
+        client_code: str,
         ad_account_id: str,
         campaign_id: str,
-        meta_payload,
+        meta_payload: dict,
         status: str = "PAUSED",
     ) -> dict[str, Any]:
-        client = self._get_client()
-        account_id = self._normalize_ad_account_id(ad_account_id)
-
-        return await client.post(
+        account_id = ad_account_id.removeprefix("act_")
+        return await meta_client.post(
             f"/act_{account_id}/adsets",
-            json=meta_payload,
+            client_code=client_code,
+            json={
+                **meta_payload,
+                "campaign_id": campaign_id,
+                "status": status,
+            },
         )

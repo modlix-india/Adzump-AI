@@ -98,3 +98,93 @@ class MetaAPIException(BaseAppException):
 
     def __init__(self, message: str = "Meta API request failed"):
         super().__init__(message, status.HTTP_502_BAD_GATEWAY)
+
+
+class GoogleAdsException(BaseAppException):
+    """Google Ads API communication error."""
+
+    def __init__(
+        self,
+        message: str = "Google Ads API request failed",
+        status_code: int = status.HTTP_502_BAD_GATEWAY,
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status_code, details)
+
+
+class GoogleAdsAuthException(GoogleAdsException):
+    """Google Ads API authentication/authorization error (401, 403)."""
+
+    def __init__(
+        self,
+        message: str = "Google Ads API authentication failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_401_UNAUTHORIZED, details)
+
+
+class GoogleAdsValidationException(GoogleAdsException):
+    """Google Ads API request validation/syntax error (400)."""
+
+    def __init__(
+        self,
+        message: str = "Google Ads API request validation failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_400_BAD_REQUEST, details)
+
+
+class KeywordServiceException(BaseAppException):
+    """General keyword service logic error."""
+
+    def __init__(
+        self,
+        message: str = "Keyword service processing failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR, details)
+
+
+class GoogleAutocompleteException(BaseAppException):
+    """Google Autocomplete API communication error."""
+
+    def __init__(
+        self,
+        message: str = "Google Autocomplete API request failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
+
+
+class GoogleAPIException(BaseAppException):
+    """Google Ads API error."""
+
+    def __init__(
+        self,
+        message: str = "Google API request failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
+
+
+class CoreTokenException(BaseAppException):
+    """Core token service error."""
+
+    def __init__(
+        self,
+        message: str = "Failed to fetch token from core service",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_401_UNAUTHORIZED, details)
+
+
+class GoogleAdsMutationError(BaseAppException):
+    """Google Ads Mutation logic error."""
+
+    def __init__(
+        self,
+        message: str = "Google Ads mutation failed",
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status_code, details)

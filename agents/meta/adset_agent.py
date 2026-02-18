@@ -1,15 +1,10 @@
+import asyncio
 import structlog
-from typing import List
-import json
 
 from adapters.meta.adsets import MetaAdSetAdapter
-from adapters.meta.models.adset_model import (
-    AdSetSuggestion,
-    CreateAdSetRequest,
-    CreateAdSetResponse,
-)
+from core.models.meta import AdSetPayload, CreateAdSetRequest
 from agents.shared.llm import chat_completion
-from core.context import auth_context
+from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
@@ -25,97 +20,94 @@ class MetaAdSetAgent:
         self.business_service = BusinessService()
         self.adset_adapter = MetaAdSetAdapter()
 
-    async def create_payload(
-        self,
-        data_object_id: str,
-        ad_account_id: str,
-    ) -> dict:
-        product_data = await self.business_service.fetch_product_details(
-            data_object_id=data_object_id,
-            access_token=auth_context.access_token,
-            client_code=auth_context.client_code,
-            x_forwarded_host=auth_context.x_forwarded_host,
-            x_forwarded_port=auth_context.x_forwarded_port,
-        )
+    async def generate_payload(self, session_id: str) -> dict:
+        website_data = await self.business_service.fetch_website_data(session_id)
+        summary = website_data.final_summary or website_data.summary
 
-        summary = product_data.get("summary") or product_data.get("finalSummary")
         if not summary:
             raise BusinessValidationException(
                 "Missing summary in product data. Please complete website analysis."
             )
 
+        business_type = website_data.business_type or ""
 
-        business_type = product_data.get("businessType") or ""
-
-        llm_output = await self._generate_payload_from_llm(
+        targeting = await self._generate_targeting_from_llm(
             summary=summary,
             business_type=business_type,
         )
 
-
-        resolved_locales = []
-
-        for language in llm_output.languages:
-            locale = await self.adset_adapter.resolve_locale_by_name(language)
-            if locale:
-                resolved_locales.append(locale)
+        locales = await self._search_ad_locales(targeting.languages)
 
         return {
-            "genders": llm_output.genders,
-            "age_min": llm_output.age_min,
-            "age_max": llm_output.age_max,
-            "locales": resolved_locales,
+            "genders": targeting.genders,
+            "age_min": targeting.age_min,
+            "age_max": targeting.age_max,
+            "locales": locales,
         }
 
-    async def _generate_payload_from_llm(
+    # TODO: wire to API route when adset creation endpoint is added
+    async def create_adset(
+        self,
+        create_adset_request: CreateAdSetRequest,
+    ) -> dict:
+        result = await self.adset_adapter.create(
+            client_code=auth_context.client_code,
+            ad_account_id=create_adset_request.ad_account_id,
+            campaign_id=create_adset_request.campaign_id,
+            meta_payload=create_adset_request.adset_payload,
+        )
+        return {"adsetId": result["id"]}
+
+    async def _generate_targeting_from_llm(
         self,
         summary: str,
         business_type: str,
-    ) -> AdSetSuggestion:
+    ) -> AdSetPayload:
         template = load_prompt("meta/adset.txt")
         prompt = template.format(
             summary=summary,
             business_type=business_type,
         )
-
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are a Meta Ads targeting assistant. "
-                    "Return ONLY valid JSON. "
+                    "You are a Meta Ads targeting assistant. Return ONLY valid JSON. "
                 ),
             },
             {"role": "user", "content": prompt},
         ]
-
-        response = await chat_completion(messages)
-        content = response.choices[0].message.content
-
-        if not content:
+        response = await chat_completion(messages, model="gpt-4.1-mini")
+        raw_output = response.choices[0].message.content
+        if not raw_output:
             raise AIProcessingException("LLM returned empty response")
-
         try:
-            return AdSetSuggestion.model_validate_json(content)
+            return AdSetPayload.model_validate_json(raw_output)
         except Exception as e:
             logger.error(
                 "Failed to parse AdSet LLM output",
                 error=str(e),
-                raw=content,
+                raw=raw_output,
             )
             raise AIProcessingException("LLM output is not valid JSON")
 
-    async def create_adset(
-        self,
-        create_adset_request: CreateAdSetRequest,
-    ) -> CreateAdSetResponse:
-        result = await self.adset_adapter.create(
-            ad_account_id=create_adset_request.ad_account_id,
-            campaign_id=create_adset_request.campaign_id,
-            meta_payload=create_adset_request.adset_payload,
+    async def _search_ad_locales(self, languages: list[str]) -> list[dict]:
+        results = await asyncio.gather(
+            *(
+                self.adset_adapter.search_ad_locale(auth_context.client_code, lang)
+                for lang in languages
+            ),
+            return_exceptions=True,
         )
-
-        return CreateAdSetResponse(adsetId=result["id"])
+        locales: list[dict] = []
+        for language, result in zip(languages, results):
+            if isinstance(result, BaseException):
+                logger.warning(
+                    "Failed to search locale", language=language, error=str(result)
+                )
+            elif isinstance(result, dict):
+                locales.append(result)
+        return locales
 
 
 meta_adset_agent = MetaAdSetAgent()

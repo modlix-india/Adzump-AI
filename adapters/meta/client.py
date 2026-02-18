@@ -1,67 +1,75 @@
-from typing import Any, Optional
+import os
+from typing import Any
 
 import httpx
 import structlog
 
+from adapters.meta.exceptions import MetaAPIError
+from core.infrastructure.http_client import http_request
+from oserver.services.connection import fetch_meta_api_token
+
 META_BASE_URL = "https://graph.facebook.com/v22.0"
-META_HTTP_TIMEOUT = 30
 
-logger = structlog.get_logger()
-
-# Module-level client - reused across all requests for connection pooling
-_http_client: Optional[httpx.AsyncClient] = None
-
-
-def _get_http_client() -> httpx.AsyncClient:
-    global _http_client
-    if _http_client is None:
-        _http_client = httpx.AsyncClient(
-            base_url=META_BASE_URL,
-            timeout=META_HTTP_TIMEOUT,
-        )
-    return _http_client
+logger = structlog.get_logger(__name__)
 
 
 class MetaClient:
-    def __init__(self, access_token: str):
-        self.access_token = access_token
-
-    def _headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json",
-        }
+    BASE_URL = META_BASE_URL
 
     async def post(
         self,
         endpoint: str,
-        json: Optional[dict[str, Any]] = None,
-        params: Optional[dict[str, Any]] = None,
+        client_code: str,
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        client = _get_http_client()
-        response = await client.post(
-            endpoint, json=json, params=params, headers=self._headers()
+        token = self._get_meta_api_token(client_code)
+        url = f"{self.BASE_URL}{endpoint}"
+        response = await http_request(
+            "POST",
+            url,
+            json=json,
+            params=params,
+            headers=self._build_headers(token),
+            error_handler=_handle_meta_error,
         )
-        return self._handle_response(response)
+        return response.json()
 
     async def get(
         self,
         endpoint: str,
-        params: Optional[dict[str, Any]] = None,
+        client_code: str,
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        client = _get_http_client()
-        response = await client.get(endpoint, params=params, headers=self._headers())
-        return self._handle_response(response)
-
-    def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
-        from adapters.meta.exceptions import MetaAPIError
-
-        if response.status_code != 200:
-            error_data = response.json()
-            logger.error(
-                "Meta API error", status=response.status_code, error=error_data
-            )
-            error_msg = error_data.get("error", {}).get("message", "Unknown error")
-            raise MetaAPIError(error_msg, response.status_code, error_data)
-
+        token = self._get_meta_api_token(client_code)
+        url = f"{self.BASE_URL}{endpoint}"
+        response = await http_request(
+            "GET",
+            url,
+            params=params,
+            headers=self._build_headers(token),
+            error_handler=_handle_meta_error,
+        )
         return response.json()
+
+    def _get_meta_api_token(self, client_code: str) -> str:
+        env_token = os.getenv("META_ACCESS_TOKEN")
+        if env_token:
+            return env_token
+        return fetch_meta_api_token(client_code)
+
+    def _build_headers(self, access_token: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
+
+def _handle_meta_error(response: httpx.Response) -> None:
+    error_data = response.json()
+    logger.error("Meta API error", status=response.status_code, error=error_data)
+    error_msg = error_data.get("error", {}).get("message", "Unknown error")
+    raise MetaAPIError(error_msg, response.status_code, error_data)
+
+
+meta_client = MetaClient()
