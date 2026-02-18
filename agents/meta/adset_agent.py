@@ -2,7 +2,7 @@ import asyncio
 import structlog
 
 from adapters.meta.adsets import MetaAdSetAdapter
-from core.models.meta import AdSetPayload, CreateAdSetRequest
+from core.models.meta import AdSetPayload, CreateAdSetRequest, DetailedTargeting
 from agents.shared.llm import chat_completion
 from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import (
@@ -12,6 +12,8 @@ from exceptions.custom_exceptions import (
 from services.business_service import BusinessService
 from utils.prompt_loader import load_prompt
 
+from adapters.meta.detailed_targeting import MetaDetailedTargetingAdapter
+
 logger = structlog.get_logger()
 
 
@@ -19,8 +21,9 @@ class MetaAdSetAgent:
     def __init__(self):
         self.business_service = BusinessService()
         self.adset_adapter = MetaAdSetAdapter()
+        self.targeting_adapter = MetaDetailedTargetingAdapter()
 
-    async def generate_payload(self, session_id: str) -> dict:
+    async def generate_payload(self, session_id: str, ad_account_id: str) -> dict:
         website_data = await self.business_service.fetch_website_data(session_id)
         summary = website_data.final_summary or website_data.summary
 
@@ -38,11 +41,22 @@ class MetaAdSetAgent:
 
         locales = await self._search_ad_locales(targeting.languages)
 
+        detailed_targeting = await self._generate_detailed_targeting(summary)
+
+        flexible_spec = await self.targeting_adapter.build_flexible_spec(
+            ad_account_id=ad_account_id,
+            client_code=auth_context.client_code,
+            interests=detailed_targeting.interests,
+            behaviors=detailed_targeting.behaviors,
+            demographics=detailed_targeting.demographics,
+        )
+
         return {
             "genders": targeting.genders,
             "age_min": targeting.age_min,
             "age_max": targeting.age_max,
             "locales": locales,
+            "flexible_spec": flexible_spec,
         }
 
     # TODO: wire to API route when adset creation endpoint is added
@@ -90,6 +104,34 @@ class MetaAdSetAgent:
                 raw=raw_output,
             )
             raise AIProcessingException("LLM output is not valid JSON")
+
+    async def _generate_detailed_targeting(
+        self,
+        summary: str,
+    ) -> DetailedTargeting:
+        template = load_prompt("meta/detailed_targeting.txt")
+        prompt = template.format(summary=summary)
+
+        messages = [
+            {"role": "system", "content": "Respond only with valid JSON"},
+            {"role": "user", "content": prompt},
+        ]
+
+        response = await chat_completion(messages)
+        raw_output = response.choices[0].message.content
+
+        if not raw_output:
+            raise AIProcessingException("Detailed targeting LLM returned empty response")
+
+        try:
+            return DetailedTargeting.model_validate_json(raw_output)
+        except Exception as e:
+            logger.error(
+                "Failed to parse detailed targeting output",
+                error=str(e),
+                raw=raw_output,
+            )
+            raise AIProcessingException("Detailed targeting output invalid JSON")        
 
     async def _search_ad_locales(self, languages: list[str]) -> list[dict]:
         results = await asyncio.gather(
