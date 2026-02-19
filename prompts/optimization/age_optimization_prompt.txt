@@ -31,6 +31,7 @@ Instructions:
 - ADD = enable targeting for this age range
 - REMOVE = exclude or disable this age range
 - Include ad_group level details for precise targeting
+- For REMOVE recommendations, include the resource_name from the metrics data
 - Use the product_id from the metrics data for each campaign
 - Output strictly valid JSON
 
@@ -56,6 +57,7 @@ Output Format:
             "ad_group_name": "Ad Group Name",
             "age_range": "AGE_RANGE_18_24",
             "recommendation": "REMOVE",
+            "resource_name": "customers/123/adGroupCriteria/456~789",
             "reason": "Low CTR (0.5%) and high CPA ($150) - inefficient spend."
           }},
           {{

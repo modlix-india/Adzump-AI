@@ -107,6 +107,8 @@ class AgeOptimizationAgent:
             content = "\n".join(content.splitlines()[1:-1]).strip()
 
         parsed = OptimizationResponse.model_validate_json(content)
+        for rec in parsed.recommendations:
+            rec.campaign_type = "SEARCH"
         return list(parsed.recommendations)
 
 

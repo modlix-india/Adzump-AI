@@ -3,7 +3,7 @@ from typing import Optional
 
 from structlog import get_logger
 from core.infrastructure.context import auth_context
-from adapters.google.client import GoogleAdsClient
+from adapters.google.client import google_ads_client
 from adapters.google.optimization._metrics import build_metrics
 from utils.google_dateutils import format_date_range
 
@@ -14,7 +14,7 @@ class GoogleKeywordAdapter:
     DEFAULT_DURATION = "LAST_30_DAYS"
 
     def __init__(self):
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
 
     async def fetch_keyword_metrics(
         self, account_id: str, parent_account_id: str
@@ -30,7 +30,9 @@ class GoogleKeywordAdapter:
             client_code=auth_context.client_code,
         )
         keywords = [_transform_row(row) for row in results]
-        logger.info("keyword_metrics_fetched", account_id=account_id, count=len(keywords))
+        logger.info(
+            "keyword_metrics_fetched", account_id=account_id, count=len(keywords)
+        )
         return keywords
 
 
@@ -88,7 +90,7 @@ def _transform_row(row: dict) -> dict:
         "keyword": keyword_info.get("text", "").strip().lower(),
         "criterion_id": str(criterion.get("criterionId", "")),
         "resource_name": criterion.get("resourceName", ""),
-        "match_type": keyword_info.get("matchType", "PHRASE").lower(),
+        "match_type": keyword_info.get("matchType", "PHRASE"),
         "ad_group_id": str(ad_group.get("id", "")),
         "ad_group_name": ad_group.get("name", ""),
         "campaign_id": str(campaign.get("id", "")),

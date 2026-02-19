@@ -2,7 +2,7 @@ from datetime import date
 
 from structlog import get_logger
 from core.infrastructure.context import auth_context
-from adapters.google.client import GoogleAdsClient
+from adapters.google.client import google_ads_client
 from utils.helpers import micros_to_rupees
 from utils.google_dateutils import format_date_range
 
@@ -13,7 +13,7 @@ class GoogleAgeAdapter:
     DEFAULT_DURATION = "LAST_30_DAYS"
 
     def __init__(self):
-        self.client = GoogleAdsClient()
+        self.client = google_ads_client
 
     async def fetch_age_metrics(self, account_id: str, parent_account_id: str) -> list:
         """Fetch age metrics for a Google Ads account with calculated performance metrics."""
@@ -22,13 +22,16 @@ class GoogleAgeAdapter:
         query = f"""
         SELECT campaign.id, campaign.name, campaign.advertising_channel_type,
                ad_group.id, ad_group.name,
+               ad_group_criterion.resource_name,
                ad_group_criterion.age_range.type,
+               ad_group_criterion.status,
                metrics.impressions, metrics.clicks, metrics.conversions, metrics.cost_micros
         FROM age_range_view
         WHERE {duration_clause}
           AND campaign.status = 'ENABLED'
           AND campaign.end_date >= '{date.today().strftime("%Y-%m-%d")}'
           AND ad_group.status = 'ENABLED'
+          AND ad_group_criterion.status != 'REMOVED'
         """
 
         try:
