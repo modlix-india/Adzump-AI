@@ -13,6 +13,7 @@ from services.business_service import BusinessService
 from utils.prompt_loader import load_prompt
 
 from adapters.meta.detailed_targeting import MetaDetailedTargetingAdapter
+from adapters.meta.geo_targeting import MetaGeoTargetingAdapter
 
 logger = structlog.get_logger()
 
@@ -22,6 +23,7 @@ class MetaAdSetAgent:
         self.business_service = BusinessService()
         self.adset_adapter = MetaAdSetAdapter()
         self.targeting_adapter = MetaDetailedTargetingAdapter()
+        self.geo_targeting_adapter = MetaGeoTargetingAdapter()
 
     async def generate_payload(self, session_id: str, ad_account_id: str) -> dict:
         website_data = await self.business_service.fetch_website_data(session_id)
@@ -51,12 +53,15 @@ class MetaAdSetAgent:
             demographics=detailed_targeting.demographics,
         )
 
+        locations = await self._build_locations(website_data=website_data)
+
         return {
             "genders": targeting.genders,
             "age_min": targeting.age_min,
             "age_max": targeting.age_max,
             "locales": locales,
             "flexible_spec": flexible_spec,
+            "locations": locations,
         }
 
     # TODO: wire to API route when adset creation endpoint is added
@@ -150,6 +155,45 @@ class MetaAdSetAgent:
             elif isinstance(result, dict):
                 locales.append(result)
         return locales
+
+    async def _build_locations(
+        self,
+        website_data,
+    ) -> list[dict] | None:
+        if not website_data.location:
+            return None
+
+        raw_location = website_data.location.product_location
+        if not raw_location:
+            return None
+
+        parts = [p.strip() for p in raw_location.split(",")]
+        candidates = []
+
+        if len(parts) >= 3:
+            candidates.append(f"{parts[1]}, {parts[2]}")
+            candidates.append(parts[1])
+            candidates.append(parts[2])
+        elif len(parts) == 2:
+            candidates.append(raw_location)
+            candidates.append(parts[1])
+        else:
+            candidates.append(raw_location)
+
+        for location_name in candidates:
+            if not location_name:
+                continue
+
+            results = await self.geo_targeting_adapter.search_locations(
+                client_code=auth_context.client_code,
+                location_name=location_name,
+                limit=5,
+            )
+
+            if results:
+                return results  # return raw list for UI
+
+        return None
 
 
 meta_adset_agent = MetaAdSetAgent()
