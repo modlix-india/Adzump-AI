@@ -100,14 +100,6 @@ class CreativePayload(BaseModel):
     image: Optional[CreativeImage] = None
 
 
-class GenerateCreativeRequest(BaseModel):
-    session_id: str = Field(..., alias="sessionId")
-
-
-class GenerateCreativeResponse(BaseModel):
-    creativePayload: CreativePayload = Field(..., alias="creativePayload")
-
-
 class CreateCreativeRequest(BaseModel):
     adAccountId: str = Field(..., alias="adAccountId")
     creativePayload: CreativePayload = Field(..., alias="creativePayload")
