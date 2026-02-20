@@ -167,6 +167,39 @@ class GoogleAPIException(BaseAppException):
         super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
 
 
+class TrendServiceException(BaseAppException):
+    """Google Trends (PyTrends) service error."""
+
+    def __init__(
+        self,
+        message: str = "Trend service request failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
+
+
+class TrendRateLimitException(TrendServiceException):
+    """Google Trends rate limit (429) error."""
+
+    def __init__(
+        self,
+        message: str = "Trend service rate limit hit",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_429_TOO_MANY_REQUESTS, details)
+
+
+class EnrichmentException(BaseAppException):
+    """Keyword enrichment pipeline error."""
+
+    def __init__(
+        self,
+        message: str = "Keyword enrichment failed",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(message, status.HTTP_500_INTERNAL_SERVER_ERROR, details)
+
+
 class CoreTokenException(BaseAppException):
     """Core token service error."""
 

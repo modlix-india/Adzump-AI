@@ -1,22 +1,27 @@
-from structlog import get_logger    #type: ignore
+from structlog import get_logger  # type: ignore
 import json
-from http.client import HTTPException
-from oserver.models.storage_request_model import StorageFilter, StorageReadRequest, StorageUpdateWithPayload
+from oserver.models.storage_request_model import (
+    StorageFilter,
+    StorageReadRequest,
+    StorageUpdateWithPayload,
+)
 from oserver.services.storage_service import StorageService
 from utils import prompt_loader
 from services.openai_client import chat_completion
 from utils.helpers import normalize_url
+from fastapi import HTTPException
 
 logger = get_logger(__name__)
+
 
 async def generate_final_summary(
     business_url: str,
     access_token: str,
     client_code: str,
     x_forwarded_host: str,
-    x_forwarded_port: str
+    x_forwarded_port: str,
 ):
-    
+
     business_url = normalize_url(business_url)
     logger.info(f"[FinalSummary] Normalized URL: {business_url}")
 
@@ -24,7 +29,7 @@ async def generate_final_summary(
         storageName="AISuggestedData",
         appCode="marketingai",
         clientCode=client_code,
-        filter=StorageFilter(field="businessUrl", value=business_url)
+        filter=StorageFilter(field="businessUrl", value=business_url),
     )
 
     storage_service = StorageService(
@@ -61,7 +66,7 @@ async def generate_final_summary(
     website_summary = record.get("summary", "")
 
     external_summary = "\n".join(
-        x.get("urlSummary", "") 
+        x.get("urlSummary", "")
         for x in record.get("externalLinks", [])
         if x.get("urlSummary")
     )
@@ -74,42 +79,53 @@ async def generate_final_summary(
 
     logger.info("[FinalSummary] Summaries collected from record.")
 
-
     prompt = prompt_loader.format_prompt(
         "business/final_summary_prompt.txt",
         website_summary=website_summary,
         external_summary=external_summary,
-        assets_summary=assets_summary
+        assets_summary=assets_summary,
     )
-    logger.info(f"[FinalSummary] Prompt prepared for LLM: {prompt}")
-    logger.info("[FinalSummary] Sending to LLM to generate final summary...")
 
     response = await chat_completion(
         messages=[{"role": "user", "content": prompt}],
-        model="gpt-4o-mini",
+        model="gpt-4o",
         max_tokens=10000,
-        temperature=0.2
+        temperature=0.2,
+        response_format={"type": "json_object"},
     )
 
     raw_response = response.choices[0].message.content.strip()
 
-    # Parse JSON response and extract finalSummary
+    # Parse JSON response and extract finalSummary and competitors
+    final_summary_text = ""
+    competitors = []
+
+    # Robust parsing: strip markdown code blocks and whitespace
+    content_to_parse = raw_response.strip()
+    if content_to_parse.startswith("```"):
+        content_to_parse = content_to_parse.strip("`").strip()
+        if content_to_parse.startswith("json"):
+            content_to_parse = content_to_parse[4:].strip()
+
     try:
-        parsed = json.loads(raw_response)
-        final_summary_text = parsed.get("finalSummary", raw_response)
+        parsed = json.loads(content_to_parse)
+        final_summary_text = parsed.get("finalSummary", content_to_parse)
+        competitors = parsed.get("competitors", [])
         logger.info("[FinalSummary] Parsed JSON response successfully.")
     except json.JSONDecodeError:
         logger.warning("[FinalSummary] Failed to parse JSON, using raw response")
         final_summary_text = raw_response
 
-    logger.info("[FinalSummary] Final summary generated successfully.")
+    logger.info("[FinalSummary] Final summary and competitors generated successfully.")
+
+    data_to_update = {"finalSummary": final_summary_text, "competitors": competitors}
 
     update_request = StorageUpdateWithPayload(
         storageName="AISuggestedData",
         dataObjectId=storage_id,
         clientCode=client_code,
         appCode="",
-        dataObject={"finalSummary": final_summary_text}
+        dataObject=data_to_update,
     )
 
     update_response = await storage_service.update_storage(update_request)
@@ -124,4 +140,5 @@ async def generate_final_summary(
         "businessUrl": business_url,
         "storageId": storage_id,
         "finalSummary": final_summary_text,
+        "competitors": competitors,
     }
