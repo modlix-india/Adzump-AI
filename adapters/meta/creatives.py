@@ -1,18 +1,12 @@
 from typing import Any
-import os
 from datetime import datetime
 
 from adapters.meta.client import MetaClient
-from core.context import auth_context
-# from oserver.services.connection import fetch_meta_api_token
-
-
+from core.infrastructure.context import auth_context
 
 
 class MetaCreativeAdapter:
     def _get_client(self) -> MetaClient:
-        # meta_token = fetch_meta_api_token(auth_context.client_code)
-        meta_token = os.getenv("META_ACCESS_TOKEN", "")
         return MetaClient(meta_token)
 
     def _normalize_ad_account_id(self, ad_account_id: str) -> str:
@@ -23,7 +17,6 @@ class MetaCreativeAdapter:
         ad_account_id: str,
         creative_payload: dict[str, Any],
         page_id: str,
-        instagram_actor_id: str | None = None,
     ) -> dict[str, Any]:
         client = self._get_client()
         account_id = self._normalize_ad_account_id(ad_account_id)
@@ -55,8 +48,6 @@ class MetaCreativeAdapter:
         }
 
 
-        # if instagram_actor_id:
-        #     object_story_spec["instagram_actor_id"] = instagram_actor_id
 
         payload = {
             "name": f"Creative {datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
@@ -66,5 +57,6 @@ class MetaCreativeAdapter:
 
         return await client.post(
             f"/act_{account_id}/adcreatives",
+            auth_context.client_code,
             json=payload,
         )

@@ -8,14 +8,13 @@ import structlog
 from pydantic import ValidationError
 
 from adapters.meta.creatives import MetaCreativeAdapter
-from adapters.meta.models import (
+from core.models.meta import (
     CreativePayload,
     CreateCreativeRequest,
     CreateCreativeResponse,
     CallToAction,
     CreativeImage,
 )
-from core.context import auth_context
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
@@ -58,28 +57,19 @@ class MetaCreativeAgent:
         self.business_service = BusinessService()
         self.creative_adapter = MetaCreativeAdapter()
 
-    async def create_payload(self, session_id: str) -> CreativePayload:
-        campaign_data = self._get_session_data(session_id)
+    async def generate_payload(self, session_id: str) -> CreativePayload:
 
-        website_url = campaign_data.get("websiteURL")
-        if not website_url:
-            raise BusinessValidationException("Session missing websiteURL")
+        if session_id not in sessions:
+            raise BusinessValidationException("Session not found")
 
-        ad_account_id = campaign_data.get("adAccountId")
-        if not ad_account_id:
-            raise BusinessValidationException("Session missing adAccountId")
+        website_data = await self.business_service.fetch_website_data(session_id)
 
-        product_data = await self.business_service.process_website_data(
-            website_url=website_url,
-            access_token=auth_context.access_token,
-            client_code=auth_context.client_code,
-            x_forwarded_host=auth_context.x_forwarded_host,
-            x_forwarded_port=auth_context.x_forwarded_port,
-        )
+        summary = website_data.final_summary or website_data.summary   
 
-        summary = product_data.final_summary
         if not summary:
-            raise BusinessValidationException("Missing business summary")
+            raise BusinessValidationException(
+                "Missing summary in product data. Please complete website analysis."
+            )    
 
         strategy_raw = await chat_completion(
             [{"role": "user", "content": STRATEGY_PROMPT.format(summary=summary)}]
@@ -98,10 +88,7 @@ class MetaCreativeAgent:
         text_json["cta"] = normalize_cta(text_json.get("cta"))
 
         try:
-            payload_data = {
-                "text": text_json,
-            }
-            creative_payload = CreativePayload(**payload_data)
+            creative_payload = CreativePayload(text=text_json)
         except ValidationError as e:
             logger.error(
                 "Creative payload validation failed",
@@ -112,19 +99,25 @@ class MetaCreativeAgent:
 
         return creative_payload
 
-    async def generate_image(self, session_id: str) -> CreativeImage:
-        campaign_data = self._get_session_data(session_id)
+    async def generate_image(
+        self, 
+        session_id: str,
+        ad_account_id: str,
+    ) -> CreativeImage:
+
+        if session_id not in sessions:
+            raise BusinessValidationException("Session not found")
+
+        campaign_data = sessions[session_id].get("campaign_data", {})
+
         summary = campaign_data.get("business_summary")
         strategy_json = campaign_data.get("visual_strategy")
-        ad_account_id = campaign_data.get("adAccountId")
 
         if not summary or not strategy_json:
-            # If not in session, we might need to regenerate or throw error
-            # For now, let's assume creative/generate was called first
             raise BusinessValidationException("Creative text must be generated before image")
 
         if not ad_account_id:
-             raise BusinessValidationException("Session missing adAccountId")
+            raise BusinessValidationException("adAccountId is required to generate image")    
 
         image_intent_raw = await chat_completion(
             [{"role": "user", "content": IMAGE_INTENT_PROMPT.format(
@@ -162,11 +155,11 @@ class MetaCreativeAgent:
             raise AIProcessingException(f"Image generation failed: {str(e)}")
 
     async def create_creative(
-        self, request: CreateCreativeRequest
+        self, 
+        request: CreateCreativeRequest
     ) -> CreateCreativeResponse:
 
         page_id = os.getenv("META_PAGE_ID")
-        # instagram_actor_id = os.getenv("META_INSTAGRAM_ACTOR_ID")
 
         if not page_id:
             raise BusinessValidationException("META_PAGE_ID not configured")
@@ -185,15 +178,9 @@ class MetaCreativeAgent:
             ad_account_id=request.adAccountId,
             creative_payload=request.creativePayload.model_dump(mode="json"),
             page_id=page_id,
-            # instagram_actor_id=instagram_actor_id,
         )
 
         return CreateCreativeResponse(creativeId=result["id"])
-
-    def _get_session_data(self, session_id: str) -> dict[str, Any]:
-        if session_id not in sessions:
-            raise BusinessValidationException(f"Session not found: {session_id}")
-        return sessions[session_id].get("campaign_data", {})
 
 
 meta_creative_agent = MetaCreativeAgent()

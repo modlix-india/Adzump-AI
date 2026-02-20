@@ -1,12 +1,9 @@
-import os
 from adapters.meta.client import MetaClient
+from core.infrastructure.context import auth_context
 
 class MetaAdImageAdapter:
     def _get_client(self) -> MetaClient:
-        meta_token = os.getenv("META_ACCESS_TOKEN", "")
-        if not meta_token:
-            raise ValueError("META_ACCESS_TOKEN not configured")
-        return MetaClient(meta_token)
+        return MetaClient()
 
     async def upload_image(
         self,
@@ -22,5 +19,6 @@ class MetaAdImageAdapter:
 
         return await client.post(
             f"/act_{account_id}/adimages",
+            auth_context.client_code,
             json=payload,
         )
