@@ -1,8 +1,6 @@
 # Competitor Analysis Service — Complete Architecture
 
-**Version:** 2.0  
-**Last Updated:** February 2025  
-**Status:** Design Complete — Ready for Implementation  
+**Status:** Phase 1–4 Complete — Phase 5–6 Pending
 **Team Stack:** Python · FastAPI · OpenAI API · Google APIs · PostgreSQL · Redis
 
 ---
@@ -17,55 +15,12 @@
 6. [Phase 2 — Competitor Discovery](#6-phase-2--competitor-discovery)
 7. [Phase 3 — Keyword Extraction](#7-phase-3--keyword-extraction)
 8. [Phase 4 — Keyword Enrichment](#8-phase-4--keyword-enrichment)
-9. [Phase 5 — Gap Analysis](#9-phase-5--gap-analysis)
-10. [Phase 6 — Report Generation](#10-phase-6--report-generation)
-11. [Complete API Usage Map](#11-complete-api-usage-map)
-12. [Cost Analysis](#12-cost-analysis)
-13. [Scalability Strategy](#13-scalability-strategy)
-14. [Configuration Strategy](#14-configuration-strategy)
-15. [Implementation Roadmap](#15-implementation-roadmap)
-16. [Key Design Decisions](#16-key-design-decisions)
-
----
-
-## 0. Codebase Readiness — What We Have vs What We Need
-
-> [!NOTE]
-> This section maps the architecture requirements against our existing codebase to identify reusable services and what still needs to be built.
-
-### ✅ Services We Already Have
-
-| Required Component                       | Existing Service                                                                               | File Path                                         | Used In           |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------- | ----------------- |
-| **Web Scraping** (httpx + BeautifulSoup) | `ScraperService`                                                                               | `services/scraper_service.py`                     | Phases 1, 2, 3, 5 |
-| **Google Autocomplete**                  | `fetch_autocomplete_suggestions` / `batch_fetch_autocomplete_suggestions`                      | `utils/google_autocomplete.py`                    | Phases 2, 3       |
-| **Google Keyword Planner**               | `GoogleKeywordPlannerAdapter`                                                                  | `adapters/google/optimization/keyword_planner.py` | Phase 4           |
-| **PyTrends**                             | `PyTrendsService` — interest over time, related queries, trending searches, keyword comparison | `services/trends/pytrends_service.py`             | Phase 4           |
-| **PyTrends API Routes**                  | Trends router with FastAPI endpoints                                                           | `apis/routes/trends.py`                           | Phase 4           |
-| **OpenAI Client**                        | `chat_completion` + `generate_embeddings`                                                      | `services/openai_client.py`                       | Phases 1, 2, 4, 5 |
-
-### 🔴 Services We Need to Build
-
-| Component                        | Phase   | Description                                                                                                               | Can Reuse                                                         |
-| -------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **Business Analyzer Service**    | Phase 1 | Scrape URL → extract meta/headings/content → GPT-4o-mini classification → `BusinessContext` output                        | `ScraperService`, `openai_client`                                 |
-| **Google Custom Search Adapter** | Phase 2 | Wrapper for Google Custom Search JSON API — queries like `"{name} alternatives"`, returns candidate URLs                  | Nothing — entirely new                                            |
-| **AlternativeTo Scraper**        | Phase 2 | Scrape `alternativeto.net/software/{name}/` for alternative product listings                                              | `ScraperService` for HTTP fetching                                |
-| **Competitor Discovery Service** | Phase 2 | Orchestrate Google CSE + AlternativeTo + "X vs Y" autocomplete → GPT-4o validation → validated competitor list            | `google_autocomplete.py`, `openai_client`                         |
-| **Keyword Extraction Service**   | Phase 3 | Multi-page crawl of competitor sites → extract keywords from titles, headings, meta, URL paths → deduplicate              | `ScraperService`, `google_autocomplete.py`                        |
-| **Keyword Enrichment Service**   | Phase 4 | Merge Keyword Planner volumes + PyTrends trend data + GPT-4o opportunity evaluation per keyword                           | `GoogleKeywordPlannerAdapter`, `PyTrendsService`, `openai_client` |
-| **Gap Analysis Service**         | Phase 5 | Scrape user pages vs competitor pages → GPT-4o "Why You Lose" analysis with specific page-based comparison                | `ScraperService`, `openai_client`                                 |
-| **Report Generator**             | Phase 6 | Aggregate all phase outputs → JSON + Markdown + CSV export. Pure assembly, no API calls                                   | Nothing — entirely new                                            |
-| **Main Orchestrator**            | All     | Central coordinator — runs Phases 1→6, tracks progress, handles caching and error recovery                                | Nothing — entirely new                                            |
-| **Pydantic Data Models**         | All     | `BusinessContext`, `Competitor`, `CompetitorKeywords`, `EnrichedKeyword`, `GapAnalysisReport`, `CompetitorAnalysisReport` | Nothing — entirely new                                            |
-| **Competitor API Routes**        | All     | FastAPI endpoints — trigger analysis, check progress, get results                                                         | Nothing — entirely new                                            |
-| **Caching Layer**                | All     | Redis for reports (7-day TTL), shared keyword pool (30-day TTL)                                                           | Nothing — entirely new (post-MVP)                                 |
-
-### Summary
-
-- **6 existing services** can be reused directly as data-layer building blocks
-- **~12 new components** need to be built: orchestration, new adapters, phase services, models, API routes, and caching
-- Heaviest new work: **Competitor Discovery** (Phase 2) and **Gap Analysis** (Phase 5)
+9. [Future Roadmap (Deferred Phases)](#9-future-roadmap-deferred-phases)
+10. [API Usage Map](#10-api-usage-map)
+11. [Cost Analysis](#11-cost-analysis)
+12. [Scalability Strategy](#12-scalability-strategy)
+13. [Configuration Strategy](#13-configuration-strategy)
+14. [Key Design Decisions](#14-key-design-decisions)
 
 ---
 
@@ -81,11 +36,11 @@ Takes a **single business URL** as input and returns a complete competitor analy
 INPUT:  https://yourapp.com
 
 OUTPUT:
-  ✅ 5-10 validated direct competitors (with URLs)
-  ✅ 50+ keyword opportunities with AI scoring and reasoning
-  ✅ "Why You Lose" analysis for top 10 keywords
-  ✅ Prioritised action plan with effort estimates
-  ✅ Exportable report (JSON + Markdown + CSV)
+   5-10 validated direct competitors (with URLs)
+   50+ keyword opportunities with AI scoring and reasoning
+   "Why You Lose" analysis for top 10 keywords
+   Prioritised action plan with effort estimates
+   Exportable report (JSON + Markdown + CSV)
 ```
 
 ### Key Differentiator
@@ -122,17 +77,17 @@ These tools scrape **Google SERPs in real-time** for a keyword, then use NLP/AI 
 
 This service takes a **single URL** and does everything — discovers competitors, finds keywords, explains why you lose, and builds an action plan. No prior keyword knowledge required.
 
-| Capability                  | Ahrefs/SEMrush      | Surfer/Clearscope/Frase | **This Service**                               |
-| --------------------------- | ------------------- | ----------------------- | ---------------------------------------------- |
-| **Input required**          | Keywords / domain   | Keywords                | **Just a URL**                                 |
-| **Competitor discovery**    | Manual lookup       | ❌ Not available        | ✅ **Automated from URL**                      |
-| **Keyword research**        | Database lookup     | User-provided           | ✅ **Auto-discovered from competitors**        |
-| **Trend data**              | Limited             | ❌ Not included         | ✅ **PyTrends built-in**                       |
-| **"Why you lose" analysis** | ❌ Raw metrics only | Partial (content-level) | ✅ **GPT-4o strategic reasoning**              |
-| **Action plan**             | ❌ User interprets  | "Add these terms"       | ✅ **"Build this page, here's the structure"** |
-| **Backlink data**           | ✅ Deep             | ❌ None                 | ⚠️ Via DataForSEO (post-MVP)                   |
-| **SERP positions**          | ✅ Historical       | ✅ Real-time            | ⚠️ Via SerpApi (post-MVP)                      |
-| **Infrastructure cost**     | $10M+               | Moderate                | **Near-zero**                                  |
+| Capability                  | Ahrefs/SEMrush    | Surfer/Clearscope/Frase | **This Service**                            |
+| --------------------------- | ----------------- | ----------------------- | ------------------------------------------- |
+| **Input required**          | Keywords / domain | Keywords                | **Just a URL**                              |
+| **Competitor discovery**    | Manual lookup     | Not available           | **Automated from URL**                      |
+| **Keyword research**        | Database lookup   | User-provided           | **Auto-discovered from competitors**        |
+| **Trend data**              | Limited           | Not included            | **PyTrends built-in**                       |
+| **"Why you lose" analysis** | Raw metrics only  | Partial (content-level) | **GPT-4o strategic reasoning**              |
+| **Action plan**             | User interprets   | "Add these terms"       | **"Build this page, here's the structure"** |
+| **Backlink data**           | Deep              | None                    | Via DataForSEO (post-MVP)                   |
+| **SERP positions**          | Historical        | Real-time               | Via SerpApi (post-MVP)                      |
+| **Infrastructure cost**     | $10M+             | Moderate                | **Near-zero**                               |
 
 #### The One-Line Pitch
 
@@ -159,8 +114,6 @@ flowchart TB
     Orch --> P2[Phase 2\nCompetitor Discovery]
     Orch --> P3[Phase 3\nKeyword Extraction]
     Orch --> P4[Phase 4\nKeyword Enrichment]
-    Orch --> P5[Phase 5\nGap Analysis]
-    Orch --> P6[Phase 6\nReport Generation]
 
     subgraph DataLayer [Data Layer — Facts & Numbers]
         WS[Web Scraping\nhttpx + BeautifulSoup]
@@ -190,10 +143,7 @@ flowchart TB
     P4 --> PT
     P4 --> GPT4o
 
-    P5 --> WS
-    P5 --> GPT4o
-
-    P6 --> Report([Final Report\nJSON · Markdown · CSV])
+    P4 --> Report([Analysis Result\nStructured JSON])
 
     style IntelLayer fill:#dbeafe,stroke:#2563eb
     style DataLayer fill:#fef9c3,stroke:#ca8a04
@@ -343,7 +293,6 @@ graph TB
     P1[Phase 1\nBusiness Classification] --> GPT4oMini
     P2[Phase 2\nCompetitor Validation] --> GPT4o
     P4[Phase 4\nOpportunity Evaluation] --> GPT4o
-    P5[Phase 5\nGap Analysis] --> GPT4o
 
     style GPT4o fill:#86efac,stroke:#16a34a
     style GPT4oMini fill:#86efac,stroke:#16a34a
@@ -352,12 +301,11 @@ graph TB
 
 ### Model Selection Rationale
 
-| Phase       | Task                    | Model         | Why This Model                                                                                                                        |
-| ----------- | ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| **Phase 1** | Business classification | `gpt-4o-mini` | Simple extraction task. Clear structure. 15x cheaper than GPT-4o. Fast.                                                               |
-| **Phase 2** | Competitor validation   | `gpt-4o`      | Needs nuanced judgment. Must distinguish products vs media vs review sites. Mini misses edge cases.                                   |
-| **Phase 4** | Opportunity evaluation  | `gpt-4o`      | Multi-factor reasoning. Must weigh trade-offs and consider business context. Strategic thinking required.                             |
-| **Phase 5** | Gap analysis            | `gpt-4o`      | Deepest analysis in the service. Must provide specific examples from real pages. This is the killer feature — quality non-negotiable. |
+| Phase       | Task                    | Model         | Why This Model                                                                                            |
+| ----------- | ----------------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
+| **Phase 1** | Business classification | `gpt-4o-mini` | Simple extraction task. Clear structure. 15x cheaper than GPT-4o. Fast.                                   |
+| **Phase 2** | Competitor validation   | `gpt-4o`      | Needs nuanced judgment. Must distinguish products vs media vs review sites. Mini misses edge cases.       |
+| **Phase 4** | Opportunity evaluation  | `gpt-4o`      | Multi-factor reasoning. Must weigh trade-offs and consider business context. Strategic thinking required. |
 
 ### Why Not o1?
 
@@ -428,7 +376,7 @@ sequenceDiagram
     Note over GPT: Model: gpt-4o-mini<br/>Temp: 0.3<br/>JSON mode: ON
     GPT-->>S: BusinessContext JSON
 
-    S-->>U: Phase complete ✅ (15% progress)
+    S-->>U: Phase complete  (15% progress)
 ```
 
 ### Data Sources
@@ -509,8 +457,6 @@ sequenceDiagram
         S->>WS: Scrape candidate URL (Validation)
         WS-->>S: Title, description, content preview
 
-        Note over S: Ensure URL is live and content<br/>actually matches industry.
-
         alt Live & Valid
             S->>S: Add to final list
         else Broken/Irrelevant
@@ -519,7 +465,7 @@ sequenceDiagram
     end
 
     Note over S: 5–10 validated competitors
-    S-->>S: Phase complete ✅ (35% progress)
+    S-->>S: Phase complete  (35% progress)
 ```
 
 ### Data Sources
@@ -533,8 +479,8 @@ sequenceDiagram
 
 Even the best LLMs can occasionally provide outdated URLs or miss a brand-new startup. We mitigate this by:
 
-1. **Auto-Validation:** The service immediately scrapes every URL provided by the AI. If the URL returns a 404 or the content doesn't match the industry, it is filtered out.
-2. **Phase 1 Context:** We don't just ask "who are my competitors?". we provide the **BusinessContext** (Phase 1 output) which includes the specific value prop and target audience, forcing the AI to be precise.
+1.  **Auto-Validation:** The service immediately scrapes every URL provided by the AI. If the URL returns a 404 or the content doesn't match the industry, it is filtered out.
+2.  **Phase 1 Context:** We don't just ask "who are my competitors?". we provide the **BusinessContext** (Phase 1 output) which includes the specific value prop and target audience, forcing the AI to be precise.
 
 ### Intelligence Applied — Reasoning LLM (o1/o3-mini)
 
@@ -610,7 +556,7 @@ sequenceDiagram
 
     Note over S: Combine all sources<br/>Deduplicate<br/>Filter stop words<br/>200–500 unique keywords
 
-    S-->>S: Phase complete ✅ (60% progress)
+    S-->>S: Phase complete  (60% progress)
 ```
 
 ### Data Sources
@@ -714,7 +660,7 @@ sequenceDiagram
     end
 
     Note over S: Enriched keywords sorted by opportunity score
-    S-->>S: Phase complete ✅ (80% progress)
+    S-->>S: Phase complete  (80% progress)
 ```
 
 ### Data Sources
@@ -816,520 +762,21 @@ JSON format."
 
 ---
 
-## 8.5. Phase 4.5 — SERP Analysis (New)
+## 9. Future Roadmap (Deferred Phases)
 
-**Goal:** For each top keyword opportunity, find out **who actually ranks on Google** — so Phase 5 can compare against the exact pages Google rewards, not just competitor homepages.
+The current implementation focuses on deep keyword intelligence and competitor profiling. The following phases are designed but pending implementation.
 
-> [!IMPORTANT]
-> Without SERP data, Phase 5 compares your site against competitor homepages. With SERP data, Phase 5 compares against **the specific pages ranking #1-#3 for each keyword** — this makes Gap Analysis 10x more accurate.
+### Phase 5 — Gap Analysis
 
-### Where It Fits
+Comparing user landing pages directly against top-ranking competitor pages using GPT-4o to identify specific content and structural "Whys" behind ranking differences.
 
-```
-Phase 4:   Keyword Enrichment     → Volume + trends + scoring
-                ↓
-Phase 4.5: SERP Analysis (NEW)    → Who actually ranks for these keywords?
-                ↓
-Phase 5:   Gap Analysis            → Why do THEY rank and you don't?
-```
+### Phase 6 — Formal Report Generation
 
-### Two Approaches
-
-#### Approach A — DIY Scraping (Playwright)
-
-Use your existing `ScraperService` (Playwright-based) to scrape Google search results directly.
-
-```mermaid
-sequenceDiagram
-    participant S as Service
-    participant PW as Playwright Browser
-    participant G as Google Search
-
-    loop For each top 10 keywords
-        S->>PW: Open headless browser
-        PW->>G: Search "project management for remote teams"
-        G-->>PW: HTML results page
-        PW-->>S: Parse organic results (position, URL, title, snippet)
-
-        Note over S: Wait 5-10 seconds<br/>to avoid detection
-    end
-
-    Note over S: 10 keywords × top 10 results<br/>= 100 ranking URLs mapped
-```
-
-**File structure:**
-
-```
-adapters/
-  serp/
-    __init__.py
-    google_serp_scraper.py    ← Playwright-based Google scraping
-```
-
-#### Approach B — SerpApi (Paid API)
-
-Use SerpApi's REST API to get structured Google results.
-
-```mermaid
-sequenceDiagram
-    participant S as Service
-    participant API as SerpApi
-
-    loop For each top 10 keywords
-        S->>API: GET /search?q=keyword&api_key=xxx
-        API-->>S: JSON with organic_results[]
-
-        Note over S: No delay needed<br/>API handles rate limits
-    end
-
-    Note over S: 10 keywords × top 10 results<br/>= 100 ranking URLs mapped
-```
-
-**File structure:**
-
-```
-adapters/
-  serp/
-    __init__.py
-    serp_api_adapter.py       ← SerpApi REST client
-```
-
-### Comparison — DIY vs SerpApi
-
-| Aspect              | DIY (Playwright)                                                         | SerpApi                                           |
-| ------------------- | ------------------------------------------------------------------------ | ------------------------------------------------- |
-| **Cost**            | Free                                                                     | $50/month (5,000 searches) or 100/month free tier |
-| **Reliability**     | ❌ Google blocks after ~20 queries, CAPTCHAs, IP bans                    | ✅ Very reliable — handles all anti-bot measures  |
-| **Speed**           | Slow — 5-10s delay between queries (50-100s for 10 keywords)             | Fast — no delay needed (~5s for 10 keywords)      |
-| **Maintenance**     | ❌ High — Google changes HTML structure, need to update parser regularly | ✅ Zero — SerpApi maintains their parsers         |
-| **Data quality**    | ⚠️ May get degraded results when Google detects bot                      | ✅ Exact same results a real user sees            |
-| **Legal risk**      | ⚠️ Violates Google ToS — risk of IP blacklist                            | ✅ Fully legal — uses their own infrastructure    |
-| **Setup effort**    | Medium — extend ScraperService, write HTML parser                        | Low — simple REST calls                           |
-| **Proxy needed?**   | Yes (~$20/month for residential proxies)                                 | No                                                |
-| **Total real cost** | ~$20/month (proxies) + maintenance time                                  | $50/month (or free for 100/month)                 |
-| **Best for**        | Hobby projects, testing                                                  | Production, MVP                                   |
-
-> [!WARNING]
-> **DIY scraping looks free but isn't.** Between proxy costs ($20/month), maintenance time, and unreliability, SerpApi's free tier (100 searches/month = ~10 analyses) is the better MVP choice. Scale to paid tier only when needed.
-
-### Recommendation
-
-| Stage                      | Approach                                                   | Why                                                              |
-| -------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| **MVP (now)**              | Skip SERP entirely                                         | Phase 5 still works — compares against competitor pages directly |
-| **v1.1 (after MVP works)** | SerpApi free tier (100/month)                              | Enough for ~10 analyses/month, zero maintenance                  |
-| **Scale (100+ customers)** | SerpApi paid ($50/month) or DataForSEO                     | 5,000+ searches/month                                            |
-| **DIY**                    | Only if cost is critical and you have time for maintenance | Not recommended for production                                   |
-
-### Output — SERP Results Per Keyword
-
-```json
-{
-  "keyword": "project management for remote teams",
-  "search_volume": 8500,
-  "serp_results": [
-    {
-      "position": 1,
-      "url": "https://monday.com/use-cases/remote-teams",
-      "title": "Remote Project Management | Monday.com",
-      "snippet": "Manage remote teams effectively with...",
-      "domain": "monday.com"
-    },
-    {
-      "position": 2,
-      "url": "https://asana.com/uses/remote-teams",
-      "title": "Remote Team Management Software | Asana",
-      "snippet": "Keep distributed teams connected...",
-      "domain": "asana.com"
-    },
-    {
-      "position": 3,
-      "url": "https://clickup.com/teams/remote",
-      "title": "Remote Work Tools | ClickUp",
-      "snippet": "All-in-one remote project management...",
-      "domain": "clickup.com"
-    }
-  ],
-  "your_position": null,
-  "your_url_in_results": false
-}
-```
-
-### How This Improves Phase 5
-
-| Without SERP (current)                   | With SERP (improved)                                              |
-| ---------------------------------------- | ----------------------------------------------------------------- |
-| Compares you vs **competitor homepages** | Compares you vs **the exact pages ranking #1-#3**                 |
-| "Monday.com is a competitor"             | "Monday.com's `/remote-teams` page ranks #1 — here's exactly why" |
-| Generic comparison                       | **Keyword-specific** comparison                                   |
-| Guessing which pages matter              | **Data-driven** — Google told us which pages win                  |
+Aggregation of all analysis data into downloadable Markdown, PDF, and CSV formats.
 
 ---
 
-## 9. Phase 5 — Gap Analysis
-
-**Goal:** Explain exactly why competitors rank better for each top opportunity and provide a concrete action plan.
-
-**This is the killer feature that differentiates us from every other SEO tool.**
-
-### Flow
-
-```mermaid
-sequenceDiagram
-    participant S as Service
-    participant WS as Web Scraper
-    participant GPT as GPT-4o
-
-    loop For each of the top 10 opportunity keywords
-        S->>WS: Scrape your current page for this keyword
-        WS-->>S: Your page: title, H1, word count, structure, elements
-
-        S->>WS: Scrape top 3 competitor pages for this keyword
-        WS-->>S: Competitor pages: same data points
-
-        Note over S: Prepare structured comparison:<br/>content length, headings structure,<br/>page type, trust elements, CTAs
-
-        S->>GPT: Why do competitors rank better?
-        Note over GPT: Model: gpt-4o<br/>Temp: 0.5<br/>JSON mode: ON<br/>Max tokens: 1500
-        GPT-->>S: Gaps + action items + opportunities
-
-        S->>S: Add to gap analysis report
-    end
-
-    Note over S: Prioritise all actions by impact
-    S-->>S: Phase complete ✅ (95% progress)
-```
-
-### Intelligence Applied — GPT-4o
-
-```
-System: "You are an expert SEO strategist and content analyst.
-         You analyse why pages rank and provide specific, actionable recommendations.
-         Focus on concrete examples from the actual pages. Be specific — not generic."
-
-User:
-"Analyse why competitors rank better for this keyword:
-
-KEYWORD: {keyword}
-
-YOUR PAGE:
-URL: {your_url}
-Title: {your_title}
-H1: {your_h1}
-Word Count: {your_word_count}
-Page Type: {your_page_type}
-Heading Structure:
-{your_headings_outline}
-Elements Present:
-  - CTAs: {your_cta_count}
-  - Comparison Table: {has_table}
-  - Screenshots: {screenshot_count}
-
-TOP RANKING COMPETITOR PAGES:
-
-1. {comp1_url}
-   Title: {comp1_title}
-   Word Count: {comp1_word_count}
-   Page Type: {comp1_page_type}
-   Heading Structure: {comp1_headings}
-   Elements: {comp1_elements}
-
-2. {comp2_url}
-   [same structure]
-
-3. {comp3_url}
-   [same structure]
-
-Provide:
-1. content_gaps — specific topics competitors cover that you don't
-2. structural_gaps — page structure and element differences
-3. trust_gaps — social proof, testimonials, case study differences
-4. action_items — prioritised list with effort and expected impact
-5. differentiation_opportunities — competitor weaknesses you could exploit
-
-JSON format with specific, concrete examples from the actual pages."
-```
-
-### What Other Tools Give You vs What We Give You
-
-**Ahrefs/SEMrush output:**
-
-```
-You are not ranking for "project management for remote teams"
-Competition: Medium  |  Volume: 8,500/month
-```
-
-**Our output:**
-
-```json
-{
-  "keyword": "project management for remote teams",
-  "content_gaps": [
-    {
-      "gap": "Competitor covers 8 specific remote team challenges with solutions",
-      "your_coverage": "127 words on homepage, no dedicated page",
-      "competitor_example": "Monday.com /remote-teams covers: timezone coordination,
-                             async standups, distributed onboarding, cross-timezone
-                             planning, remote retrospectives — each with a specific
-                             feature solution and screenshot"
-    },
-    {
-      "gap": "No comparison table",
-      "your_coverage": "None",
-      "competitor_example": "Asana shows side-by-side: Remote-optimised tools vs
-                             traditional PM — covers 8 dimensions with checkmarks"
-    }
-  ],
-  "action_items": [
-    {
-      "priority": 1,
-      "action": "Create dedicated /remote-teams landing page",
-      "effort": "2–3 days",
-      "impact": "high",
-      "specifics": {
-        "target_word_count": "2,000–2,500 words",
-        "required_sections": [
-          "Hero: async-first value prop for remote teams",
-          "8 remote team challenges + how you solve each",
-          "Feature showcase with screenshots",
-          "Comparison table: async vs synchronous tools",
-          "Case studies from remote-first customers",
-          "FAQ targeting question keywords"
-        ]
-      },
-      "expected_result": "Page 1 ranking in 3–4 months"
-    },
-    {
-      "priority": 2,
-      "action": "Update homepage title tag",
-      "effort": "5 minutes",
-      "impact": "medium",
-      "specifics": {
-        "current": "YourApp — Project Management Software",
-        "recommended": "YourApp — Project Management for Remote Teams"
-      }
-    }
-  ],
-  "differentiation_opportunities": [
-    {
-      "competitor_weakness": "All 3 competitors emphasise features. None own the async-first philosophy.",
-      "your_opportunity": "Position as 'async-first' — educate the market on why async beats sync for remote teams. No competitor owns this angle.",
-      "action": "Lead with philosophy, not feature list. Create /async-vs-sync comparison content."
-    }
-  ]
-}
-```
-
----
-
-## 10. Phase 6 — Report Generation
-
-**Goal:** Aggregate all phase outputs into a clean, exportable report. No AI calls needed — pure assembly.
-
-### Assembly Flow
-
-```mermaid
-graph LR
-    P1o[Phase 1 Output\nBusinessContext] --> Agg[Report Aggregator]
-    P2o[Phase 2 Output\nValidated Competitors] --> Agg
-    P4o[Phase 4 Output\nEnriched Keywords] --> Agg
-    P5o[Phase 5 Output\nGap Analysis] --> Agg
-
-    Agg --> S[Executive Summary]
-    Agg --> C[Competitor Table]
-    Agg --> K[Top Opportunities]
-    Agg --> G[Gap Analysis]
-    Agg --> A[Action Plan]
-
-    S --> JSON[report.json]
-    C --> JSON
-    K --> JSON
-    G --> JSON
-    A --> JSON
-
-    JSON --> MD[report.md]
-    JSON --> CSV[keywords.csv]
-```
-
-### Final Report Structure
-
-```json
-{
-  "metadata": {
-    "business_url": "yourapp.com",
-    "generated_at": "2025-02-17T10:30:00Z",
-    "processing_time": "4.5 minutes",
-    "report_version": "2.0"
-  },
-
-  "executive_summary": {
-    "business": {
-      "name": "YourApp",
-      "industry": "Project Management SaaS for remote teams"
-    },
-    "key_findings": [
-      "10 direct competitors identified",
-      "87 keyword opportunities discovered",
-      "Top opportunity: 'project management for remote teams' (8.5K/month, rising)",
-      "Primary gap: No dedicated landing pages for high-value keywords"
-    ],
-    "top_recommendation": "Own the 'async-first remote teams' positioning — no competitor has claimed it"
-  },
-
-  "competitors": {
-    "total_found": 10,
-    "list": ["monday.com", "asana.com", "clickup.com", "..."]
-  },
-
-  "keyword_opportunities": {
-    "total_analyzed": 50,
-    "high_priority": 12,
-    "medium_priority": 23,
-    "low_priority": 15,
-    "top_opportunities": ["..."]
-  },
-
-  "gap_analysis": {
-    "keywords_analyzed": 10,
-    "total_action_items": 47,
-    "high_priority_actions": 12
-  },
-
-  "action_plan": {
-    "immediate": ["..."],
-    "short_term": ["..."],
-    "long_term": ["..."]
-  }
-}
-```
-
----
-
-## 10.5. Progressive UI Display
-
-**Goal:** Instead of making users wait 3-5 minutes for the full report, show results **progressively** as each phase completes. The competitor list from Phase 2 can be displayed immediately.
-
-### How It Works
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant UI as Frontend
-    participant API as Backend API
-
-    U->>UI: Enters business URL
-    UI->>API: POST /competitor/analyze
-    API-->>UI: { status: "processing", analysis_id: "abc123" }
-
-    Note over UI: Show loading state
-
-    UI->>API: GET /competitor/status/abc123
-    API-->>UI: Phase 1 complete → BusinessContext
-    Note over UI: Show business summary card
-
-    UI->>API: GET /competitor/status/abc123
-    API-->>UI: Phase 2 complete → Competitor list
-    Note over UI: Show competitor cards
-
-    UI->>API: GET /competitor/status/abc123
-    API-->>UI: Phase 4 complete → Keywords
-    Note over UI: Show keyword opportunities table
-
-    UI->>API: GET /competitor/status/abc123
-    API-->>UI: Phase 5 complete → Gap analysis
-    Note over UI: Show "Why You Lose" analysis
-
-    UI->>API: GET /competitor/status/abc123
-    API-->>UI: Phase 6 complete → Full report
-    Note over UI: Show download buttons (JSON/CSV/MD)
-```
-
-### What Shows At Each Step
-
-| Phase Completes | What Appears In UI                                                        | Time From Start |
-| --------------- | ------------------------------------------------------------------------- | --------------- |
-| Phase 1         | **Business Summary** — name, industry, target audience, value proposition | ~3 seconds      |
-| Phase 2         | **Competitor Cards** — name, URL, confidence, reasoning                   | ~30 seconds     |
-| Phase 4         | **Keyword Table** — keyword, volume, trend, opportunity score, action     | ~2 minutes      |
-| Phase 5         | **Gap Analysis** — "Why You Lose" cards per keyword                       | ~3 minutes      |
-| Phase 6         | **Download Buttons** — JSON, Markdown, CSV export                         | ~3.5 minutes    |
-
-### Competitor Cards (Phase 2 Output → UI)
-
-The Phase 2 output contains everything needed to show competitors immediately:
-
-```
-┌──────────────────────────────────────────────────┐
-│  🔍 Competitor Analysis for yourapp.com          │
-│  Found 8 direct competitors                      │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│  🏢 Monday.com              Confidence: 95%  ●●  │
-│  https://monday.com                              │
-│  "Direct competitor — both target remote teams   │
-│   with project management. Similar pricing       │
-│   ($10-16/user/month), overlapping features."    │
-│                                                  │
-│  🏢 Asana                   Confidence: 92%  ●●  │
-│  https://asana.com                               │
-│  "Overlapping feature set, similar pricing tier. │
-│   Strong presence in the async collaboration     │
-│   space."                                        │
-│                                                  │
-│  🏢 ClickUp                 Confidence: 88%  ●●  │
-│  https://clickup.com                             │
-│  "All-in-one project management tool with        │
-│   aggressive pricing. Targets similar audience." │
-│                                                  │
-│  🏢 Notion                  Confidence: 75%  ●○  │
-│  https://notion.so                               │
-│  "Adjacent tool — wiki + project management.     │
-│   Different core use case but overlapping ICP."  │
-│                                                  │
-└──────────────────────────────────────────────────┘
-```
-
-### API Response Format For Progressive Updates
-
-```json
-{
-  "analysis_id": "abc123",
-  "status": "processing",
-  "progress": 35,
-  "current_phase": "competitor_discovery",
-  "completed_phases": {
-    "business_analysis": {
-      "business_name": "YourApp",
-      "industry": "Project Management SaaS for remote teams",
-      "target_audience": "Distributed teams of 10-50 people"
-    },
-    "competitor_discovery": {
-      "total_found": 8,
-      "competitors": [
-        {
-          "name": "Monday.com",
-          "url": "https://monday.com",
-          "confidence": 0.95,
-          "reasoning": "Direct competitor — both target remote teams..."
-        }
-      ]
-    }
-  },
-  "pending_phases": [
-    "keyword_extraction",
-    "keyword_enrichment",
-    "gap_analysis",
-    "report"
-  ]
-}
-```
-
-> [!NOTE]
-> This does **not** require Google Custom Search. Any Phase 2 approach (hybrid AI-first or full 3-source) returns the same competitor list structure that the UI can display.
-
----
-
-## 11. Complete API Usage Map
+## 10. API Usage Map
 
 ```mermaid
 graph TB
@@ -1357,15 +804,9 @@ graph TB
         P4AI[GPT-4o]
     end
 
-    subgraph Phase5 [Phase 5 — Gap Analysis]
-        P5WS[Web Scraping]
-        P5AI[GPT-4o]
-    end
-
     style P1AI fill:#dbeafe,stroke:#2563eb
     style P2AI fill:#dbeafe,stroke:#2563eb
     style P4AI fill:#dbeafe,stroke:#2563eb
-    style P5AI fill:#dbeafe,stroke:#2563eb
 
     style P2GCS fill:#fef9c3,stroke:#ca8a04
     style P2GAC fill:#fef9c3,stroke:#ca8a04
@@ -1376,21 +817,21 @@ graph TB
 
 ### API Summary Table
 
-| API                            | Phase      | Purpose                                                     | Free Limit               | Can AI Replace?                       |
-| ------------------------------ | ---------- | ----------------------------------------------------------- | ------------------------ | ------------------------------------- |
-| **Web Scraping** (httpx + BS4) | 1, 2, 3, 5 | Extract page content                                        | Unlimited (rate limited) | ❌ Need real content                  |
-| **Google Custom Search**       | 2          | Find competitor URLs                                        | 100 queries/day          | ❌ AI can't search web                |
-| **Google Autocomplete**        | 2, 3       | Real search suggestions, "X vs Y" patterns                  | Unlimited                | ❌ AI doesn't know what people search |
-| **Google Keyword Planner**     | 4          | Monthly volume + competition                                | Unlimited\*              | ❌ AI doesn't have this data          |
-| **PyTrends**                   | 4          | Trend direction + slope over 12 months                      | Unlimited (2s delay)     | ❌ AI doesn't have real-time data     |
-| **GPT-4o-mini**                | 1          | Business classification                                     | Pay per token            | —                                     |
-| **GPT-4o**                     | 2, 4, 5    | Competitor validation, opportunity evaluation, gap analysis | Pay per token            | —                                     |
+| API                            | Phase   | Purpose                                    | Free Limit               | Can AI Replace?                    |
+| ------------------------------ | ------- | ------------------------------------------ | ------------------------ | ---------------------------------- |
+| **Web Scraping** (httpx + BS4) | 1, 2, 3 | Extract page content                       | Unlimited (rate limited) | Need real content                  |
+| **Google Custom Search**       | 2       | Find competitor URLs                       | 100 queries/day          | AI can't search web                |
+| **Google Autocomplete**        | 2, 3    | Real search suggestions, "X vs Y" patterns | Unlimited                | AI doesn't know what people search |
+| **Google Keyword Planner**     | 4       | Monthly volume + competition               | Unlimited\*              | AI doesn't have this data          |
+| **PyTrends**                   | 4       | Trend direction + slope over 12 months     | Unlimited (2s delay)     | AI doesn't have real-time data     |
+| **GPT-4o-mini**                | 1       | Business classification                    | Pay per token            | —                                  |
+| **GPT-4o**                     | 2, 4    | Competitor validation, opportunity scoring | Pay per token            | —                                  |
 
 \*Requires a free Google Ads account (no spend required)
 
 ---
 
-## 12. Cost Analysis
+## 11. Cost Analysis
 
 ### Cost Per Full Analysis
 
@@ -1404,24 +845,21 @@ Phase 2 — Competitor Validation (GPT-4o)
 Phase 4 — Opportunity Evaluation (GPT-4o)
   50 keywords × ~2,000 input tokens × $2.50/1M = $0.25
 
-Phase 5 — Gap Analysis (GPT-4o)
-  10 analyses × ~4,000 input tokens × $2.50/1M = $0.10
-
 ──────────────────────────────────────────────
-Input cost total:   ~$0.43
+Input cost total:   ~$0.33
 Output cost total:  ~$0.15 (estimated)
 ──────────────────────────────────────────────
-TOTAL PER ANALYSIS: ~$0.58
+TOTAL PER ANALYSIS: ~$0.48
 ```
 
 ### SaaS Pricing Tiers
 
 | Tier     | Price/Month | Analyses | API Cost | Gross Margin |
 | -------- | ----------- | -------- | -------- | ------------ |
-| Free     | $0          | 1        | $0.58    | —            |
-| Starter  | $29         | 5        | $2.90    | $26.10 (90%) |
-| Pro      | $99         | 20       | $11.60   | $87.40 (88%) |
-| Business | $299        | 100      | $58.00   | $241 (81%)   |
+| Free     | $0          | 1        | $0.48    | —            |
+| Starter  | $29         | 5        | $2.40    | $26.60 (92%) |
+| Pro      | $99         | 20       | $9.60    | $89.40 (90%) |
+| Business | $299        | 100      | $48.00   | $251 (84%)   |
 
 **Margins are excellent even with premium AI models.**
 
@@ -1437,90 +875,7 @@ TOTAL PER ANALYSIS: ~$0.58
 
 ---
 
-## 12.5. Platform Integration — When To Use This Service
-
-This service is useful at **two stages** in the Adzump-AI platform: campaign creation and campaign optimization.
-
-### Campaign Creation (Primary Use Case — 70% of value)
-
-This is where the service delivers the most value — **before the advertiser spends any money**.
-
-```mermaid
-flowchart LR
-    U[User creates new campaign] --> Q{"Run competitor\nanalysis first?"}
-    Q -->|Yes| CA[Competitor Analysis\n~3 minutes]
-    Q -->|No| Manual[Manual keyword selection]
-
-    CA --> R[Show results:\nCompetitors + Keywords\n+ Gap Analysis]
-    R --> Select[User selects keywords\nfrom recommendations]
-    Select --> Create[Create campaign with\ninformed keyword choices\n+ better ad copy]
-```
-
-| Service Phase          | Value for Campaign Creation                                                             |
-| ---------------------- | --------------------------------------------------------------------------------------- |
-| Phase 2 (Competitors)  | Know who you're bidding against before you start                                        |
-| Phase 3+4 (Keywords)   | Discover keywords you'd never have thought of — directly from what competitors target   |
-| Phase 4 (Scoring)      | Prioritise which keywords to bid on — skip expensive, low-ROI ones                      |
-| Phase 4 (Trends)       | Avoid declining keywords, ride rising trends                                            |
-| Phase 5 (Gap Analysis) | Understand competitor landing pages → build better ad copy and landing pages from day 1 |
-
-### Campaign Optimization (Secondary Use Case — 30% of value, but repeatable)
-
-When a campaign is already running and performance plateaus or declines.
-
-```mermaid
-flowchart LR
-    C[Campaign running\n3+ months] --> D{Performance\ndeclining?}
-    D -->|Yes| CA[Re-run competitor\nanalysis]
-    D -->|Schedule| Monthly[Monthly check-up\nautomatic re-run]
-
-    CA --> Diff[Compare results\nvs last analysis]
-    Diff --> New[New keywords found\nNew competitors detected\nTrend shifts identified]
-    New --> Update[Update campaign:\nadd keywords,\nupdate ad copy,\nadjust bids]
-```
-
-| Service Phase          | Value for Optimization                                                                 |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| Phase 2 (Competitors)  | Detect **new competitors** entering the market                                         |
-| Phase 3+4 (Keywords)   | Find keywords competitors added that you're missing                                    |
-| Phase 4 (Trends)       | Catch keywords **rising or declining** since campaign launched                         |
-| Phase 5 (Gap Analysis) | **Most valuable** — understand why competitors' ads/landing pages outperform yours now |
-
-### Integration Points with Existing Adzump-AI Services
-
-```mermaid
-flowchart TB
-    subgraph Existing [Existing Adzump-AI Services]
-        KWS[Google Keywords Service\ngoogle_keywords_service.py]
-        OPT[Optimization Agents\nage, keyword, search term]
-        MUT[Mutation Service\ngoogle_ads_mutation_service.py]
-        CC[Campaign Creation\ncreate_campaign_service.py]
-    end
-
-    subgraph New [New Competitor Analysis Service]
-        CA[Competitor Analysis\nPhases 1-6]
-    end
-
-    CA -->|"Feed discovered keywords"| KWS
-    CA -->|"Inform keyword bids\nand targeting"| CC
-    CA -->|"Competitor insights for\nad copy optimization"| OPT
-    OPT -->|"Apply changes"| MUT
-
-    style New fill:#dbeafe,stroke:#2563eb
-    style Existing fill:#f0fdf4,stroke:#16a34a
-```
-
-### Suggested Usage Pattern
-
-| When                 | Trigger                                                    | Output Feeds Into                                 |
-| -------------------- | ---------------------------------------------------------- | ------------------------------------------------- |
-| **New campaign**     | User clicks "Analyse competitors" during campaign creation | Keyword selection, ad copy, landing page strategy |
-| **Monthly check-up** | Scheduled or manual re-run for existing campaigns          | Keyword optimization, new ad group suggestions    |
-| **Performance drop** | Alert when CTR/conversions decline → suggest re-analysis   | Gap analysis to identify what changed             |
-
----
-
-## 13. Scalability Strategy
+## 12. Scalability Strategy
 
 ### The Three Phases of Scale
 
@@ -1556,8 +911,8 @@ graph LR
 WHY CACHING IS YOUR COMPETITIVE MOAT:
 
 If 100 customers all analyse "monday.com" as a competitor:
-  - Without caching: 100 × full scrape + AI analysis = 100 × $0.58 cost
-  - With shared cache: 1 × full analysis, then 99 × cache hit = ~$0.58 total
+  - Without caching: 100 × full scrape + AI analysis = 100 × $0.48 cost
+  - With shared cache: 1 × full analysis, then 99 × cache hit = ~$0.48 total
 
 The more customers you have, the MORE efficient the system becomes.
 This is the opposite of most systems — scale makes it cheaper, not more expensive.
@@ -1571,7 +926,7 @@ Cache TTLs:
 
 ---
 
-## 14. Configuration Strategy
+## 13. Configuration Strategy
 
 ### What Belongs in Configuration
 
@@ -1633,73 +988,7 @@ Business logic — scoring, thresholds, what makes a good opportunity — lives 
 
 ---
 
-## 15. Implementation Roadmap
-
-> [!IMPORTANT]
-> This plan must be **approved before implementation begins**. The hybrid Phase 2 approach is used for MVP (GPT-4o + Autocomplete — no Google CSE or AlternativeTo).
-
-### 30-Day MVP Plan
-
-```mermaid
-gantt
-    title Competitor Analysis Service — 30 Day MVP
-    dateFormat X
-    axisFormat Week %w
-    section Week 1 — Foundation
-    Pydantic data models + config         :w1a, 0, 2d
-    Phase 1 Business Analysis service     :w1b, 2d, 5d
-    section Week 2 — Discovery
-    Phase 2 Competitor Discovery (hybrid) :w2a, 7d, 4d
-    Phase 3 Keyword Extraction            :w2b, 11d, 3d
-    section Week 3 — Intelligence
-    Phase 4 Keyword Enrichment            :w3a, 14d, 4d
-    Phase 5 Gap Analysis                  :w3b, 18d, 3d
-    section Week 4 — Assembly + Testing
-    Phase 6 Report Generation             :w4a, 21d, 2d
-    Orchestrator + API routes             :w4b, 23d, 3d
-    Test on 5 real businesses             :w4c, 26d, 4d
-```
-
-### Week-by-Week Breakdown
-
-**Week 1 — Foundation (Days 1–7)**
-
-- Pydantic data models (`BusinessContext`, `Competitor`, `EnrichedKeyword`, `GapAnalysisReport`)
-- Phase 1: Reuse `ScraperService` + `openai_client` → GPT-4o-mini business classification → `BusinessContext` output
-- Unit tests for Phase 1
-
-**Week 2 — Discovery & Extraction (Days 8–14)**
-
-- Phase 2 (Hybrid): GPT-4o competitor suggestion + Google Autocomplete gap-filling + scrape-based validation
-- Phase 3: Multi-page crawl of competitor sites → keyword extraction from titles, headings, meta, URL paths
-- Unit tests for Phases 2 + 3
-
-**Week 3 — Intelligence (Days 15–21)**
-
-- Phase 4: Reuse `GoogleKeywordPlannerAdapter` + `PyTrendsService` + GPT-4o opportunity scoring
-- Phase 5: Gap analysis — scrape your pages vs competitor pages → GPT-4o "Why You Lose" reasoning
-- Prompt engineering and output quality testing
-
-**Week 4 — Assembly & Testing (Days 22–30)**
-
-- Phase 6: Report assembly (JSON + Markdown + CSV export)
-- Main Orchestrator (Phase 1→6 coordinator with error handling)
-- FastAPI routes (`/competitor/analyze`, `/competitor/status/{id}`, `/competitor/results/{id}`)
-- Test end-to-end on 5 real business URLs, refine prompts
-
-### Post-MVP Enhancements
-
-| Enhancement                                 | When                               | Why                                        | Effort |
-| ------------------------------------------- | ---------------------------------- | ------------------------------------------ | ------ |
-| SERP Analysis (Phase 4.5) via SerpApi       | After MVP works                    | Makes Gap Analysis 10x more accurate       | 1 day  |
-| Redis caching (shared keyword pool)         | 100+ users                         | Reduce API costs, faster repeat analyses   | 2 days |
-| Progressive UI (poll-based updates)         | With frontend team                 | Show competitors + keywords as they appear | 2 days |
-| Google CSE + AlternativeTo (full Phase 2)   | If hybrid misses niche competitors | Belt-and-suspenders competitor discovery   | 3 days |
-| Historical tracking (diff vs last analysis) | Monthly check-up feature           | Track competitor changes over time         | 3 days |
-
----
-
-## 16. Key Design Decisions
+## 14. Key Design Decisions
 
 | Decision                   | What We Chose                                        | Alternative Considered                             | Rationale                                                              |
 | -------------------------- | ---------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -1707,7 +996,6 @@ gantt
 | **Phase 2 approach (MVP)** | Hybrid: GPT-4o + Autocomplete                        | Full 3-source (CSE + AlternativeTo + Autocomplete) | Simpler, fewer failure points, comparable accuracy for most businesses |
 | **Competitor validation**  | GPT-4o with business context                         | Hardcoded scoring rules                            | Rules fail on edge cases. AI handles nuance, provides reasoning        |
 | **Opportunity scoring**    | GPT-4o with business context                         | Fixed mathematical formula                         | Context-aware scoring is far more valuable than a generic formula      |
-| **Gap analysis**           | GPT-4o with real page comparison                     | Checklist of predefined factors                    | Specific, page-based analysis beats generic advice                     |
 | **SERP data**              | Skip for MVP, add SerpApi in v1.1                    | DIY scraping / include day 1                       | DIY is unreliable, SerpApi adds cost. Core product works without it    |
 | **Configuration**          | System constraints only                              | Heavy config for business logic                    | Business logic belongs in the intelligence layer, not config files     |
 | **Caching**                | Post-MVP (file-based for now)                        | Redis from day 1                                   | Premature complexity. Add when user count warrants it                  |
@@ -1727,5 +1015,3 @@ gantt
 ---
 
 _End of Architecture Document_
-
-**Status: Pending approval → Implementation begins at Week 1, Day 1.**
