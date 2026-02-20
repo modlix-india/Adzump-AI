@@ -1,5 +1,4 @@
 import os
-from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 load_dotenv()  # Load env vars before other imports
@@ -8,11 +7,7 @@ from config.logging_config import setup_logging
 
 setup_logging()
 
-from structlog import get_logger  # type: ignore
-
-logger = get_logger(__name__)
 from fastapi import FastAPI
-from sqlalchemy import text
 from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
@@ -25,54 +20,13 @@ from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
 from core.infrastructure.middleware import AuthContextMiddleware
 from core.infrastructure.request_logging_middleware import RequestLoggingMiddleware
-from core.infrastructure.http_client import init_http_client, close_http_client
+from core.infrastructure.lifecycle import lifespan
+from core.metadata import SERVICE_NAME, APP_TITLE
 from api.meta import router as meta_ads_router
 from api.optimization import router as optimization_router
-from db import db_session
 
 
-# TODO: clean up this code later
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    engine = None
-    try:
-        # Startup: create engine and validate DB connectivity
-        engine = db_session.get_engine()
-        async with engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
-        logger.info("Database connected", component="db")
-
-        # Initialize shared HTTP client
-        init_http_client()
-        logger.info("HTTP client initialized", component="http")
-
-        # Make engine available to routes/services via app.state
-        app.state.engine = engine
-        yield
-    except Exception as e:
-        logger.error(
-            "Database connection failed", component="db", error=str(e), exc_info=True
-        )
-        # Re-raise to fail-fast on bad DB config
-        raise
-    finally:
-        # Shutdown: dispose the engine/pool only if it was created
-        if engine is not None:
-            try:
-                await engine.dispose()
-                logger.info("Database engine disposed", component="db")
-            except Exception as e:
-                logger.error(
-                    "Error during DB dispose",
-                    component="db",
-                    error=str(e),
-                    exc_info=True,
-                )
-        await close_http_client()
-        logger.info("HTTP client closed", component="http")
-
-
-app = FastAPI(title="Ads AI: Automate, Optimize, Analyze", lifespan=lifespan)
+app = FastAPI(title=APP_TITLE, lifespan=lifespan)
 
 # Auth context middleware - extracts access-token and clientCode headers into request context.
 # Headers are optional here; endpoints requiring auth should validate via their own logic.
@@ -85,7 +39,7 @@ app.add_middleware(RequestLoggingMiddleware)
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "ds-service"}
+    return {"status": "healthy", "service": SERVICE_NAME}
 
 
 app.include_router(ads_router)

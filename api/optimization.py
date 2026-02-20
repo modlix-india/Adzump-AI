@@ -14,6 +14,7 @@ from agents.optimization.keyword_optimization_agent import (
 from agents.optimization.location_optimization_agent import (
     location_optimization_agent,
 )
+from agents.optimization.gender_optimization_agent import gender_optimization_agent
 
 router = APIRouter(prefix="/api/ds/optimize", tags=["optimization"])
 
@@ -45,6 +46,14 @@ async def generate_keyword_optimization():
 @router.post("/locations")
 async def generate_location_optimization():
     result = await location_optimization_agent.generate_recommendations(
+        client_code=auth_context.client_code,
+    )
+    return {"status": "success", "data": result}
+
+
+@router.post("/gender")
+async def generate_gender_optimization():
+    result = await gender_optimization_agent.generate_recommendations(
         client_code=auth_context.client_code,
     )
     return {"status": "success", "data": result}
