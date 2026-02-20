@@ -47,7 +47,9 @@ class StorageService:
     async def read_storage(self, request: StorageRequest) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/Read"
         try:
-            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
+            result = await self.client.request(
+                "POST", url, headers=self._headers(), payload=request.model_dump()
+            )
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")
@@ -57,29 +59,43 @@ class StorageService:
     async def read_page_storage(self, request: StorageReadRequest) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/ReadPage"
         try:
-            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
+            result = await self.client.request(
+                "POST", url, headers=self._headers(), payload=request.model_dump()
+            )
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")
         except Exception as e:
             return StorageResponse(success=False, error=f"Unexpected error: {str(e)}")
 
-    async def write_storage(self, request: StorageRequestWithPayload) -> StorageResponse:
+    async def write_storage(
+        self, request: StorageRequestWithPayload
+    ) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/Create"
         try:
-            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
+            result = await self.client.request(
+                "POST", url, headers=self._headers(), payload=request.model_dump()
+            )
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")
         except Exception as e:
             return StorageResponse(success=False, error=f"Unexpected error: {str(e)}")
-    
-    async def update_storage(self, request: StorageUpdateWithPayload) -> StorageResponse:
+
+    async def update_storage(
+        self, request: StorageUpdateWithPayload
+    ) -> StorageResponse:
         url = f"{self.client.base_url}/api/core/function/execute/CoreServices.Storage/Update"
         try:
-            result = await self.client.request("POST", url, headers=self._headers(), payload=request.model_dump())
+            result = await self.client.request(
+                "POST", url, headers=self._headers(), payload=request.model_dump()
+            )
             return StorageResponse(success=True, result=result)
         except httpx.RequestError as e:
             return StorageResponse(success=False, error=f"Network error: {str(e)}")
         except Exception as e:
             return StorageResponse(success=False, error=f"Unexpected error: {str(e)}")
+
+
+# Singleton instance (context-aware)
+storage_service = StorageService()
