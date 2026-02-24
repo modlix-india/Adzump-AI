@@ -4,9 +4,9 @@ The Age Optimization feature evaluates Google Ads performance across age ranges 
 
 Recommendations are:
 - **Metric-driven** — based on real impressions, clicks, conversions, and cost data from the last 30 days
-- **LLM-assisted** — GPT-4o-mini analyzes performance and suggests ADD or REMOVE actions
+- **LLM-assisted** — GPT-4o-mini analyzes performance per ad group and suggests ADD or REMOVE actions
 - **Post-filtered** — strict validation ensures ADD only targets untargeted ranges, REMOVE only targets active ranges
-- **Balanced** — a 1:1 replacement strategy prevents net loss of targeting coverage
+- **Hallucination-resistant** — each LLM call receives only one ad group's data, minimizing cross-ad-group confusion
 
 ---
 
@@ -29,80 +29,90 @@ POST /api/ds/optimize/age
 
 ```
 API Request
-  → AgeOptimizationAgent.run()
-    → Fetch all accessible Google accounts (GoogleAccountsAdapter)
+  → AgeOptimizationAgent.generate_recommendations()
+    → Fetch all accessible Google accounts
+    → Get campaign → product mapping
     → For each account (parallel):
-        → Fetch age metrics (GoogleAgeAdapter.fetch_age_metrics)
-        → Filter campaigns linked to a product (campaign_mapping_service)
-        → Fetch current age targeting state (GoogleAgeAdapter.fetch_age_targeting)
-        → Build LLM prompt with metrics + targeting state + product context
-        → Call GPT-4o-mini for ADD/REMOVE recommendations
-        → Filter & balance recommendations (_filter_and_balance_recommendations)
-        → Store results (recommendation_storage_service)
+        → fetch_age_metrics()  ← fires PERFORMANCE_QUERY + TARGETING_QUERY in parallel
+          → Merges is_targeted into each row
+          → Injects synthetic rows for all 7 age ranges per ad group
+        → Filter campaigns linked to a product
+        → Rebuild targeting_map from merged rows
+        → Group rows by ad_group_id
+        → For each ad group (parallel):
+            → Call GPT-4o-mini with that ad group's 7 rows
+            → Parse recommendations
+        → _filter_recommendations() — validate all ADD/REMOVE actions
+        → Store results
 ```
 
 ---
 
 ## Components
 
-### 1. API Layer — `api/optimization.py`
+### 1. Adapter — `adapters/google/optimization/age.py`
 
-- Accepts `POST /api/ds/optimize/age`
-- Delegates to `AgeOptimizationAgent.run()`
-- Returns the list of `CampaignRecommendation` objects
+Handles all Google Ads API interactions. Key design decisions:
+
+- **Class-level query constants** — `PERFORMANCE_QUERY` and `TARGETING_QUERY` are defined as class constants (easier to read and maintain)
+- **Parallel fetch** — both queries fire simultaneously via `asyncio.gather`
+- **Account-level `TARGETING_QUERY`** — no campaign filter; fetches all age targeting for the account and filters locally
+- **`is_targeted` merged per row** — every output row has `is_targeted: true/false` embedded, so the LLM needs no separate context block
+- **Synthetic row injection** — age ranges not in `age_range_view` (zero impressions, never served) are injected with zero metrics and `is_targeted` derived from the targeting map, ensuring all 7 age ranges are always visible to the LLM
+
+**`fetch_age_metrics()`** — the single public method. Returns a flat list of rows, one per (ad_group, age_range) pair:
+
+| Field | Description |
+|---|---|
+| `campaign_id`, `campaign_name`, `campaign_type` | Campaign metadata |
+| `ad_group_id`, `ad_group_name` | Ad group metadata |
+| `age_range` | e.g. `AGE_RANGE_18_24` |
+| `is_targeted` | `true` = ENABLED in Google Ads, `false` = not enabled |
+| `resource_name` | Criterion resource name (only when `is_targeted: true`) |
+| `calculated_metrics` | CTR, CPA, CPC, cost (zeros = never served) |
+
+GAQL queries:
+```sql
+-- PERFORMANCE_QUERY (age_range_view)
+SELECT campaign.id, campaign.name, ad_group.id, ad_group.name,
+       ad_group_criterion.age_range.type, ad_group_criterion.resource_name,
+       metrics.impressions, metrics.clicks, metrics.conversions, metrics.cost_micros
+FROM age_range_view
+WHERE {duration_clause} AND campaign.status = 'ENABLED'
+  AND ad_group.status = 'ENABLED' AND ad_group_criterion.status != 'REMOVED'
+
+-- TARGETING_QUERY (ad_group_criterion) — account-level, no campaign filter
+SELECT ad_group.id, ad_group_criterion.age_range.type, ad_group_criterion.status
+FROM ad_group_criterion
+WHERE ad_group_criterion.type = 'AGE_RANGE'
+  AND ad_group_criterion.status IN ('ENABLED', 'PAUSED')
+  AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED'
+```
 
 ### 2. Agent — `agents/optimization/age_optimization_agent.py`
 
-The core orchestrator. Key responsibilities:
+Core orchestrator. Key responsibilities:
 
-- **Parallel account processing** — all accessible accounts are processed concurrently via `asyncio.gather`
-- **Campaign filtering** — only campaigns linked to a product (via `campaign_mapping_service`) are processed
-- **Two-step data fetch** — metrics and targeting state are fetched separately for clarity
-- **LLM context enrichment** — prompt includes performance metrics, current targeting state, untargeted ranges, and product summary
-- **Post-LLM filtering** — `_filter_and_balance_recommendations()` enforces:
-  - ADD only if the age range is **not** currently targeted
-  - REMOVE only if the age range **is** currently targeted
-- **1:1 replacement strategy** — if REMOVEs > ADDs, `_suggest_untargeted_ranges()` auto-suggests new ranges based on performance (adjacent to best performer, or fallback to next best untargeted range)
+- **Per-ad-group LLM calls** — metrics are grouped by `ad_group_id` and each group gets its own parallel LLM call. This prevents cross-ad-group hallucination since the LLM only sees one `ad_group_id` at a time.
+- **Error isolation** — `asyncio.gather(return_exceptions=True)` means a failed ad group call is logged and skipped; other ad groups still produce recommendations.
+- **`targeting_map` rebuilt locally** — scanned from `is_targeted` fields in merged rows. No extra API call needed.
+- **`resource_name` backfill** — before calling the LLM, a `(ad_group_id, age_range) → resource_name` map is built from the metrics rows. After parsing the LLM response, any REMOVE recommendation missing a `resource_name` is backfilled from this map. This ensures REMOVE operations always have the criterion ID needed to execute against the Google Ads API, even if the LLM omits it.
+- **Strict post-LLM filter** — `_filter_recommendations()` enforces correctness independently of what the LLM said.
 
-### 3. Google Ads Adapter — `adapters/google/optimization/age.py`
+### 3. LLM Prompt — `prompts/optimization/age_optimization_prompt.txt`
 
-Handles all Google Ads API interactions:
+The prompt receives **one ad group's data at a time** (7 rows — one per age range). The LLM reads `is_targeted` directly from each row:
 
-- **`fetch_age_metrics()`** — queries `age_range_view` for impressions, clicks, conversions, and cost over the last 30 days. Only returns campaigns with actual activity (zero-spend campaigns are excluded automatically).
-- **`fetch_age_targeting()`** — queries `ad_group_criterion` to get the current ENABLED age range targeting state per ad group, returning a `dict[ad_group_id → set[age_range]]`.
-
-GAQL query used for metrics:
-```sql
-SELECT
-  campaign.id, campaign.name,
-  ad_group.id, ad_group.name,
-  ad_group_criterion.age_range.type,
-  ad_group_criterion.status,
-  metrics.impressions, metrics.clicks,
-  metrics.conversions, metrics.cost_micros
-FROM age_range_view
-WHERE segments.date DURING LAST_30_DAYS
-  AND campaign.status = ENABLED
-  AND ad_group.status = ENABLED
-  AND ad_group_criterion.status != REMOVED
+```
+is_targeted: true  → REMOVE if poor performance
+is_targeted: false → ADD if strong product-audience fit
 ```
 
-### 4. LLM Decision Logic — `prompts/optimization/age_optimization_prompt.txt`
+No separate text blocks for targeting state or untargeted ranges are needed — everything is self-contained in each row.
 
-The prompt provides the LLM with:
-- Per-campaign, per-ad-group performance metrics
-- Currently targeted age ranges
-- Untargeted age ranges available to add
-- Product context summary
+### 4. Models — `core/models/optimization.py`
 
-The LLM outputs a JSON array of recommendations, each with:
-- `ad_group_id`, `age_range`, `recommendation` (`ADD` or `REMOVE`), `reason`
-
-### 5. Models — `core/models/optimization.py`
-
-All recommendations are validated against Pydantic models:
-
-- **`AgeFieldRecommendation`** — single age range action (`ad_group_id`, `age_range`, `recommendation`, `resource_name`, `reason`)
+- **`AgeFieldRecommendation`** — `ad_group_id`, `age_range`, `recommendation` (`ADD`/`REMOVE`), `resource_name`, `reason`
 - **`OptimizationFields`** — container with `age: list[AgeFieldRecommendation]`
 - **`CampaignRecommendation`** — top-level object with `campaign_id`, `account_id`, `product_id`, `fields`
 
@@ -110,15 +120,25 @@ All recommendations are validated against Pydantic models:
 
 ## Filtering Logic
 
-After the LLM responds, `_filter_recommendations()` runs the following steps in order:
+After each ad group's LLM call, `_filter_recommendations()` runs:
 
-1. **Exclude `AGE_RANGE_UNDETERMINED`** from the targeting map — it is not a real targetable range and cannot be added or removed meaningfully
-2. **Deduplicate** — drop any recommendation with a duplicate `(ad_group_id, age_range, recommendation)` key
-3. **Filter ADDs** — drop any ADD for a range already in `targeting_map[ad_group_id]` (it's already allowed)
-4. **Filter REMOVEs** — drop any REMOVE for a range not in `targeting_map[ad_group_id]` (nothing to remove)
-5. **All-REMOVE guard** — if the valid REMOVEs would remove every currently targeted range and there are no valid ADDs, skip the entire ad group to prevent zeroing out targeting
+1. **Exclude `AGE_RANGE_UNDETERMINED`** from targeting checks — not a real targetable range
+2. **Deduplicate** — drop any `(ad_group_id, age_range, recommendation)` duplicate
+3. **Filter ADDs** — drop ADD if the range is already in `targeting_map[ad_group_id]`
+4. **Filter REMOVEs** — drop REMOVE if the range is not in `targeting_map[ad_group_id]`
+5. **All-REMOVE guard** — if valid REMOVEs would remove every currently targeted range with no valid ADDs, skip the entire ad group
 
-> **Why no 1:1 replacement?** Age range targeting in Google Ads is exclusionary — enabling a range means "don't exclude this group", not "target only this group". Auto-adding ranges to compensate for removals is a no-op when those ranges are already enabled, and produces incorrect recommendations when they aren't. The LLM's REMOVE suggestions are trusted directly after filtering.
+---
+
+## API Call Efficiency
+
+| Stage | Calls |
+|---|---|
+| Fetch accounts | 1 |
+| `fetch_age_metrics()` per account | **2 in parallel** (PERFORMANCE + TARGETING) |
+| LLM calls per ad group | 1 per ad group (all parallel) |
+
+For an account with 10 linked campaigns and 3 ad groups each: **2 API calls + 30 parallel LLM calls** (vs the old approach of 2 sequential API calls + 1 large LLM call prone to hallucination).
 
 ---
 
@@ -126,10 +146,10 @@ After the LLM responds, `_filter_recommendations()` runs the following steps in 
 
 | Scenario | Behavior |
 |---|---|
-| Campaign has no age data (new/zero-spend) | Skipped — `age_range_view` returns no rows |
-| Campaign not linked to a product | Skipped — filtered out by `campaign_mapping_service` |
-| LLM returns invalid JSON | Exception logged via `structlog`, account skipped |
-| Google Ads API error | Exception propagated and logged |
+| Campaign has no age data | Skipped — no rows returned from `age_range_view` |
+| Campaign not linked to a product | Skipped — filtered by `campaign_mapping_service` |
+| One ad group's LLM call fails | Logged, skipped — other ad groups still processed |
+| Google Ads API error | Exception logged, account returns empty list |
 
 ---
 
@@ -137,23 +157,26 @@ After the LLM responds, `_filter_recommendations()` runs the following steps in 
 
 ```json
 {
-  "platform": "google_ads",
+  "platform": "GOOGLE",
   "account_id": "4220436668",
   "campaign_id": "23085457578",
-  "campaign_name": "Subha White Waters - Demand Gen 7 Oct 25",
+  "campaign_name": "Winter Sale Campaign",
   "fields": {
     "age": [
       {
         "ad_group_id": "195048573508",
+        "ad_group_name": "Shoes - Broad",
         "age_range": "AGE_RANGE_18_24",
         "recommendation": "REMOVE",
-        "reason": "Zero impressions and clicks over 30 days"
+        "resource_name": "customers/123/adGroupCriteria/456~789",
+        "reason": "Zero impressions over 30 days — inactive audience segment"
       },
       {
         "ad_group_id": "195048573508",
-        "age_range": "AGE_RANGE_25_34",
+        "ad_group_name": "Shoes - Broad",
+        "age_range": "AGE_RANGE_35_44",
         "recommendation": "ADD",
-        "reason": "Adjacent to best-performing 35-44 range, untargeted"
+        "reason": "Not currently targeted. Product targets professionals — strong demographic fit."
       }
     ]
   }

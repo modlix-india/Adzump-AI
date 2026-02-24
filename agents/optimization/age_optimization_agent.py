@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections import defaultdict
 from structlog import get_logger
 
 from core.services.campaign_mapping import campaign_mapping_service
@@ -8,7 +9,7 @@ from core.models.optimization import (
     CampaignRecommendation,
 )
 from adapters.google.accounts import GoogleAccountsAdapter
-from adapters.google.optimization.age import GoogleAgeAdapter, ALL_AGE_RANGES
+from adapters.google.optimization.age import GoogleAgeAdapter
 from core.services.recommendation_storage import recommendation_storage_service
 from services.openai_client import chat_completion
 from utils.prompt_loader import load_prompt
@@ -27,7 +28,6 @@ class AgeOptimizationAgent:
             logger.info("No accessible accounts found", client_code=client_code)
             return {"recommendations": []}
 
-        # Fetch both campaign→product mapping and product summaries
         campaign_product_map = (
             await campaign_mapping_service.get_campaign_mapping_with_summary(
                 client_code
@@ -62,6 +62,7 @@ class AgeOptimizationAgent:
         account_id = account["customer_id"]
         parent_account_id = account["login_customer_id"]
 
+        # Single call — adapter fetches performance + targeting in parallel internally
         metrics = await self.age_adapter.fetch_age_metrics(
             account_id, parent_account_id
         )
@@ -75,36 +76,54 @@ class AgeOptimizationAgent:
             logger.info(
                 "No linked campaigns for account",
                 account_id=account_id,
-                total_campaigns=len(metrics),
+                total_rows=len(metrics),
             )
             return []
 
-        # Fetch current age targeting state for all campaigns
-        campaign_ids = list(
-            set(str(m.get("campaign", {}).get("id")) for m in linked_metrics)
-        )
-        targeting_map = await self.age_adapter.fetch_age_targeting(
-            account_id, parent_account_id, campaign_ids
-        )
+        # Rebuild targeting_map from merged rows (needed for post-LLM filter)
+        targeting_map: dict[str, set[str]] = {}
+        for row in linked_metrics:
+            if row["is_targeted"]:
+                targeting_map.setdefault(row["ad_group_id"], set()).add(
+                    row["age_range"]
+                )
 
-        # Log targeting state for each ad group
-        for ad_group_id, targeted_ranges in targeting_map.items():
-            untargeted_ranges = set(ALL_AGE_RANGES) - targeted_ranges
+        # Log targeting state per ad group
+        ad_group_ids = {row["ad_group_id"] for row in linked_metrics}
+        for ad_group_id in ad_group_ids:
+            targeted = targeting_map.get(ad_group_id, set())
             logger.info(
                 "Age targeting state",
                 account_id=account_id,
                 ad_group_id=ad_group_id,
-                previously_targeted=sorted(list(targeted_ranges)),
-                remaining_untargeted=sorted(list(untargeted_ranges)),
-                total_targeted=len(targeted_ranges),
-                total_untargeted=len(untargeted_ranges),
+                targeted=sorted(targeted),
+                total_targeted=len(targeted),
             )
 
-        recommendations = await self._analyze_google_metrics(
-            linked_metrics, account_id, parent_account_id, targeting_map
+        # Group by ad group
+        grouped: dict[str, list] = defaultdict(list)
+        for row in linked_metrics:
+            grouped[row["ad_group_id"]].append(row)
+
+        # One LLM call per ad group, all in parallel — isolated failures
+        results = await asyncio.gather(
+            *[
+                self._analyze_adgroup_metrics(
+                    adgroup_metrics, account_id, parent_account_id
+                )
+                for adgroup_metrics in grouped.values()
+            ],
+            return_exceptions=True,
         )
 
-        return self._filter_recommendations(recommendations, targeting_map)
+        all_recs: list[CampaignRecommendation] = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error("Ad group LLM analysis failed", error=str(result))
+                continue
+            all_recs.extend(result)
+
+        return self._filter_recommendations(all_recs, targeting_map)
 
     def _filter_linked_google_campaigns(
         self, metrics: list, campaign_product_map: dict
@@ -112,10 +131,9 @@ class AgeOptimizationAgent:
         """Filter metrics to only campaigns with linked products."""
         linked = []
         for m in metrics:
-            campaign_id = str(m.get("campaign", {}).get("id"))
+            campaign_id = m.get("campaign_id", "")
             if campaign_id in campaign_product_map:
                 mapping_data = campaign_product_map[campaign_id]
-                # Handle both string (old) and dict (new) formats
                 if isinstance(mapping_data, str):
                     m["product_id"] = mapping_data
                     m["product_summary"] = ""
@@ -125,18 +143,25 @@ class AgeOptimizationAgent:
                 linked.append(m)
         return linked
 
-    async def _analyze_google_metrics(
+    async def _analyze_adgroup_metrics(
         self,
-        metrics: list,
+        metrics: list[dict],
         account_id: str,
         parent_account_id: str,
-        targeting_map: dict[str, set[str]],
     ) -> list[CampaignRecommendation]:
-        """Send metrics to LLM for analysis and return parsed recommendations."""
-        # Build targeting state summary and untargeted ranges for prompt
-        targeting_summary = self._build_targeting_summary(metrics, targeting_map)
-        untargeted_summary = self._build_untargeted_summary(metrics, targeting_map)
-        product_context = self._build_product_context(metrics)
+        """Call LLM for a single ad group's age range data and return parsed recommendations."""
+        first = metrics[0]
+        product_context = (
+            first.get("product_summary") or "No product information available"
+        )
+
+        # Build resource_name lookup for backfill after LLM parse
+        # (ad_group_id, age_range) → resource_name
+        resource_name_map: dict[tuple[str, str], str] = {
+            (row["ad_group_id"], row["age_range"]): row["resource_name"]
+            for row in metrics
+            if row.get("resource_name")
+        }
 
         prompt = load_prompt("optimization/age_optimization_prompt.txt")
         formatted = prompt.format(
@@ -144,10 +169,7 @@ class AgeOptimizationAgent:
             parent_account_id=parent_account_id,
             account_id=account_id,
             metrics=json.dumps(metrics, indent=2),
-            targeting_state=targeting_summary,
-            untargeted_ranges=untargeted_summary,
             product_context=product_context,
-            all_age_ranges=", ".join(ALL_AGE_RANGES),
         )
 
         response = await chat_completion(
@@ -158,7 +180,17 @@ class AgeOptimizationAgent:
             model="gpt-4o-mini",
         )
 
-        return self._parse_llm_response(response)
+        recs = self._parse_llm_response(response)
+
+        # Backfill resource_name on REMOVE recommendations the LLM forgot to include
+        for rec in recs:
+            for age_rec in rec.fields.age or []:
+                if age_rec.recommendation == "REMOVE" and not age_rec.resource_name:
+                    age_rec.resource_name = resource_name_map.get(
+                        (age_rec.ad_group_id, age_rec.age_range)
+                    )
+
+        return recs
 
     def _parse_llm_response(self, response) -> list[CampaignRecommendation]:
         """Parse and validate LLM response."""
@@ -171,91 +203,11 @@ class AgeOptimizationAgent:
             rec.campaign_type = "SEARCH"
         return list(parsed.recommendations)
 
-    def _build_targeting_summary(
-        self, metrics: list, targeting_map: dict[str, set[str]]
-    ) -> str:
-        """Build a summary of current targeting state for the LLM prompt."""
-        ad_groups = {}
-        for m in metrics:
-            ad_group_id = str(m.get("adGroup", {}).get("id", ""))
-            ad_group_name = m.get("adGroup", {}).get("name", "Unknown")
-            if ad_group_id and ad_group_id not in ad_groups:
-                ad_groups[ad_group_id] = ad_group_name
-
-        summary_lines = []
-        for ad_group_id, ad_group_name in ad_groups.items():
-            targeted = targeting_map.get(ad_group_id, set())
-            if targeted:
-                summary_lines.append(
-                    f"- Ad Group {ad_group_id} ({ad_group_name}): {', '.join(sorted(targeted))}"
-                )
-            else:
-                summary_lines.append(
-                    f"- Ad Group {ad_group_id} ({ad_group_name}): No age targeting configured"
-                )
-
-        return "\n".join(summary_lines) if summary_lines else "No ad groups found"
-
-    def _build_untargeted_summary(
-        self, metrics: list, targeting_map: dict[str, set[str]]
-    ) -> str:
-        """Build a summary of untargeted age ranges available for testing."""
-        ad_groups = {}
-        for m in metrics:
-            ad_group_id = str(m.get("adGroup", {}).get("id", ""))
-            ad_group_name = m.get("adGroup", {}).get("name", "Unknown")
-            if ad_group_id and ad_group_id not in ad_groups:
-                ad_groups[ad_group_id] = ad_group_name
-
-        summary_lines = []
-        for ad_group_id, ad_group_name in ad_groups.items():
-            targeted = targeting_map.get(ad_group_id, set())
-            # Exclude UNDETERMINED — it is not a real targetable range
-            untargeted = set(ALL_AGE_RANGES) - targeted - {"AGE_RANGE_UNDETERMINED"}
-            if untargeted:
-                summary_lines.append(
-                    f"- Ad Group {ad_group_id} ({ad_group_name}): {', '.join(sorted(untargeted))}"
-                )
-            else:
-                summary_lines.append(
-                    f"- Ad Group {ad_group_id} ({ad_group_name}): All age ranges already targeted"
-                )
-
-        return "\n".join(summary_lines) if summary_lines else "No ad groups found"
-
-    def _build_product_context(self, metrics: list) -> str:
-        """Build product context for LLM to understand the business."""
-        products = {}
-        for m in metrics:
-            product_id = m.get("product_id", "")
-            product_summary = m.get("product_summary", "")
-            if product_id and product_summary and product_id not in products:
-                products[product_id] = product_summary
-
-        if not products:
-            return "No product information available"
-
-        context_lines = []
-        for product_id, summary in products.items():
-            context_lines.append(f"Product {product_id}: {summary}")
-
-        return "\n".join(context_lines)
-
     def _filter_recommendations(
         self,
         recommendations: list[CampaignRecommendation],
         targeting_map: dict[str, set[str]],
     ) -> list[CampaignRecommendation]:
-        """
-        Filter LLM recommendations based on current targeting state.
-
-        Rules:
-        - ADD only if the age range is NOT currently targeted
-        - REMOVE only if the age range IS currently targeted
-        - Deduplicate by (ad_group_id, age_range, recommendation)
-        - All-REMOVE guard: skip ad group if removes would zero out all targeting
-        - AGE_RANGE_UNDETERMINED is excluded from targeting checks
-        """
         filtered_recs = []
 
         for rec in recommendations:
@@ -266,14 +218,12 @@ class AgeOptimizationAgent:
             if not ad_group_id:
                 continue
 
-            # Exclude UNDETERMINED — not a real targetable range
             currently_targeted = {
                 r
                 for r in targeting_map.get(ad_group_id, set())
                 if r != "AGE_RANGE_UNDETERMINED"
             }
 
-            # Log what LLM suggested
             llm_adds = [
                 a.age_range for a in rec.fields.age if a.recommendation == "ADD"
             ]
