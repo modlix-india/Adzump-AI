@@ -15,6 +15,9 @@ from utils.prompt_loader import load_prompt
 from adapters.meta.detailed_targeting import MetaDetailedTargetingAdapter
 from adapters.meta.geo_targeting import MetaGeoTargetingAdapter
 
+from oserver.models.storage_request_model import StorageRequest
+from oserver.services.storage_service import StorageService
+
 logger = structlog.get_logger()
 
 
@@ -53,7 +56,21 @@ class MetaAdSetAgent:
             demographics=detailed_targeting.demographics,
         )
 
-        locations = await self._build_locations(website_data=website_data)
+        suggested_geo_targets = getattr(website_data, "suggested_geo_targets", None)
+
+        if not suggested_geo_targets and getattr(website_data, "storage_id", None):
+            suggested_geo_targets = await self._fetch_suggested_geo_targets(
+                website_data.storage_id
+            )
+
+        allowed_countries = getattr(website_data, "special_ad_category_country", None)
+        if allowed_countries and isinstance(allowed_countries, str):
+            allowed_countries = [allowed_countries]
+
+        locations = await self._build_locations(
+            suggested_geo_targets=suggested_geo_targets,
+            allowed_countries=allowed_countries,
+        )
 
         return {
             "genders": targeting.genders,
@@ -156,44 +173,97 @@ class MetaAdSetAgent:
                 locales.append(result)
         return locales
 
+    async def _fetch_suggested_geo_targets(self, storage_id: str):
+        if not storage_id:
+            return None
+
+        storage_service = StorageService(
+            access_token=auth_context.access_token,
+            client_code=auth_context.client_code,
+            x_forwarded_host=auth_context.x_forwarded_host,
+            x_forwarded_port=auth_context.x_forwarded_port,
+        )
+
+        payload = StorageRequest(
+            storageName="AISuggestedData",
+            appCode="marketingai",
+            dataObjectId=storage_id,
+            clientCode=auth_context.client_code,
+            eager=False,
+            eagerFields=[],
+        )
+
+        response = await storage_service.read_storage(payload)
+
+        if not response.success or not response.result:
+            return None
+
+        data = response.result
+
+        try:
+            if isinstance(data, list) and len(data) > 0:
+                record = data[0]["result"]["result"]
+            elif isinstance(data, dict):
+                record = data["result"]["result"]
+            else:
+                return None
+        except Exception:
+            return None
+
+        return record.get("suggestedGeoTargets")    
+
     async def _build_locations(
         self,
-        website_data,
-    ) -> list[dict] | None:
-        if not website_data.location:
+        suggested_geo_targets,
+        allowed_countries,
+    ) -> dict | None:
+
+        if not suggested_geo_targets:
             return None
 
-        raw_location = website_data.location.product_location
-        if not raw_location:
-            return None
-
-        parts = [p.strip() for p in raw_location.split(",")]
-        candidates = []
-
-        if len(parts) >= 3:
-            candidates.append(f"{parts[1]}, {parts[2]}")
-            candidates.append(parts[1])
-            candidates.append(parts[2])
-        elif len(parts) == 2:
-            candidates.append(raw_location)
-            candidates.append(parts[1])
-        else:
-            candidates.append(raw_location)
-
-        for location_name in candidates:
-            if not location_name:
-                continue
-
+        async def resolve_target(target):
             results = await self.geo_targeting_adapter.search_locations(
                 client_code=auth_context.client_code,
-                location_name=location_name,
-                limit=5,
+                location_name=target.get("canonicalName"),
+                limit=3,
             )
 
-            if results:
-                return results  # return raw list for UI
+            if not results:
+                results = await self.geo_targeting_adapter.search_locations(
+                client_code=auth_context.client_code,
+                location_name=target.get("name"),
+                limit=3,
+            )
 
-        return None
+            if not results:
+                return None
+
+            if allowed_countries:
+                matched = [
+                    r for r in results
+                    if r.get("country_code") in allowed_countries
+                ]
+                return matched[0] if matched else results[0]
+
+            return results[0]
+
+        tasks = [
+            resolve_target(target)
+            for target in suggested_geo_targets
+            if target
+        ]
+
+        resolved_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        valid_locations = [
+            r for r in resolved_results
+            if r and not isinstance(r, Exception)
+        ]
+
+        if not valid_locations:
+            return None
+
+        return self.geo_targeting_adapter.build_geo_structure(valid_locations)
 
 
 meta_adset_agent = MetaAdSetAgent()

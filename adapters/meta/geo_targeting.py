@@ -2,16 +2,12 @@ import json
 import structlog
 from typing import Optional, Dict, Any, List
 
-from adapters.meta.client import MetaClient
-from exceptions.custom_exceptions import InternalServerException
+from adapters.meta.client import meta_client
 
 logger = structlog.get_logger()
 
 
 class MetaGeoTargetingAdapter:
-
-    def __init__(self):
-        self.client = MetaClient()
 
     async def search_locations(
         self,
@@ -20,38 +16,29 @@ class MetaGeoTargetingAdapter:
         limit: int = 5,
     ) -> List[Dict[str, Any]]:
 
-        try:
-            response = await self.client.get(
-                client_code=client_code,
-                endpoint="/search",
-                params={
-                    "type": "adgeolocation",
-                    "location_types": json.dumps(
-                        ["neighborhood", "city", "zip", "region", "country"]
-                    ),
-                    "q": location_name,
-                    "limit": limit,
-                },
-            )
+        response = await meta_client.get(
+            "/search",
+            client_code=client_code,
+            params={
+                "type": "adgeolocation",
+                "location_types": json.dumps(
+                    ["neighborhood", "city", "zip", "region", "country"]
+                ),
+                "q": location_name,
+                "limit": limit,
+            },
+        )
 
-            data = response.get("data", [])
+        data = response.get("data", [])
 
-            if not data:
-                logger.warning(
-                    "No Meta geo location found",
-                    location=location_name,
-                )
-                return []
-
-            return data
-
-        except Exception as e:
-            logger.error(
-                "Meta geo location search failed",
-                error=str(e),
+        if not data:
+            logger.warning(
+                "No Meta geo location found",
                 location=location_name,
             )
-            raise InternalServerException("Failed to search Meta location")
+            return []
+
+        return data
 
     def build_geo_structure(
         self,
@@ -79,12 +66,6 @@ class MetaGeoTargetingAdapter:
             if not meta_field:
                 continue
 
-            if meta_field not in geo_payload:
-                geo_payload[meta_field] = []
-
-            geo_payload[meta_field].append({"key": key})
-
-        if not geo_payload:
-            raise InternalServerException("No valid geo locations to build")
+            geo_payload.setdefault(meta_field, []).append({"key": key})
 
         return geo_payload

@@ -1,14 +1,13 @@
 from typing import List, Dict, Any
-import os
+import asyncio
 
-from adapters.meta.client import MetaClient
-
+from adapters.meta.client import meta_client
+import structlog
+logger = structlog.get_logger()
 
 class MetaDetailedTargetingAdapter:
     """Adapter for Meta Detailed Targeting operations."""
 
-    def _get_client(self) -> MetaClient:
-        return MetaClient()
 
     def _normalize_ad_account_id(self, ad_account_id: str) -> str:
         return ad_account_id.removeprefix("act_")
@@ -21,10 +20,9 @@ class MetaDetailedTargetingAdapter:
         client_code: str,
     ) -> List[Dict[str, Any]]:
 
-        client = self._get_client()
         account_id = self._normalize_ad_account_id(ad_account_id)
 
-        response = await client.get(
+        response = await meta_client.get(
             f"/act_{account_id}/targetingsearch",
             client_code=client_code,
             params={
@@ -43,25 +41,35 @@ class MetaDetailedTargetingAdapter:
         ad_account_id: str,
         search_type: str,
         client_code: str,
-    ) -> List[Dict[str, str]]:
+    ) -> List[Dict[str, Any]]:
 
-        resolved_items = []
-
-        for name in names:
-            if not name:
-                continue
-
-            data = await self._search(
+        tasks = [
+            self._search(
                 ad_account_id=ad_account_id,
                 search_type=search_type,
                 query=name.strip(),
                 client_code=client_code,
             )
+            for name in names
+            if name
+        ]
 
-            if not data:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        resolved_items: List[Dict[str, Any]] = []
+        seen_ids = set()
+
+        for data in results:
+            if isinstance(data, Exception) or not data:
                 continue
 
             item = data[0]
+
+            item_id = item.get("id")
+            if not item_id or item_id in seen_ids:
+                continue
+
+            seen_ids.add(item_id)
 
             resolved_items.append(
                 {
@@ -85,6 +93,10 @@ class MetaDetailedTargetingAdapter:
         behaviors: List[str] | None = None,
         demographics: List[str] | None = None,
     ) -> List[Dict[str, Any]]:
+
+        logger.info("Interests from LLM", interests=interests)
+        logger.info("Behaviors from LLM", behaviors=behaviors)
+        logger.info("Demographics from LLM", demographics=demographics)
 
         flexible_spec = []
 
