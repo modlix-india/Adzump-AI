@@ -170,19 +170,42 @@ def _get_oauth_token() -> str | None:
 
 
 def _raise_google_error(response: httpx.Response) -> None:
+    """Parse Google Ads API error response and raise structured exception."""
+    error_message = f"Google Ads API failed: {response.status_code}"
+    error_context = {"status_code": response.status_code}
+
+    try:
+        # Attempt to parse Google's structured error format
+        error_payload = response.json().get("error", {})
+        if error_payload:
+            error_message = error_payload.get("message", error_message)
+
+            # Extract specific errors if available (Google Ads Failure format)
+            details_list = error_payload.get("details", [])
+            if details_list and isinstance(details_list, list):
+                # Usually the first detail contains the GoogleAdsFailure
+                failure_info = details_list[0]
+                error_context["errors"] = failure_info.get("errors", [])
+                # Extract requestId for tracing
+                if "requestId" in failure_info:
+                    error_context["google_request_id"] = failure_info["requestId"]
+    except Exception:
+        # Fallback to raw text if JSON parsing fails
+        error_context["response_text"] = response.text
+
     if response.status_code in (401, 403):
         raise GoogleAdsAuthException(
-            message=f"Google Ads API authentication failed ({response.status_code})",
-            details={"response": response.text},
+            message=f"Google Ads API authentication failed: {error_message}",
+            details=error_context,
         )
     if response.status_code == 400:
         raise GoogleAdsValidationException(
-            message="Google Ads API validation failed (400)",
-            details={"response": response.text},
+            message=f"Google Ads API validation failed: {error_message}",
+            details=error_context,
         )
     raise GoogleAPIException(
-        message=f"Google Ads API failed: {response.text}",
-        details={"status_code": response.status_code},
+        message=f"{error_message}",
+        details=error_context,
     )
 
 
