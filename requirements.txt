@@ -62,6 +62,11 @@ asyncpg>=0.2
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
 
+### ChatV2 dependencies (LangGraph + LangChain)
+langchain-openai>=0.1.0
+langchain-core>=0.2.0
+langgraph>=0.2.0
+
 ### structured logging dependencies
 structlog>=24.1.0
 
