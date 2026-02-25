@@ -12,6 +12,8 @@ from exceptions.custom_exceptions import (
 from services.business_service import BusinessService
 from utils.prompt_loader import load_prompt
 
+from pydantic import ValidationError
+
 from adapters.meta.detailed_targeting import MetaDetailedTargetingAdapter
 from adapters.meta.geo_targeting import MetaGeoTargetingAdapter
 
@@ -119,7 +121,7 @@ class MetaAdSetAgent:
             raise AIProcessingException("LLM returned empty response")
         try:
             return AdSetPayload.model_validate_json(raw_output)
-        except Exception as e:
+        except ValidationError as e:
             logger.error(
                 "Failed to parse AdSet LLM output",
                 error=str(e),
@@ -147,7 +149,7 @@ class MetaAdSetAgent:
 
         try:
             return DetailedTargeting.model_validate_json(raw_output)
-        except Exception as e:
+        except ValidationError as e:
             logger.error(
                 "Failed to parse detailed targeting output",
                 error=str(e),

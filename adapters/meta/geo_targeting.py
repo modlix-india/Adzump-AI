@@ -1,6 +1,6 @@
 import json
 import structlog
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any, List
 
 from adapters.meta.client import meta_client
 
