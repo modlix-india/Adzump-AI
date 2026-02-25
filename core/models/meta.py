@@ -41,3 +41,10 @@ class CreateAdSetRequest(BaseModel):
     ad_account_id: str = Field(..., alias="adAccountId")
     campaign_id: str = Field(..., alias="campaignId")
     adset_payload: AdSetPayload = Field(..., alias="adsetPayload")
+
+
+class DetailedTargeting(BaseModel):
+    interests: List[str] = []
+    behaviors: List[str] = []
+    demographics: List[str] = []
+
