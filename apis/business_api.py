@@ -32,7 +32,7 @@ async def take_screenshot(
         url=target_url,
         retake=payload.retake,
     )
-    return success_response(result.model_dump())
+    return success_response(result)
 
 
 @router.post("/websiteSummary")
@@ -49,7 +49,7 @@ async def analyze_website(
         x_forwarded_host=headers.x_forwarded_host,
         x_forwarded_port=headers.x_forwarded_port,
     )
-    return success_response(result.model_dump())
+    return success_response(result)
 
 
 @router.post("/generate/external-summary")
@@ -66,7 +66,7 @@ async def generate_external_summary(
         x_forwarded_host=headers.x_forwarded_host,
         x_forwarded_port=headers.x_forwarded_port,
     )
-    return success_response(result.model_dump())
+    return success_response(result)
 
 
 @router.post("/generate/pdf-summary")

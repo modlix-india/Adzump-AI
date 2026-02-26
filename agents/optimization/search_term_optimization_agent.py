@@ -29,11 +29,15 @@ class SearchTermOptimizationAgent:
             logger.info("No accessible accounts found", client_code=client_code)
             return {"recommendations": []}
 
-        campaign_mapping = await campaign_mapping_service.get_campaign_mapping_with_summary(client_code)
+        campaign_mapping = (
+            await campaign_mapping_service.get_campaign_mapping_with_summary(
+                client_code
+            )
+        )
 
-        results = await asyncio.gather(*[
-            self._process_account(acc, campaign_mapping) for acc in accounts
-        ])
+        results = await asyncio.gather(
+            *[self._process_account(acc, campaign_mapping) for acc in accounts]
+        )
         all_recs = [r for recs in results for r in recs]
 
         for rec in all_recs:
@@ -41,16 +45,25 @@ class SearchTermOptimizationAgent:
 
         return {"recommendations": [r.model_dump() for r in all_recs]}
 
-    async def _process_account(self, account: dict, campaign_mapping: dict) -> list[CampaignRecommendation]:
+    async def _process_account(
+        self, account: dict, campaign_mapping: dict
+    ) -> list[CampaignRecommendation]:
         account_id = account["customer_id"]
         parent_id = account["login_customer_id"]
 
-        search_terms = await self.search_term_adapter.fetch_search_terms(account_id, parent_id)
+        search_terms = await self.search_term_adapter.fetch_search_terms(
+            account_id, parent_id
+        )
         if not search_terms:
             return []
 
         campaigns = self._group_by_campaign(search_terms)
-        logger.info("Search terms fetched", account_id=account_id, total=len(search_terms), campaigns=len(campaigns))
+        logger.info(
+            "Search terms fetched",
+            account_id=account_id,
+            total=len(search_terms),
+            campaigns=len(campaigns),
+        )
 
         recommendations = []
         for cid, data in campaigns.items():
@@ -58,44 +71,56 @@ class SearchTermOptimizationAgent:
             if not mapping or not mapping.get("summary"):
                 continue
 
-            logger.info("Processing campaign", campaign_id=cid, term_count=len(data["terms"]))
+            logger.info(
+                "Processing campaign", campaign_id=cid, term_count=len(data["terms"])
+            )
 
-            keywords, negative_keywords = await self._analyze_terms(data["terms"], mapping["summary"])
+            keywords, negative_keywords = await self._analyze_terms(
+                data["terms"], mapping["summary"]
+            )
             if not keywords and not negative_keywords:
                 continue
 
-            recommendations.append(CampaignRecommendation(
-                _id=None,
-                platform="GOOGLE",
-                parent_account_id=parent_id,
-                account_id=account_id,
-                product_id=mapping["product_id"],
-                campaign_id=cid,
-                campaign_name=data["name"],
-                campaign_type="SEARCH",
-                completed=False,
-                fields=OptimizationFields(
-                    keywords=keywords or None,
-                    negativeKeywords=negative_keywords or None,
-                ),
-            ))
+            recommendations.append(
+                CampaignRecommendation(
+                    _id=None,
+                    platform="GOOGLE",
+                    parent_account_id=parent_id,
+                    account_id=account_id,
+                    product_id=mapping["product_id"],
+                    campaign_id=cid,
+                    campaign_name=data["name"],
+                    campaign_type="SEARCH",
+                    completed=False,
+                    fields=OptimizationFields(
+                        keywords=keywords or None,
+                        negativeKeywords=negative_keywords or None,
+                    ),
+                )
+            )
 
-        logger.info("Account processed", account_id=account_id, campaigns=len(recommendations))
+        logger.info(
+            "Account processed", account_id=account_id, campaigns=len(recommendations)
+        )
         return recommendations
 
     async def _analyze_terms(
         self, terms: list, summary: str
     ) -> tuple[list[KeywordRecommendation], list[KeywordRecommendation]]:
-        results = await asyncio.gather(*[
-            self.analyzer.analyze_term(summary, t["search_term"], t["metrics"])
-            for t in terms
-        ])
+        results = await asyncio.gather(
+            *[
+                self.analyzer.analyze_term(summary, t["search_term"], t["metrics"])
+                for t in terms
+            ]
+        )
 
         keywords, negative_keywords = [], []
         for t, r in zip(terms, results):
             text = r["text"]
             if len(text) > KEYWORD_MAX_LENGTH:
-                logger.info("Skipping long search term", text=text[:50], length=len(text))
+                logger.info(
+                    "Skipping long search term", text=text[:50], length=len(text)
+                )
                 continue
             match_type = _normalize_match_type(t["match_type"])
             rec = KeywordRecommendation(
@@ -104,8 +129,8 @@ class SearchTermOptimizationAgent:
                 reason=r["reason"],
                 metrics=r["metrics"],
                 analysis=SearchTermAnalysis(**r["analysis"]),
-                ad_group_id=None,
-                ad_group_name=None,
+                ad_group_id=t.get("ad_group_id"),
+                ad_group_name=t.get("ad_group_name"),
                 criterion_id=None,
                 resource_name=None,
             )
@@ -120,11 +145,14 @@ class SearchTermOptimizationAgent:
     def _group_by_campaign(search_terms: list) -> dict[str, dict]:
         campaigns: dict[str, dict] = {}
         for term in search_terms:
-            group = campaigns.setdefault(term["campaign_id"], {
-                "name": term["campaign_name"],
-                "type": term["campaign_type"],
-                "terms": [],
-            })
+            group = campaigns.setdefault(
+                term["campaign_id"],
+                {
+                    "name": term["campaign_name"],
+                    "type": term["campaign_type"],
+                    "terms": [],
+                },
+            )
             group["terms"].append(term)
         return campaigns
 
@@ -144,5 +172,6 @@ _SEARCH_TERM_TO_KEYWORD_MATCH: dict[str, str] = {
 
 def _normalize_match_type(search_term_match_type: str | None) -> str:
     return _SEARCH_TERM_TO_KEYWORD_MATCH.get(search_term_match_type or "", "BROAD")
+
 
 search_term_optimization_agent = SearchTermOptimizationAgent()

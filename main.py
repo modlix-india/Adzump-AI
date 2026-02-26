@@ -15,6 +15,7 @@ from apis.business_api import router as business_router
 from mlops.google_search.performance.prediction_api import router as performance_router
 from mlops.google_search.budget_prediction.api import router as budget_router
 from apis.maps import router as maps_router
+from apis.competitor_api import router as competitor_router
 from exceptions.handlers import setup_exception_handlers
 from feedback.keyword.api import router as feedback_router
 from core.infrastructure.middleware import AuthContextMiddleware
@@ -53,5 +54,6 @@ if not os.getenv("SKIP_ML_MODELS"):
 app.include_router(feedback_router)
 app.include_router(meta_ads_router)
 app.include_router(optimization_router)
+app.include_router(competitor_router)
 
 setup_exception_handlers(app)
