@@ -37,15 +37,23 @@ FIELD_REGISTRY: dict[str, FieldDef] = {
     ),
     "budget": FieldDef(
         type=str,
-        description="Advertising budget (numeric value, e.g., 5000 or 5k)",
+        description="Daily advertising budget (numeric value, e.g., 5000 or 5k)",
         validator="parse_and_validate_budget",
         error_msg="Please provide budget as a number, e.g. 5000 or 5k",
+        required=False,
     ),
     "durationDays": FieldDef(
         type=int,
         description="Campaign duration in days (numeric value, e.g., 7 or 14)",
         validator="validate_duration",
         error_msg="How many days should the campaign run? e.g. 7 or 14",
+    ),
+    "targetLeads": FieldDef(
+        type=int,
+        description="Target number of leads/conversions for Google campaigns (e.g., 50 or 100)",
+        validator="validate_target_leads",
+        error_msg="Please provide a number of leads, e.g. 50 or 100",
+        required=False,
     ),
 }
 

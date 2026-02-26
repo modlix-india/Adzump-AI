@@ -54,15 +54,6 @@ async def collect_data_node(state: ChatState) -> dict[str, Any]:
     _emit_reasoning(writer, tool_calls)
     ad_plan, tool_result = await _process_tool_call(tool_calls, ad_plan, writer)
 
-    if tool_result:
-        reply_text = await _get_followup_response(
-            state, tool_calls, response, tool_result
-        )
-    elif not reply_text.strip() and tool_calls:
-        reply_text = await _get_continuation_response(state, ad_plan)
-
-    response_message = reply_text.strip()
-
     if _has_all_fields(ad_plan):
         new_status = ChatStatus.SELECTING_PARENT_ACCOUNT
         platform = ad_plan.get("platform", "google")
@@ -75,9 +66,16 @@ async def collect_data_node(state: ChatState) -> dict[str, Any]:
                 "content": f"All details collected! Moving to {label} account selection...",
             }
         )
-        # Override LLM response — the next node (account fetch) will provide the actual response
+        # Skip follow-up LLM call — next node will provide the response
         response_message = ""
     else:
+        if tool_result:
+            reply_text = await _get_followup_response(
+                state, tool_calls, response, tool_result
+            )
+        elif not reply_text.strip() and tool_calls:
+            reply_text = await _get_continuation_response(state, ad_plan)
+        response_message = reply_text.strip()
         new_status = state["status"]
 
     return {
@@ -155,7 +153,8 @@ async def _get_followup_response(
 async def _get_continuation_response(state: ChatState, ad_plan: dict) -> str:
     """Get AI response when tool succeeded but LLM didn't provide conversational reply."""
     context = _build_context(ad_plan)
-    missing = [f for f in REQUIRED_FIELDS if f not in ad_plan]
+    required = _get_dynamic_required(ad_plan)
+    missing = [f for f in required if f not in ad_plan]
     messages = [
         SystemMessage(content=_get_system_prompt()),
         *state["messages"],
@@ -169,7 +168,12 @@ async def _get_continuation_response(state: ChatState, ad_plan: dict) -> str:
 
 
 def _has_all_fields(ad_plan: dict) -> bool:
-    return all(field in ad_plan for field in REQUIRED_FIELDS)
+    if not all(f in ad_plan for f in REQUIRED_FIELDS):
+        return False
+    platform = ad_plan.get("platform")
+    if platform == "google":
+        return "budget" in ad_plan or "targetLeads" in ad_plan
+    return "budget" in ad_plan
 
 
 def _emit_reasoning(writer: Callable, tool_calls: list) -> None:
@@ -187,11 +191,26 @@ def _emit_reasoning(writer: Callable, tool_calls: list) -> None:
             )
 
 
+def _get_dynamic_required(ad_plan: dict) -> list[str]:
+    """Required fields based on current platform context."""
+    base = list(REQUIRED_FIELDS)
+    platform = ad_plan.get("platform")
+    if not platform:
+        return base
+    if platform == "google":
+        if "budget" not in ad_plan:
+            base.append("targetLeads")
+    else:
+        base.append("budget")
+    return base
+
+
 def _build_context(ad_plan: dict) -> str:
     """Build context message with collected values and missing fields."""
-    collected = {f: ad_plan[f] for f in REQUIRED_FIELDS if f in ad_plan}
-    missing = [f for f in REQUIRED_FIELDS if f not in ad_plan]
-    total = len(REQUIRED_FIELDS)
+    required = _get_dynamic_required(ad_plan)
+    collected = {f: ad_plan[f] for f in required if f in ad_plan}
+    missing = [f for f in required if f not in ad_plan]
+    total = len(required)
     n = len(collected)
     if not collected:
         return (

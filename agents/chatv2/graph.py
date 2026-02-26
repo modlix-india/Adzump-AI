@@ -14,6 +14,9 @@ Flow Diagram:
               collect_data
                    │
                    ▼ (all fields → SELECTING_PARENT_ACCOUNT)
+              predict_budget
+                   │ (Google + targetLeads → predict, else passthrough)
+                   ▼
               fetch_parent_account
                    │
               ┌────┴────┐
@@ -37,6 +40,7 @@ from structlog import get_logger
 
 from agents.chatv2.nodes import (
     collect_data_node,
+    predict_budget_node,
     confirm_node,
     show_summary_node,
     fetch_parent_account_options,
@@ -50,6 +54,7 @@ from core.chatv2.models import ChatStatus
 logger = get_logger(__name__)
 
 COLLECT_DATA = "collect_data"
+PREDICT_BUDGET = "predict_budget"
 FETCH_PARENT_ACCOUNT = "fetch_parent_account"
 SELECT_PARENT_ACCOUNT = "select_parent_account"
 FETCH_ACCOUNT = "fetch_account"
@@ -80,6 +85,7 @@ def _build_graph() -> CompiledStateGraph:
     graph = StateGraph[ChatState, None, ChatState, ChatState](ChatState)
 
     graph.add_node(COLLECT_DATA, collect_data_node)
+    graph.add_node(PREDICT_BUDGET, predict_budget_node)
     graph.add_node(FETCH_PARENT_ACCOUNT, fetch_parent_account_options)
     graph.add_node(SELECT_PARENT_ACCOUNT, select_parent_account_node)
     graph.add_node(FETCH_ACCOUNT, fetch_account_options)
@@ -101,6 +107,11 @@ def _build_graph() -> CompiledStateGraph:
     graph.add_conditional_edges(
         COLLECT_DATA,
         _route_after_collect,
+        {PREDICT_BUDGET: PREDICT_BUDGET, END: END},
+    )
+    graph.add_conditional_edges(
+        PREDICT_BUDGET,
+        _route_after_predict,
         {FETCH_PARENT_ACCOUNT: FETCH_PARENT_ACCOUNT, END: END},
     )
     graph.add_conditional_edges(
@@ -131,7 +142,14 @@ def _route_entry(state: ChatState) -> str:
 
 
 def _route_after_collect(state: ChatState) -> str:
-    """After collection: proceed to fetch only when all fields are collected."""
+    """After collection: proceed to budget prediction when all fields are collected."""
+    if _get_status(state) == ChatStatus.SELECTING_PARENT_ACCOUNT:
+        return PREDICT_BUDGET
+    return END
+
+
+def _route_after_predict(state: ChatState) -> str:
+    """After prediction: proceed to account fetch if budget is set, else back to collect."""
     if _get_status(state) == ChatStatus.SELECTING_PARENT_ACCOUNT:
         return FETCH_PARENT_ACCOUNT
     return END

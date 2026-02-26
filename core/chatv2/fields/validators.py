@@ -192,9 +192,23 @@ def validate_platform(value: str) -> ValidatorResult:
     return None, "Please specify 'google' or 'meta' as the platform"
 
 
+def validate_target_leads(value: int | str) -> ValidatorResult:
+    """Validate target leads count. Returns (normalized_value, error)."""
+    try:
+        leads = int(value)
+        if leads <= 0:
+            return None, "Target leads must be a positive number"
+        if leads > 100000:
+            return None, "Target leads seems too high, please provide a realistic number"
+        return leads, None
+    except (ValueError, TypeError):
+        return None, "Target leads must be a valid number"
+
+
 VALIDATORS = {
     "validate_website": validate_website,
     "parse_and_validate_budget": parse_and_validate_budget,
     "validate_duration": validate_duration,
     "validate_platform": validate_platform,
+    "validate_target_leads": validate_target_leads,
 }
