@@ -18,6 +18,9 @@ class BusinessMetadata(BaseModel):
     unique_features: List[str] = Field(
         default_factory=list, description="Unique business features"
     )
+    business_summary: str = Field(
+        default="", description="Summary of the business used for context"
+    )
 
     @classmethod
     def from_raw_data(cls, data: dict) -> "BusinessMetadata":
@@ -100,6 +103,8 @@ class WebsiteSummaryResponse(BaseModel):
     location: Optional[LocationInfo] = None
     suggested_geo_targets: Optional[List[dict]] = None
     unresolved_locations: Optional[List[str]] = None
+    competitors: Optional[List[dict]] = None
+    competitor_analysis: Optional[List[dict]] = None
 
 
 class WarningType(str, Enum):
