@@ -32,6 +32,13 @@ class MetaAdSetAgent:
 
     async def generate_payload(self, session_id: str, ad_account_id: str) -> dict:
         website_data = await self.business_service.fetch_website_data(session_id)
+
+        logger.info(
+            "meta_adset_geo.website_data_fetched",
+            storage_id=getattr(website_data, "storage_id", None),
+            suggested_geo_direct=getattr(website_data, "suggested_geo_targets", None),
+        )
+
         summary = website_data.final_summary or website_data.summary
 
         if not summary:
@@ -50,12 +57,24 @@ class MetaAdSetAgent:
 
         detailed_targeting = await self._generate_detailed_targeting(summary)
 
+        logger.info(
+            "meta_adset_detailed.llm_output",
+            interests=detailed_targeting.interests,
+            behaviors=detailed_targeting.behaviors,
+            demographics=detailed_targeting.demographics,
+        )
+
         flexible_spec = await self.targeting_adapter.build_flexible_spec(
             ad_account_id=ad_account_id,
             client_code=auth_context.client_code,
             interests=detailed_targeting.interests,
             behaviors=detailed_targeting.behaviors,
             demographics=detailed_targeting.demographics,
+        )
+
+        logger.info(
+            "meta_adset_detailed.flexible_spec_result",
+            flexible_spec_count=len(flexible_spec),
         )
 
         suggested_geo_targets = getattr(website_data, "suggested_geo_targets", None)
@@ -65,9 +84,20 @@ class MetaAdSetAgent:
                 website_data.storage_id
             )
 
+        logger.info(
+            "meta_adset_geo.final_suggested_targets",
+            suggested_geo_targets=suggested_geo_targets,
+        )
+
         allowed_countries = getattr(website_data, "special_ad_category_country", None)
         if allowed_countries and isinstance(allowed_countries, str):
             allowed_countries = [allowed_countries]
+
+        logger.info(
+            "meta_adset_geo.enter_build_locations",
+            suggested_geo_targets=suggested_geo_targets,
+            allowed_countries=allowed_countries,
+        )
 
         locations = await self._build_locations(
             suggested_geo_targets=suggested_geo_targets,
@@ -220,10 +250,18 @@ class MetaAdSetAgent:
         allowed_countries,
     ) -> dict | None:
 
+        logger.info(
+            "meta_adset_geo.entering_build_locations",
+            suggested_geo_targets=suggested_geo_targets,
+            allowed_countries=allowed_countries,
+        )
+
         if not suggested_geo_targets:
+            logger.info("meta_adset_geo.no_suggested_targets")
             return None
 
         async def resolve_target(target):
+            logger.info("meta_adset_geo.resolving_target", target=target)
             results = await self.geo_targeting_adapter.search_locations(
                 client_code=auth_context.client_code,
                 location_name=target.get("canonicalName"),
@@ -262,7 +300,14 @@ class MetaAdSetAgent:
             if r and not isinstance(r, Exception)
         ]
 
+        logger.info(
+            "meta_adset_geo.resolved_valid_locations",
+            count=len(valid_locations),
+            locations=valid_locations,
+        )
+
         if not valid_locations:
+            logger.info("meta_adset_geo.no_valid_locations_after_resolve")
             return None
 
         return self.geo_targeting_adapter.build_geo_structure(valid_locations)

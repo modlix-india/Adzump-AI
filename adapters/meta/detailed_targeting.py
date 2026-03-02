@@ -147,5 +147,9 @@ class MetaDetailedTargetingAdapter:
                     }
                 )
 
+        logger.info(
+            "meta_adset_detailed.flexible_spec_built",
+            count=len(flexible_spec),
+        )
 
         return flexible_spec
