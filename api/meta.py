@@ -7,6 +7,7 @@ from core.models.meta import CreateCreativeRequest
 from agents.meta.creative_agent import meta_creative_agent
 
 
+
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
 
 
@@ -17,8 +18,11 @@ async def generate_campaign(session_id: str = Query(..., alias="sessionId")):
 
 
 @router.post("/adset/generate")
-async def generate_adset(session_id: str = Query(..., alias="sessionId")):
-    result = await meta_adset_agent.generate_payload(session_id)
+async def generate_adset(
+    session_id: str = Query(..., alias="sessionId"),
+    ad_account_id: str = Query(..., alias="adAccountId"),
+):
+    result = await meta_adset_agent.generate_payload(session_id, ad_account_id)
     return success_response(data=result)
 
 
