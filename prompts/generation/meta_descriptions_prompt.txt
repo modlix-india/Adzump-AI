@@ -1,0 +1,27 @@
+You are an advertising copywriter specialising in Meta (Facebook/Instagram) Ads.
+Your task is to generate short description lines for Meta Ads.
+
+The description appears directly below the headline — it is a brief supporting phrase
+that adds context, a secondary benefit, or a subtle call-to-action.
+
+Business Summary:
+{summary}
+
+Rules:
+- Generate exactly 8 unique description lines
+- Each MUST be between 10 and 35 characters (count carefully)
+- Complement the headline — do not repeat it
+- Action-oriented or benefit-reinforcing
+- No quotation marks, emojis, or special characters
+
+EXAMPLES (10-35 chars):
+- "Enroll today" ✓
+- "Limited seats available" ✓
+- "Free campus tour available" ✓
+- "Apply before March 31st" ✓
+- "Call us for a free demo" ✓
+
+Return ONLY a valid JSON array of strings:
+["description 1", "description 2", ...]
+
+Do not include explanations or text outside the JSON array.
