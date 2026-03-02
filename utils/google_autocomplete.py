@@ -37,14 +37,15 @@ async def fetch_autocomplete_suggestions(
         limited_suggestions = suggestions[:max_results]
 
         logger.debug(
-            f"Autocomplete suggestions for '{seed_keyword}'",
+            "autocomplete.suggestions_fetched",
+            seed=seed_keyword,
             count=len(limited_suggestions),
         )
 
         return limited_suggestions
 
     except Exception as e:
-        logger.warning(f"Autocomplete error for '{seed_keyword}': {e}")
+        logger.warning("autocomplete.fetch_failed", seed=seed_keyword, error=str(e))
         raise GoogleAutocompleteException(
             message=f"Autocomplete failed for '{seed_keyword}'",
             details={"error": str(e)},
@@ -59,7 +60,7 @@ async def batch_fetch_autocomplete_suggestions(
     language: str = "en",
 ) -> List[str]:
     """Fetch autocomplete suggestions for multiple seed keywords in parallel."""
-    logger.info(f"Fetching autocomplete suggestions for {len(seed_keywords)} seeds")
+    logger.info("autocomplete.batch_started", seeds=len(seed_keywords))
 
     # Get client once for the batch
     client = get_httpx_client()

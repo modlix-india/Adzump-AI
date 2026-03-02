@@ -117,3 +117,7 @@ def _deduplicate(seen: dict[str, dict], entry: dict) -> None:
     existing = seen.get(keyword)
     if existing is None or entry["volume"] > existing["volume"]:
         seen[keyword] = entry
+
+
+# Singleton instance
+keyword_planner_adapter = GoogleKeywordPlannerAdapter()
