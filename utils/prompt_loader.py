@@ -39,16 +39,17 @@ def build_template_variables(template: str, context: Dict[str, Any]) -> Dict[str
         if value is None:
             continue
         if key == "scraped_data":
+            format_dict["scraped_data"] = value
             if "{content_summary}" in template:
                 format_dict["content_summary"] = safe_truncate_to_sentence(
                     str(value), 2000
                 )
             if "{business_summary}" in template:
-                format_dict["business_summary"] = safe_truncate_to_sentence(
-                    str(value), 2500
-                )
-            else:
-                format_dict["scraped_data"] = value
+                # Only populate if not already provided in context to avoid overwriting
+                if "business_summary" not in context:
+                    format_dict["business_summary"] = safe_truncate_to_sentence(
+                        str(value), 2500
+                    )
             continue
         if key == "brand_info" and hasattr(value, "brand_name"):
             format_dict["brand_name"] = value.brand_name

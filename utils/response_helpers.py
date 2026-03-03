@@ -1,10 +1,12 @@
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from typing import Any, Dict, Optional
 
 
 def success_response(data: Any):
     return JSONResponse(
-        content={"success": True, "data": data, "error": None}, status_code=200
+        content={"success": True, "data": jsonable_encoder(data), "error": None},
+        status_code=200,
     )
 
 

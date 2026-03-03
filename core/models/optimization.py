@@ -44,6 +44,7 @@ class AgeFieldRecommendation(BaseModel):
 
 
 class GenderFieldRecommendation(BaseModel):
+    resource_name: Optional[str] = None
     ad_group_id: str = Field(..., min_length=1)
     ad_group_name: str = Field(..., min_length=1)
     gender_type: GenderType
