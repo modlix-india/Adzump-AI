@@ -6,7 +6,7 @@ All optimization agents share: `api/optimization.py` entry point, `CampaignRecom
 
 | File | Purpose |
 |------|---------|
-| `api/optimization.py` | API routes (`/api/ds/optimize/{age,search-terms,keywords,locations}`) |
+| `api/optimization.py` | API routes (`/api/ds/optimize/{age,search-terms,keywords,locations,gender}`) |
 | `adapters/google/accounts.py` | Fetch accessible accounts for a client |
 | `core/models/optimization.py` | `CampaignRecommendation`, `KeywordRecommendation`, `OptimizationFields` |
 | `core/services/recommendation_storage.py` | Store recommendations, merge by origin |
@@ -318,6 +318,89 @@ Impressions, clicks, conversions, cost (INR), CTR (%), avg CPC (INR), CPL (INR),
 
 ---
 
+## 5. Gender Optimization
+
+`POST /api/ds/optimize/gender` → `GenderOptimizationAgent`
+
+### Flow
+
+```mermaid
+sequenceDiagram
+    participant API
+    participant AGT as GenderOptimizationAgent
+    participant ADP as GoogleGenderAdapter
+    participant EXT as External APIs
+
+    API->>AGT: generate_recommendations(client_code)
+
+    par Phase 1
+        AGT->>EXT: Fetch accounts
+        AGT->>EXT: Campaign-product mapping
+    end
+
+    loop Per Account (parallel)
+        par Dual GAQL Queries
+            AGT->>ADP: PERFORMANCE_QUERY (gender_view)
+            AGT->>ADP: TARGETING_QUERY (ad_group_criterion)
+        end
+        ADP->>ADP: _merge_metrics_with_targeting()
+        AGT->>AGT: Filter to linked campaigns
+        AGT->>AGT: Group by ad_group_id
+
+        loop Per Ad Group (parallel)
+            AGT->>EXT: Analyze metrics [LLM: GPT-4o-mini]
+            EXT-->>AGT: JSON recommendations (ADD/REMOVE)
+            AGT->>AGT: _build_targeting_lookups()
+            AGT->>AGT: _parse_llm_response() + hydrate resource_names
+            AGT->>AGT: _filter_gender_recs() [guardrails]
+        end
+    end
+
+    AGT->>AGT: Store all recommendations
+    AGT-->>API: {recommendations}
+```
+
+### File Map
+
+| File | Purpose |
+|------|---------|
+| `agents/optimization/gender_optimization_agent.py` | Orchestrator — accounts, ad groups, LLM analysis, guardrails |
+| `adapters/google/optimization/gender.py` | Dual GAQL queries (performance + targeting), merged into domain dicts |
+| `adapters/google/optimization/_metrics.py` | Shared `build_metrics()` for derived metrics (CTR, CPC, CPL) |
+| `prompts/optimization/gender_optimization_prompt.txt` | LLM analysis prompt |
+| `core/models/optimization.py` | `GenderFieldRecommendation`, `GenderType`, `GENDER_RANGE_VALUES` |
+
+### How It Works
+
+- Adapter runs two **parallel GAQL queries**: `PERFORMANCE_QUERY` (gender_view for metrics) and `TARGETING_QUERY` (ad_group_criterion for targeting state)
+- `_merge_metrics_with_targeting()` transforms raw Google Ads data into flat domain dicts — each entry is one gender's performance in one ad group with `is_targeted`, `resource_name`, and `targeted_genders`
+- Agent filters to linked campaigns (stamping `product_id`), groups by ad group
+- Each ad group's metrics sent to GPT-4o-mini → returns ADD/REMOVE recommendations per gender
+- `_build_targeting_lookups()` builds active_genders and resource_name maps in a single pass
+- `_parse_llm_response()` hydrates REMOVE recommendations with resource_names from targeting data
+- `_filter_gender_recs()` applies three guardrail rules
+
+### Guardrail Filtering
+
+| Rule | What It Blocks |
+|------|----------------|
+| All-REMOVE | Ad groups where every gender would be removed (prevents blank targeting) |
+| Redundant ADD | Adding a gender that's already targeted |
+| Orphaned REMOVE | Removing a gender without a `resource_name` (can't execute the mutation) |
+
+### LLM Calls Per Ad Group
+
+- 1 call (gpt-4o-mini)
+
+### Unique Patterns
+
+Gender introduced patterns not in other agents:
+1. **Dual-query adapter** with parallel `asyncio.gather` and merge
+2. **Post-LLM guardrail filtering** to prevent nonsensical recommendations
+3. **Resource name hydration** — enriches LLM output with Google Ads identifiers needed for mutations
+
+---
+
 ## Architecture Overview
 
 ```mermaid
@@ -326,11 +409,13 @@ graph TD
     API --> ST[SearchTermOptimizationAgent]
     API --> AGE[AgeOptimizationAgent]
     API --> LOC[LocationOptimizationAgent]
+    API --> GEN[GenderOptimizationAgent]
 
     KW --> ACC[GoogleAccountsAdapter]
     ST --> ACC
     AGE --> ACC
     LOC --> ACC
+    GEN --> ACC
 
     KW --> KWA[GoogleKeywordAdapter]
     KW --> EVL[MetricPerformanceEvaluator]
@@ -349,10 +434,13 @@ graph TD
     LOC --> LCA[GoogleLocationAdapter]
     LOC --> LCE[LocationEvaluator]
 
+    GEN --> GENA[GoogleGenderAdapter]
+
     KW --> STR[RecommendationStorage]
     ST --> STR
     AGE --> STR
     LOC --> STR
+    GEN --> STR
 
     SE --> OAI[OpenAI / Embeddings]
     KIS --> OAI
@@ -360,4 +448,5 @@ graph TD
     ANA --> OAI
     AGE --> OAI
     BCS --> OAI
+    GEN --> OAI
 ```

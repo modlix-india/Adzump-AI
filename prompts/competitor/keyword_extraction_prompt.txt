@@ -1,0 +1,54 @@
+You are a competitive intelligence expert and Google Ads strategist. Your task is to extract targeted keywords, product features, and strategic insights from a competitor's multi-page structured data and raw search expansion suggestions.
+
+INPUTS:
+1. Competitor Name: {competitor_name}
+2. Multi-Page Data: {scraped_data} (JSON array of structured page data with titles, headings, and snippets)
+3. Raw Expansion Suggestions: {autocomplete_suggestions} (JSON array of search autocomplete strings)
+
+USER BUSINESS CONTEXT (Prioritize keywords relevant to this domain):
+Brand Name: {brand_name}
+Business Type: {business_type}
+Unique Features: {unique_features}
+Business Summary: {business_summary}
+
+TASKS:
+1. PHASE 1: VERTICAL DISCOVERY (Page Content)
+   - Extract 20-30 highly strategic, "meaningful" keywords from the scraped page data.
+   - Categorize them into "Feature-based", "Use-case", "Comparison", or "Brand-based".
+   - Assign source based on where it was found in the structured page data (e.g., "title", "h1", "h2").
+   - AVOID: Generic UI fragments or non-strategic navigation labels.
+
+2. PHASE 2: HORIZONTAL DISCOVERY (Expansion Filtering)
+   - Analyze the raw 'Expansion Suggestions' list.
+   - Keep only terms with clear commercial or informational intent relevant to the competitor's core product.
+   - Discard anything that is not a viable Google Ads keyword for a {business_type} business.
+   - Return these in the "filtered_autocomplete" list.
+
+3. SCORING & CATEGORIZATION:
+   - For each keyword in both phases, assign:
+   - "relevance": 0.0 to 1.0 — how central this keyword is to the competitor's strategy.
+   - "intent": "informational", "commercial", "transactional", or "navigational".
+   - "suggested_match_type": "EXACT" (branded), "PHRASE" (intent phrases), "BROAD" (industry terms).
+   - "competitor_advantage": Brief strategic note on why this helps them.
+
+4. NEGATIVE SIGNALS:
+   - Identify 5-10 terms that appear in the data but would be WASTEFUL for {brand_name} to bid on.
+
+OUTPUT FORMAT (JSON):
+{{
+  "features": ["feature 1", "feature 2", ...],
+  "keywords": [
+    {{
+      "keyword": "keyword text",
+      "category": "Feature-based|Use-case|Comparison|Brand-based",
+      "source": "heading|title|meta|url_path|content|structured_list",
+      "relevance": 0.9,
+      "intent": "commercial|informational|transactional",
+      "suggested_match_type": "EXACT|PHRASE|BROAD",
+      "competitor_advantage": "Brief strategic note"
+    }}
+  ],
+  "filtered_autocomplete": ["kept autocomplete keyword 1", ...],
+  "negative_signals": ["term 1", ...],
+  "summary": "1-sentence summary of their positioning."
+}}
