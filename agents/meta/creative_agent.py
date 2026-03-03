@@ -21,7 +21,7 @@ from exceptions.custom_exceptions import (
 )
 from services.business_service import BusinessService
 from services.session_manager import sessions
-from agents.shared.genai import generate_images
+from adapters.gemini.client import generate_images
 from agents.shared.llm import chat_completion
 from utils.prompt_loader import load_prompt
 from adapters.meta.images import MetaAdImageAdapter
@@ -119,6 +119,11 @@ class MetaCreativeAgent:
         if not ad_account_id:
             raise BusinessValidationException("adAccountId is required to generate image")    
 
+        logger.info(
+            "Generating image generation intent", 
+            summary=summary,
+            visual_directive=strategy_json
+        )
         image_intent_raw = await chat_completion(
             [{"role": "user", "content": IMAGE_INTENT_PROMPT.format(
                 summary=summary,
@@ -146,13 +151,16 @@ class MetaCreativeAgent:
             logger.info("Meta creative image saved", image_hash=image_hash)
             return CreativeImage(image_hash=image_hash)
 
+        except AIProcessingException:
+            raise
+
         except Exception as e:
             logger.error(
                 "Image generation or upload failed",
                 error=str(e),
                 error_type=type(e).__name__
             )
-            raise AIProcessingException(f"Image generation failed: {str(e)}")
+            raise AIProcessingException(f"Image generation failed: {str(e)}") from e
 
     async def create_creative(
         self, 

@@ -22,7 +22,7 @@ async def text_completion(
     """
     client = get_client()
 
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model=model,
         contents=[prompt],
     )
@@ -41,7 +41,7 @@ async def generate_images(
     """
     client = get_client()
 
-    response = client.models.generate_content(
+    response = await client.aio.models.generate_content(
         model=model,
         contents=[prompt],
         config=types.GenerateContentConfig(

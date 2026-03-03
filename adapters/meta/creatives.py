@@ -1,13 +1,11 @@
 from typing import Any
-from datetime import datetime
+from datetime import datetime, UTC
 
-from adapters.meta.client import MetaClient
+from adapters.meta.client import meta_client
 from core.infrastructure.context import auth_context
 
 
 class MetaCreativeAdapter:
-    def _get_client(self) -> MetaClient:
-        return MetaClient(meta_token)
 
     def _normalize_ad_account_id(self, ad_account_id: str) -> str:
         return ad_account_id.removeprefix("act_")
@@ -18,7 +16,6 @@ class MetaCreativeAdapter:
         creative_payload: dict[str, Any],
         page_id: str,
     ) -> dict[str, Any]:
-        client = self._get_client()
         account_id = self._normalize_ad_account_id(ad_account_id)
 
         text = creative_payload["text"]
@@ -50,12 +47,12 @@ class MetaCreativeAdapter:
 
 
         payload = {
-            "name": f"Creative {datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+            "name": f"Creative {datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
             "object_story_spec": object_story_spec,
             "asset_feed_spec": asset_feed_spec,
         }
 
-        return await client.post(
+        return await meta_client.post(
             f"/act_{account_id}/adcreatives",
             auth_context.client_code,
             json=payload,

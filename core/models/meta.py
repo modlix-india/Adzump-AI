@@ -43,6 +43,12 @@ class CreateAdSetRequest(BaseModel):
     adset_payload: AdSetPayload = Field(..., alias="adsetPayload")
 
 
+class DetailedTargeting(BaseModel):
+    interests: List[str] = []
+    behaviors: List[str] = []
+    demographics: List[str] = []    
+
+
 class CallToAction(str, Enum):
     APPLY_NOW = "APPLY_NOW"
     BOOK_NOW = "BOOK_NOW"
