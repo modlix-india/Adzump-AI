@@ -1,16 +1,11 @@
-from functools import lru_cache
+import base64
 import os
 from typing import List
 
-from google import genai
-from google.genai import types
+import httpx
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-
-@lru_cache(maxsize=1)
-def get_client() -> genai.Client:
-    return genai.Client(api_key=GEMINI_API_KEY)
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
 async def text_completion(
@@ -18,16 +13,29 @@ async def text_completion(
     model: str = "gemini-2.0-flash",
 ) -> str:
     """
-    Generate text completion using Gemini text model.
+    Generate text completion using Gemini REST API.
     """
-    client = get_client()
+    url = f"{GEMINI_BASE_URL}/{model}:generateContent"
+    payload = {
+        "contents": [
+            {"parts": [{"text": prompt}]}
+        ]
+    }
 
-    response = await client.aio.models.generate_content(
-        model=model,
-        contents=[prompt],
-    )
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            url,
+            params={"key": GEMINI_API_KEY},
+            json=payload,
+        )
+        response.raise_for_status()
 
-    return response.text
+    data = response.json()
+
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError) as e:
+        raise ValueError(f"Unexpected Gemini response structure: {data}") from e
 
 
 async def generate_images(
@@ -36,35 +44,38 @@ async def generate_images(
     model: str = "gemini-2.5-flash-image",
 ) -> List[bytes]:
     """
-    Generate images using Gemini image model.
     Returns raw image BYTES.
     """
-    client = get_client()
+    url = f"{GEMINI_BASE_URL}/{model}:generateContent"
+    payload = {
+        "contents": [
+            {"parts": [{"text": prompt}]}
+        ],
+        "generationConfig": {
+            "responseModalities": ["IMAGE"],
+        },
+    }
 
-    response = await client.aio.models.generate_content(
-        model=model,
-        contents=[prompt],
-        config=types.GenerateContentConfig(
-            response_modalities=["IMAGE"],
-        ),
-    )
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            url,
+            params={"key": GEMINI_API_KEY},
+            json=payload,
+        )
+        response.raise_for_status()
 
+    data = response.json()
     images: List[bytes] = []
 
-    if not response or not response.candidates:
-        return images
-
-    for candidate in response.candidates:
-        if not candidate.content or not candidate.content.parts:
-            continue
-
-        for part in candidate.content.parts:
-            if (
-                part.inline_data
-                and part.inline_data.mime_type in ("image/png", "image/jpeg")
-            ):
-                images.append(part.inline_data.data)
-
+    candidates = data.get("candidates", [])
+    for candidate in candidates:
+        parts = candidate.get("content", {}).get("parts", [])
+        for part in parts:
+            inline_data = part.get("inlineData", {})
+            mime_type = inline_data.get("mimeType", "")
+            if mime_type in ("image/png", "image/jpeg"):
+                raw = inline_data.get("data", "")
+                images.append(base64.b64decode(raw))
                 if len(images) >= n:
                     return images
 
