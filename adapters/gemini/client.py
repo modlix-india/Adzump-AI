@@ -6,7 +6,7 @@ import httpx
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
-
+TIMEOUT = 60.0
 
 async def text_completion(
     prompt: str,
@@ -22,7 +22,7 @@ async def text_completion(
         ]
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.post(
             url,
             params={"key": GEMINI_API_KEY},
@@ -56,7 +56,7 @@ async def generate_images(
         },
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.post(
             url,
             params={"key": GEMINI_API_KEY},
