@@ -260,32 +260,57 @@ class MetaAdSetAgent:
             logger.info("meta_adset_geo.no_suggested_targets")
             return None
 
+        allowed_region = None
+        if suggested_geo_targets:
+            first = suggested_geo_targets[0]
+            canonical = first.get("canonicalName")
+
+            if canonical:
+                parts = [p.strip() for p in canonical.split(",")]
+                if len(parts) >= 2:
+                    allowed_region = parts[-2].strip().lower()
+
+        logger.info(
+            "meta_adset_geo.derived_allowed_region",
+            allowed_region=allowed_region,
+    )    
+
+        all_valid_results = []    
+
         async def resolve_target(target):
             logger.info("meta_adset_geo.resolving_target", target=target)
+
+            canonical = target.get("canonicalName")
+
             results = await self.geo_targeting_adapter.search_locations(
                 client_code=auth_context.client_code,
-                location_name=target.get("canonicalName"),
-                limit=3,
+                location_name=canonical,
+                limit=5,
             )
 
             if not results:
                 results = await self.geo_targeting_adapter.search_locations(
                 client_code=auth_context.client_code,
                 location_name=target.get("name"),
-                limit=3,
+                limit=5,
             )
 
             if not results:
-                return None
+                return []
 
-            if allowed_countries:
-                matched = [
-                    r for r in results
-                    if r.get("country_code") in allowed_countries
-                ]
-                return matched[0] if matched else results[0]
+            filtered = []
 
-            return results[0]
+            for r in results:
+                if allowed_countries and r.get("country_code") not in allowed_countries:
+                    continue
+
+                if allowed_region and r.get("region"):
+                    if r.get("region").strip().lower() != allowed_region:
+                        continue
+
+                filtered.append(r)
+
+            return filtered
 
         tasks = [
             resolve_target(target)
@@ -295,22 +320,30 @@ class MetaAdSetAgent:
 
         resolved_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        valid_locations = [
-            r for r in resolved_results
-            if r and not isinstance(r, Exception)
-        ]
+        for result_group in resolved_results:
+            if isinstance(result_group, Exception) or not result_group:
+                continue
+            all_valid_results.extend(result_group)
+
+        unique_by_key = {}
+        for item in all_valid_results:
+            key = item.get("key")
+            if key:
+                unique_by_key[key] = item
+
+        final_locations = list(unique_by_key.values())   
 
         logger.info(
             "meta_adset_geo.resolved_valid_locations",
-            count=len(valid_locations),
-            locations=valid_locations,
-        )
+            count=len(final_locations),
+            locations=final_locations,
+        )     
 
-        if not valid_locations:
+        if not final_locations:
             logger.info("meta_adset_geo.no_valid_locations_after_resolve")
             return None
 
-        return self.geo_targeting_adapter.build_geo_structure(valid_locations)
+        return self.geo_targeting_adapter.build_geo_structure(final_locations)
 
 
 meta_adset_agent = MetaAdSetAgent()

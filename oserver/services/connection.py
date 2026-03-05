@@ -6,6 +6,7 @@ from structlog import get_logger
 
 from oserver.utils.helpers import get_base_url
 from exceptions.custom_exceptions import CoreTokenException
+from core.infrastructure.context import auth_context
 
 logger = get_logger(__name__)
 
@@ -23,6 +24,12 @@ def fetch_oauth_token(
         "appcode": resolved_appcode,
         "clientcode": client_code,
     }
+    if auth_context.access_token:
+        headers["authorization"] = auth_context.access_token
+    if auth_context.x_forwarded_host:
+        headers["X-Forwarded-Host"] = auth_context.x_forwarded_host
+    if auth_context.x_forwarded_port:
+        headers["X-Forwarded-Port"] = auth_context.x_forwarded_port
 
     try:
         resp = requests.get(url, headers=headers, timeout=15)

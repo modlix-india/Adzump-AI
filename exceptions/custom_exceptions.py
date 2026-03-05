@@ -221,3 +221,17 @@ class GoogleAdsMutationError(BaseAppException):
         details: Optional[dict] = None,
     ):
         super().__init__(message, status_code, details)
+
+
+class SessionException(BaseAppException):
+    """Session expired or invalid."""
+
+    def __init__(
+        self,
+        session_id: str = "",
+        message: str = "Session expired or not found",
+        details: Optional[dict] = None,
+    ):
+        super().__init__(
+            message, status.HTTP_401_UNAUTHORIZED, details or {"session_id": session_id}
+        )

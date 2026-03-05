@@ -15,6 +15,9 @@ class MetaGeoTargetingAdapter:
         location_name: str,
         limit: int = 5,
     ) -> List[Dict[str, Any]]:
+        """
+        Search Meta ad geolocations using /search endpoint.
+        """
 
         response = await meta_client.get(
             "/search",
@@ -45,27 +48,22 @@ class MetaGeoTargetingAdapter:
         meta_locations: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
 
-        type_map = {
-            "neighborhood": "neighborhoods",
-            "city": "cities",
-            "zip": "zips",
-            "region": "regions",
-            "country": "countries",
+        return {
+                "data": [
+                    {
+                        "key": item.get("key"),
+                        "name": item.get("name"),
+                        "type": item.get("type"),
+                        "country_code": item.get("country_code"),
+                        "country_name": item.get("country_name"),
+                        "region": item.get("region"),
+                        "region_id": item.get("region_id"),
+                        "geo_hierarchy_level": item.get("geo_hierarchy_level"),
+                        "geo_hierarchy_name": item.get("geo_hierarchy_name"),
+                        "supports_city": item.get("supports_city"),
+                        "supports_region": item.get("supports_region"),
+                    }
+                    for item in meta_locations
+                    if item.get("key")
+                ]
         }
-
-        geo_payload: Dict[str, List[Dict[str, str]]] = {}
-
-        for item in meta_locations:
-            geo_type = item.get("type")
-            key = item.get("key")
-
-            if not geo_type or not key:
-                continue
-
-            meta_field = type_map.get(geo_type)
-            if not meta_field:
-                continue
-
-            geo_payload.setdefault(meta_field, []).append({"key": key})
-
-        return geo_payload

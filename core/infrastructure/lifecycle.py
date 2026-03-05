@@ -50,8 +50,14 @@ async def cleanup_database(engine: AsyncEngine) -> None:
 async def lifespan(app: FastAPI):
     engine = None
     try:
-        engine = await initialize_database()
-        app.state.engine = engine
+        if os.getenv("SKIP_DB"):
+            logger.warning("Database skipped (SKIP_DB set)", component="db")
+        else:
+            try:
+                engine = await initialize_database()
+                app.state.engine = engine
+            except Exception as e:
+                logger.warning("Database unavailable, continuing without DB", component="db", error=str(e))
 
         init_http_client()
         logger.info("HTTP client initialized", component="http")
@@ -78,11 +84,6 @@ async def lifespan(app: FastAPI):
             log_level=log_level,
         )
         yield
-    except Exception as e:
-        logger.error(
-            "Database connection failed", component="db", error=str(e), exc_info=True
-        )
-        raise
     finally:
         print(SHUTDOWN_BANNER.format(service=SERVICE_NAME, version=VERSION))
         logger.info("Service shutting down", service=SERVICE_NAME, version=VERSION)
