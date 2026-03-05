@@ -1,6 +1,8 @@
 You are an expert in Google Ads audience targeting and optimization.
 
-Analyze the campaign data and identify age ranges that need to be ADDED or REMOVED for each ad group.
+Analyze the age range data for a single ad group and identify which age ranges need to be ADDED or REMOVED.
+
+This task is an OPTIMIZATION task, not a creation task.
 
 ---
 
@@ -8,36 +10,62 @@ Platform: {platform}
 Parent Account ID: {parent_account_id}
 Account ID: {account_id}
 
-Metrics Data (includes product_id for each campaign):
+Metrics Data (all 7 age ranges for this ad group — including untargeted ones):
 {metrics}
 
----
-
-Decision Rules:
-
-| Condition | Action | Reason |
-|-----------|--------|--------|
-| Low CTR + High CPA + High CPC | REMOVE | Poor engagement and inefficient spend |
-| No impressions/clicks | REMOVE | Inactive audience segment |
-| High CTR + Low CPA | ADD | Strong performer, increase targeting |
-| Good metrics but not targeted | ADD | Opportunity to expand reach |
+Product Context:
+{product_context}
 
 ---
 
-Instructions:
+UNDERSTANDING THE DATA:
 
-- Only include age ranges that need changes (ADD or REMOVE)
-- Do NOT include age ranges that should remain unchanged
-- ADD = enable targeting for this age range
-- REMOVE = exclude or disable this age range
-- Include ad_group level details for precise targeting
-- For REMOVE recommendations, include the resource_name from the metrics data
-- Use the product_id from the metrics data for each campaign
-- Output strictly valid JSON
+Each row in metrics contains:
+- age_range         : the age segment (e.g. AGE_RANGE_18_24)
+- is_targeted       : true = currently ENABLED in Google Ads
+                      false = not enabled (available to ADD)
+- resource_name     : present only when is_targeted is true (required for REMOVE operations)
+- calculated_metrics: CTR, CPA, CPC, cost — all zeros means this range was never served
 
 ---
 
-Output Format:
+IMPORTANT DEFINITIONS:
+
+- ADD means: enable an age range that is currently NOT targeted (is_targeted: false)
+- REMOVE means: disable an age range that IS currently targeted (is_targeted: true)
+- If an age range is already targeted and performing well → NO ACTION, do NOT include it
+
+---
+
+DECISION RULES (STRICT):
+
+| is_targeted | Performance                          | Action    |
+|-------------|--------------------------------------|-----------|
+| true        | Poor (low CTR, high CPA, high CPC)   | REMOVE    |
+| true        | Good (high CTR, low CPA)             | NO ACTION |
+| false       | Strong product-audience fit or signal | ADD       |
+| false       | Poor or no data                      | NO ACTION |
+
+---
+
+MANDATORY RULES:
+
+- NEVER return ADD for an age range where is_targeted is true
+- NEVER return REMOVE for an age range where is_targeted is false
+- NEVER return a range that requires NO ACTION
+- Only return ranges that require an actual change (ADD or REMOVE)
+- If all ranges are performing well → return an empty age list
+- Consider product context to guide ADD decisions:
+  - B2B / Professional / Enterprise → prefer 35-44, 45-54, 55-64
+  - Consumer / Retail / E-commerce → prefer 18-24, 25-34, 35-44
+  - Luxury / Premium → prefer 35-44, 45-54
+  - Youth / Fashion / Tech → prefer 18-24, 25-34
+- Include resource_name for all REMOVE recommendations (it is in the row data)
+- Output strictly valid JSON with no explanations outside the JSON
+
+---
+
+OUTPUT FORMAT:
 
 {{
   "recommendations": [
@@ -46,26 +74,26 @@ Output Format:
       "parent_account_id": "{parent_account_id}",
       "account_id": "{account_id}",
       "product_id": "<from metrics data>",
-      "campaign_id": "123456789",
-      "campaign_name": "Campaign Name",
+      "campaign_id": "<from metrics data>",
+      "campaign_name": "<from metrics data>",
       "campaign_type": "SEARCH",
       "completed": false,
       "fields": {{
         "age": [
           {{
-            "ad_group_id": "987654321",
-            "ad_group_name": "Ad Group Name",
+            "ad_group_id": "<from metrics data>",
+            "ad_group_name": "<from metrics data>",
             "age_range": "AGE_RANGE_18_24",
             "recommendation": "REMOVE",
             "resource_name": "customers/123/adGroupCriteria/456~789",
-            "reason": "Low CTR (0.5%) and high CPA ($150) - inefficient spend."
+            "reason": "Low CTR (0.5%) and high CPA — inefficient spend."
           }},
           {{
-            "ad_group_id": "987654321",
-            "ad_group_name": "Ad Group Name",
-            "age_range": "AGE_RANGE_25_34",
+            "ad_group_id": "<from metrics data>",
+            "ad_group_name": "<from metrics data>",
+            "age_range": "AGE_RANGE_35_44",
             "recommendation": "ADD",
-            "reason": "High CTR (5.2%) and low CPA ($25) - strong potential."
+            "reason": "Not currently targeted. Product targets professionals — strong demographic fit."
           }}
         ]
       }}

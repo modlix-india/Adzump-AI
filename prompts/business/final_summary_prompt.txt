@@ -10,7 +10,8 @@ INPUTS:
 (Ignore any empty inputs without mentioning them)
 
 TASK:
-Merge all inputs into ONE cohesive marketing summary in 3-4 paragraphs.
+1. Merge all inputs into ONE cohesive marketing summary in 3-4 paragraphs.
+2. Identify the top 10 DIRECT product competitors for this business. For each competitor, provide their Name, Homepage URL, and a brief reasoning why they compete for the same audience.
 
 CONTENT PRIORITY (in order of importance):
 
@@ -53,6 +54,12 @@ STRICT RULES:
 
 OUTPUT FORMAT (return ONLY this JSON):
 {{
-  "finalSummary": "<paragraph_1>\\n\\n<paragraph_2>\\n\\n<paragraph_3>\\n\\n<paragraph_4_if_needed>"
+  "finalSummary": "<paragraph_1>\n\n<paragraph_2>\n\n<paragraph_3>\n\n<paragraph_4_if_needed>",
+  "competitors": [
+    {{
+      "name": "<competitor_name>",
+      "url": "<homepage_url>",
+      "reasoning": "<why_they_compete>"
+    }}
+  ]
 }}
-
