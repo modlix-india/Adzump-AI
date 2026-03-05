@@ -9,7 +9,6 @@ class GoogleAccountsAdapter:
     SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager
     FROM customer_client
     WHERE customer_client.status = 'ENABLED'
-      AND customer_client.manager = false
     """
 
     def __init__(self) -> None:
@@ -23,14 +22,18 @@ class GoogleAccountsAdapter:
         seen_ids: set[str] = set()
 
         for cid in customer_ids:
-            if await self._is_manager(client_code, cid):
+            is_mgr, acct_name = await self._fetch_account_info(client_code, cid)
+            if is_mgr:
                 for acc in await self._list_sub_accounts(client_code, cid):
                     if acc["customer_id"] not in seen_ids:
                         seen_ids.add(acc["customer_id"])
                         all_accounts.append(
                             {
                                 "customer_id": acc["customer_id"],
+                                "name": acc.get("name", ""),
                                 "login_customer_id": cid,
+                                "login_customer_name": acct_name,
+                                "is_manager": True,
                             }
                         )
             else:
@@ -39,7 +42,10 @@ class GoogleAccountsAdapter:
                     all_accounts.append(
                         {
                             "customer_id": cid,
+                            "name": acct_name,
                             "login_customer_id": cid,
+                            "login_customer_name": acct_name,
+                            "is_manager": False,
                         }
                     )
 
@@ -58,18 +64,23 @@ class GoogleAccountsAdapter:
         logger.info("Found accessible customers", count=len(customer_ids))
         return customer_ids
 
-    async def _is_manager(self, client_code: str, customer_id: str) -> bool:
-        """Check if account is a manager (MCC) account."""
+    async def _fetch_account_info(
+        self, client_code: str, customer_id: str
+    ) -> tuple[bool, str]:
+        """Fetch manager flag and descriptive name for an account."""
         try:
             results = await self.client.search_stream(
-                query="SELECT customer.manager FROM customer",
+                query="SELECT customer.manager, customer.descriptive_name FROM customer",
                 customer_id=customer_id,
                 login_customer_id=customer_id,
                 client_code=client_code,
             )
-            return results[0].get("customer", {}).get("manager", False)
+            customer = results[0].get("customer", {})
+            is_manager = customer.get("manager", False)
+            name = customer.get("descriptiveName", "")
+            return is_manager, name
         except Exception:
-            return False
+            return False, ""
 
     async def _list_sub_accounts(self, client_code: str, manager_id: str) -> list[dict]:
         """List sub-accounts under a manager (MCC) account."""

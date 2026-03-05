@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Load env vars before other imports
 from config.logging_config import setup_logging
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from apis.ads_api import router as ads_router
 from apis.chat_api import router as chat_router
 from apis.assets_api import router as assets_router
@@ -20,11 +21,20 @@ from core.infrastructure.lifecycle import lifespan
 from core.metadata import SERVICE_NAME, APP_TITLE
 from api.meta import router as meta_ads_router
 from api.optimization import router as optimization_router
+from api.chatv2 import router as chatv2_router
 
 
 setup_logging()
 
 app = FastAPI(title=APP_TITLE, lifespan=lifespan)
+
+# TODO: Remove dev-only CORS — production should use reverse proxy / API gateway CORS config
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Auth context middleware - extracts access-token and clientCode headers into request context.
 # Headers are optional here; endpoints requiring auth should validate via their own logic.
@@ -52,6 +62,7 @@ if not os.getenv("SKIP_ML_MODELS"):
 app.include_router(feedback_router)
 app.include_router(meta_ads_router)
 app.include_router(optimization_router)
+app.include_router(chatv2_router)
 app.include_router(competitor_router)
 
 setup_exception_handlers(app)

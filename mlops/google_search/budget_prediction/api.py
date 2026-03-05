@@ -14,7 +14,7 @@ from utils.helpers import join_url
 logger = structlog.get_logger()
 
 # Global predictor instance
-predictor: BudgetPredictor = None
+predictor: BudgetPredictor | None = None
 
 
 def get_initialized_predictor() -> BudgetPredictor:
