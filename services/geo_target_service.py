@@ -29,7 +29,7 @@ class GeoTargetService:
     def __init__(self, client_code: str) -> None:
         self._google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         self._developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self._access_token = fetch_google_api_token_simple(client_code)
+        self._access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
 
     async def suggest_geo_targets(
         self,
