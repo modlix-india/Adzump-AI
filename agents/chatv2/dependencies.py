@@ -51,6 +51,7 @@ async def fetch_customer_accounts(mcc_id: str, client_code: str) -> list[dict]:
         }
         for acc in all_accounts
         if str(acc["login_customer_id"]) == mcc_id
+        and str(acc["customer_id"]) != mcc_id
     ]
 
 
