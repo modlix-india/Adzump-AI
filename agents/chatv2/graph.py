@@ -6,6 +6,7 @@ Flow Diagram:
     Entry (_route_entry)
          │
          ├─ COMPLETED ──► END
+         ├─ CONFIRMING_LOCATION ──► confirm_location ──► predict_budget / END
          ├─ SELECTING_PARENT_ACCOUNT ──► select_parent_account ──► fetch_account / END
          ├─ SELECTING_ACCOUNT ──► select_account ──► show_summary ──► END
          ├─ AWAITING_CONFIRMATION ──► confirm ──► END
@@ -14,6 +15,9 @@ Flow Diagram:
               collect_data
                    │
                    ▼ (all fields → SELECTING_PARENT_ACCOUNT)
+              confirm_location
+                   │ (real estate → pause for map, else passthrough)
+                   ▼
               predict_budget
                    │ (Google + targetLeads → predict, else passthrough)
                    ▼
@@ -40,6 +44,7 @@ from structlog import get_logger
 
 from agents.chatv2.nodes import (
     collect_data_node,
+    confirm_location_node,
     predict_budget_node,
     confirm_node,
     show_summary_node,
@@ -54,6 +59,7 @@ from core.chatv2.models import ChatStatus
 logger = get_logger(__name__)
 
 COLLECT_DATA = "collect_data"
+CONFIRM_LOCATION = "confirm_location"
 PREDICT_BUDGET = "predict_budget"
 FETCH_PARENT_ACCOUNT = "fetch_parent_account"
 SELECT_PARENT_ACCOUNT = "select_parent_account"
@@ -64,6 +70,7 @@ CONFIRM = "confirm"
 
 STATUS_TO_NODE = {
     ChatStatus.COMPLETED: END,
+    ChatStatus.CONFIRMING_LOCATION: CONFIRM_LOCATION,
     ChatStatus.SELECTING_PARENT_ACCOUNT: SELECT_PARENT_ACCOUNT,
     ChatStatus.SELECTING_ACCOUNT: SELECT_ACCOUNT,
     ChatStatus.AWAITING_CONFIRMATION: CONFIRM,
@@ -85,6 +92,7 @@ def _build_graph() -> CompiledStateGraph:
     graph = StateGraph[ChatState, None, ChatState, ChatState](ChatState)
 
     graph.add_node(COLLECT_DATA, collect_data_node)
+    graph.add_node(CONFIRM_LOCATION, confirm_location_node)
     graph.add_node(PREDICT_BUDGET, predict_budget_node)
     graph.add_node(FETCH_PARENT_ACCOUNT, fetch_parent_account_options)
     graph.add_node(SELECT_PARENT_ACCOUNT, select_parent_account_node)
@@ -97,6 +105,7 @@ def _build_graph() -> CompiledStateGraph:
         _route_entry,
         {
             COLLECT_DATA: COLLECT_DATA,
+            CONFIRM_LOCATION: CONFIRM_LOCATION,
             SELECT_PARENT_ACCOUNT: SELECT_PARENT_ACCOUNT,
             SELECT_ACCOUNT: SELECT_ACCOUNT,
             CONFIRM: CONFIRM,
@@ -107,6 +116,11 @@ def _build_graph() -> CompiledStateGraph:
     graph.add_conditional_edges(
         COLLECT_DATA,
         _route_after_collect,
+        {CONFIRM_LOCATION: CONFIRM_LOCATION, END: END},
+    )
+    graph.add_conditional_edges(
+        CONFIRM_LOCATION,
+        _route_after_location,
         {PREDICT_BUDGET: PREDICT_BUDGET, END: END},
     )
     graph.add_conditional_edges(
@@ -142,7 +156,14 @@ def _route_entry(state: ChatState) -> str:
 
 
 def _route_after_collect(state: ChatState) -> str:
-    """After collection: proceed to budget prediction when all fields are collected."""
+    """After collection: proceed to location confirmation when all fields are collected."""
+    if _get_status(state) == ChatStatus.SELECTING_PARENT_ACCOUNT:
+        return CONFIRM_LOCATION
+    return END
+
+
+def _route_after_location(state: ChatState) -> str:
+    """After location: proceed to budget prediction if confirmed, else pause for map."""
     if _get_status(state) == ChatStatus.SELECTING_PARENT_ACCOUNT:
         return PREDICT_BUDGET
     return END

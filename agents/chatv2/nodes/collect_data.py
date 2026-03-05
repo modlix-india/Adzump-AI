@@ -1,11 +1,12 @@
 """Data Collection Node - Collects campaign business information via AI conversation."""
 
 import json
+import re
 from datetime import datetime
 from typing import Any, Callable, Optional
 
 from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
-from langgraph.config import get_stream_writer
+from langgraph.config import get_config, get_stream_writer
 from structlog import get_logger
 
 from agents.chatv2.dependencies import get_llm_adapter
@@ -51,8 +52,17 @@ async def collect_data_node(state: ChatState) -> dict[str, Any]:
         tool_choice=tool_choice,
     )
 
+    session_id = get_config()["configurable"]["thread_id"]
+
     _emit_reasoning(writer, tool_calls)
-    ad_plan, tool_result = await _process_tool_call(tool_calls, ad_plan, writer)
+    ad_plan, tool_result = await _process_tool_call(
+        tool_calls, ad_plan, writer, session_id
+    )
+
+    # Fallback: LLM sometimes re-extracts old fields and misses the URL.
+    # Detect URL in latest message programmatically when LLM fails to.
+    if "websiteURL" not in ad_plan:
+        ad_plan = await _fallback_url_extract(state, ad_plan, writer, session_id)
 
     if _has_all_fields(ad_plan):
         new_status = ChatStatus.SELECTING_PARENT_ACCOUNT
@@ -87,7 +97,7 @@ async def collect_data_node(state: ChatState) -> dict[str, Any]:
 
 
 async def _process_tool_call(
-    tool_calls: list, ad_plan: dict, writer: Callable
+    tool_calls: list, ad_plan: dict, writer: Callable, session_id: str
 ) -> tuple[dict, Optional[dict]]:
     """Process update_ad_plan tool call. Returns (ad_plan, tool_result_if_failed)."""
     tool_call = next(
@@ -112,6 +122,17 @@ async def _process_tool_call(
                 }
             )
         logger.info("Extracted campaign data", data=valid)
+
+        if "websiteURL" in valid:
+            _start_background_scrape(session_id, valid["websiteURL"])
+            writer(
+                {
+                    "type": "field_update",
+                    "field": "websiteSummary",
+                    "value": "Analyzing website...",
+                    "status": "pending",
+                }
+            )
 
     if errors:
         for field, error_msg in errors.items():
@@ -205,6 +226,24 @@ def _get_dynamic_required(ad_plan: dict) -> list[str]:
     return base
 
 
+def _start_background_scrape(session_id: str, url: str) -> None:
+    """Fire-and-forget background website scrape via ScrapeAgent."""
+    from core.infrastructure.context import get_auth_context
+    from agents.chatv2.scrape_manager import AuthParams, get_scrape_task_manager
+
+    auth = get_auth_context()
+    get_scrape_task_manager().start_scrape(
+        session_id=session_id,
+        url=url,
+        auth=AuthParams(
+            access_token=auth.access_token,
+            client_code=auth.client_code,
+            x_forwarded_host=auth.x_forwarded_host,
+            x_forwarded_port=auth.x_forwarded_port,
+        ),
+    )
+
+
 def _build_context(ad_plan: dict) -> str:
     """Build context message with collected values and missing fields."""
     required = _get_dynamic_required(ad_plan)
@@ -220,3 +259,34 @@ def _build_context(ad_plan: dict) -> str:
         f"[CONTEXT] Collected ({n}/{total}): {json.dumps(collected)}. "
         f"Still need: {missing}."
     )
+
+
+_URL_RE = re.compile(
+    r"(?:https?://)?(?:www\.)?[a-zA-Z0-9][-a-zA-Z0-9]*(?:\.[a-zA-Z0-9][-a-zA-Z0-9]*)*\.[a-zA-Z]{2,}(?:/\S*)?"
+)
+
+
+async def _fallback_url_extract(
+    state: ChatState, ad_plan: dict, writer: Callable, session_id: str
+) -> dict:
+    """Detect URL in latest user message when LLM fails to extract it."""
+    messages = state.get("messages", [])
+    if not messages:
+        return ad_plan
+
+    content = messages[-1].content if hasattr(messages[-1], "content") else ""
+    latest = content if isinstance(content, str) else ""
+    match = _URL_RE.search(latest)
+    if not match:
+        return ad_plan
+
+    valid, _ = await validate_fields({"websiteURL": match.group(0)})
+    if "websiteURL" not in valid:
+        return ad_plan
+
+    ad_plan = {**ad_plan, "websiteURL": valid["websiteURL"]}
+    writer({"type": "field_update", "field": "websiteURL", "value": valid["websiteURL"], "status": "valid"})
+    logger.info("URL fallback extraction", url=valid["websiteURL"])
+    _start_background_scrape(session_id, valid["websiteURL"])
+    writer({"type": "field_update", "field": "websiteSummary", "value": "Analyzing website...", "status": "pending"})
+    return ad_plan

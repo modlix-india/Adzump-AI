@@ -12,6 +12,7 @@ class ChatStatus(str, Enum):
     """Enumeration of possible chat flow statuses."""
 
     IN_PROGRESS = "in_progress"
+    CONFIRMING_LOCATION = "confirming_location"
     SELECTING_PARENT_ACCOUNT = "selecting_parent_account"
     SELECTING_ACCOUNT = "selecting_account"
     AWAITING_CONFIRMATION = "awaiting_confirmation"
@@ -57,6 +58,16 @@ class AccountSelection(BaseModel):
         )
 
 
+class LocationSelection(BaseModel):
+    """Map embed data for frontend to render location confirmation UI."""
+
+    product_location: Optional[str] = None
+    coordinates: Optional[dict] = None
+    area_location: Optional[str] = None
+    map_url: Optional[str] = None
+    location_found: bool = False
+
+
 class ChatResponse(BaseModel):
     """Standard chat response DTO."""
 
@@ -65,6 +76,7 @@ class ChatResponse(BaseModel):
     collected_data: dict[str, Any]
     progress: str
     account_selection: Optional[dict[str, Any]] = None
+    location_selection: Optional[dict[str, Any]] = None
 
 
 class SessionResponse(BaseModel):

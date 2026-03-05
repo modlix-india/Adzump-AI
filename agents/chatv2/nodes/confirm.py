@@ -3,7 +3,7 @@
 from typing import Any, Callable, Optional
 
 from langchain_core.messages import AIMessage, SystemMessage
-from langgraph.config import get_stream_writer
+from langgraph.config import get_config, get_stream_writer
 from structlog import get_logger
 
 from agents.chatv2.platform_config import PLATFORM_CONFIG
@@ -159,6 +159,16 @@ def build_summary(ad_plan: dict, state: ChatState) -> str:
 
         lines.append(f"- {label}: {value}")
 
+    location = ad_plan.get("location")
+    if isinstance(location, dict):
+        loc_name = location.get("product_location") or location.get("area_location")
+        if loc_name:
+            lines.append(f"- Location: {loc_name}")
+
+    competitors = ad_plan.get("competitors")
+    if isinstance(competitors, list) and competitors:
+        lines.append(f"- Competitors: {', '.join(competitors)}")
+
     lines.append("\nPlease confirm if everything is correct.")
     return "\n".join(lines)
 
@@ -224,6 +234,19 @@ async def _handle_field_modification(
                     "error": error_msg,
                 }
             )
+
+    if "websiteURL" in valid:
+        _start_background_scrape(
+            get_config()["configurable"]["thread_id"], valid["websiteURL"]
+        )
+        writer(
+            {
+                "type": "field_update",
+                "field": "websiteSummary",
+                "value": "Analyzing website...",
+                "status": "pending",
+            }
+        )
 
     if "platform" in valid:
         return _handle_platform_change(ad_plan, state, ai_message)
@@ -317,3 +340,22 @@ def _get_config(ad_plan: dict) -> dict:
 def _get_system_prompt() -> str:
     """Load the confirm prompt."""
     return load_prompt("chatv2/confirm.txt")
+
+
+
+def _start_background_scrape(session_id: str, url: str) -> None:
+    """Fire-and-forget background website scrape via ScrapeAgent."""
+    from core.infrastructure.context import get_auth_context
+    from agents.chatv2.scrape_manager import AuthParams, get_scrape_task_manager
+
+    auth = get_auth_context()
+    get_scrape_task_manager().start_scrape(
+        session_id=session_id,
+        url=url,
+        auth=AuthParams(
+            access_token=auth.access_token,
+            client_code=auth.client_code,
+            x_forwarded_host=auth.x_forwarded_host,
+            x_forwarded_port=auth.x_forwarded_port,
+        ),
+    )
