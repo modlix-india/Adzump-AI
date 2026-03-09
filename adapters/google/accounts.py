@@ -9,6 +9,8 @@ class GoogleAccountsAdapter:
     SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager
     FROM customer_client
     WHERE customer_client.status = 'ENABLED'
+        AND customer_client.manager = FALSE
+        AND customer_client.level = 1
     """
 
     def __init__(self) -> None:
