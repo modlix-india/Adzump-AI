@@ -1,4 +1,5 @@
 import structlog
+import os
 from pydantic import ValidationError
 
 from core.models.meta import LeadFormPayload
@@ -10,6 +11,8 @@ from exceptions.custom_exceptions import (
     BusinessValidationException,
     AIProcessingException,
 )
+
+from adapters.meta.lead_forms import MetaLeadFormAdapter
 
 from oserver.services.storage_service import StorageService
 from oserver.models.storage_request_model import StorageRequest
@@ -24,6 +27,7 @@ class MetaLeadFormAgent:
     def __init__(self):
         self.business_service = BusinessService()
         self.storage_service = StorageService()
+        self.lead_form_adapter = MetaLeadFormAdapter()
 
     async def generate_payload(self, session_id: str) -> LeadFormPayload:
 
@@ -81,6 +85,24 @@ class MetaLeadFormAgent:
         except ValidationError as e:
             logger.error("Failed to parse LLM output", error=str(e), raw=content)
             raise AIProcessingException("LLM output is not valid JSON")
+
+    async def create_lead_form(
+        self,
+        payload: LeadFormPayload,
+    ) -> dict:
+
+        page_id = os.getenv("META_PAGE_ID")
+
+        if not page_id:
+            raise BusinessValidationException("META_PAGE_ID not configured")
+
+        result = await self.lead_form_adapter.create(
+            client_code=auth_context.client_code,
+            page_id=page_id,
+            payload=payload.model_dump(),
+        )
+
+        return {"leadFormId": result["id"]}        
 
 
     async def _fetch_site_links(self, storage_id: str):
