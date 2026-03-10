@@ -116,21 +116,13 @@ class BusinessService:
                 status_code=500,
                 detail=response.error or "Failed to fetch product details",
             )
-        data = response.result
-        try:
-            if isinstance(data, list) and len(data) > 0:
-                product_data = data[0]["result"]["result"]
-            elif isinstance(data, dict) and "result" in data:
-                product_data = data["result"]["result"]
-            else:
-                raise HTTPException(
-                    status_code=500, detail="Unexpected product data format"
-                )
-        except (KeyError, IndexError, TypeError):
+        # Standardized: Using response.content property for robust parsing (Read)
+        if not response.content:
             raise HTTPException(
-                status_code=500, detail="Invalid product data response structure"
+                status_code=500, detail="Product details not found in storage"
             )
-        return product_data
+
+        return response.content[0]
 
     async def fetch_website_data(self, session_id: str):
         # TODO: drop explicit auth params once process_website_data reads from auth_context
@@ -187,35 +179,26 @@ class BusinessService:
             existing_location = None
 
             if existing_data_response.success:
-                try:
-                    records = (
-                        existing_data_response.result[0]
-                        .get("result", {})
-                        .get("result", {})
-                        .get("content", [])
-                    )
+                # Standardized: Using response.content property for robust parsing (ReadPage)
+                records = existing_data_response.content
 
-                    if records:
-                        existing_record = records[-1]
-                        existing_id = existing_record.get("_id")
-                        existing_businessType = existing_record.get("businessType", "")
-                        existing_summary = existing_record.get("summary", "")
-                        existing_finalSummary = existing_record.get("finalSummary", "")
-                        existing_location_data = existing_record.get("location", {})
-                        if existing_location_data:
-                            existing_location = LocationInfo(
-                                area_location=existing_location_data.get(
-                                    "area_location"
-                                ),
-                                product_location=existing_location_data.get(
-                                    "product_location"
-                                ),
-                                product_coordinates=existing_location_data.get(
-                                    "product_coordinates"
-                                ),
-                            )
-                except Exception as e:
-                    logger.warning(f"Error parsing existing storage data: {e}")
+                if records:
+                    existing_record = records[-1]
+                    existing_id = existing_record.get("_id")
+                    existing_businessType = existing_record.get("businessType", "")
+                    existing_summary = existing_record.get("summary", "")
+                    existing_finalSummary = existing_record.get("finalSummary", "")
+                    existing_location_data = existing_record.get("location", {})
+                    if existing_location_data:
+                        existing_location = LocationInfo(
+                            area_location=existing_location_data.get("area_location"),
+                            product_location=existing_location_data.get(
+                                "product_location"
+                            ),
+                            product_coordinates=existing_location_data.get(
+                                "product_coordinates"
+                            ),
+                        )
 
             # STEP 2: DEFAULT BEHAVIOR IF SUMMARY EXISTS & rescrape=False
             if (

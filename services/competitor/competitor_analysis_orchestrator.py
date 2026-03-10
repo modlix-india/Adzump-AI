@@ -72,6 +72,16 @@ class CompetitorAnalysisOrchestrator:
                 "analysis.orchestration_complete", competitor_count=len(competitors)
             )
             return result
+        except Exception as e:
+            logger.error(
+                "analysis.orchestration_failed",
+                error=str(e),
+                client_code=auth_context.client_code,
+            )
+            return CompetitorAnalysisResult(
+                status="failed",
+                message=f"Failed to start:{str(e)}",
+            )
         finally:
             structlog.contextvars.unbind_contextvars("business_url", "client_code")
 
@@ -91,7 +101,8 @@ class CompetitorAnalysisOrchestrator:
         if not resp.success or not resp.result:
             raise StorageException(f"Failed to fetch record for {business_url}")
 
-        content = resp.result[0].get("result", {}).get("result", {}).get("content", [])
+        # Standardized: Using response.content property for robust parsing (ReadPage)
+        content = resp.content
         if not content:
             raise StorageException(f"Empty record for {business_url}")
 
