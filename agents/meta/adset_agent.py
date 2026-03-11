@@ -64,7 +64,7 @@ class MetaAdSetAgent:
             demographics=detailed_targeting.demographics,
         )
 
-        flexible_spec = await self.targeting_adapter.build_flexible_spec(
+        audience_targeting = await self.targeting_adapter.build_flexible_spec(
             ad_account_id=ad_account_id,
             client_code=auth_context.client_code,
             interests=detailed_targeting.interests,
@@ -73,8 +73,8 @@ class MetaAdSetAgent:
         )
 
         logger.info(
-            "meta_adset_detailed.flexible_spec_result",
-            flexible_spec_count=len(flexible_spec),
+            "meta_adset_detailed.audience_targeting_result",
+            audience_targeting_count=len(audience_targeting),
         )
 
         suggested_geo_targets = getattr(website_data, "suggested_geo_targets", None)
@@ -109,7 +109,7 @@ class MetaAdSetAgent:
             "age_min": targeting.age_min,
             "age_max": targeting.age_max,
             "locales": locales,
-            "flexible_spec": flexible_spec,
+            "audience_targeting": audience_targeting,
             "locations": locations,
         }
 
