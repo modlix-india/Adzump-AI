@@ -21,7 +21,7 @@ async def analyze_competitors(
         login_customer_id=login_customer_id,
     )
 
-    if result.status == "failed":
-        return error_response(result.message or "Competitor analysis failed.")
+    if not result.competitor_analysis:
+        return error_response("Competitor analysis failed or no competitors found.")
 
     return success_response(result)

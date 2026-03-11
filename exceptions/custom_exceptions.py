@@ -173,10 +173,9 @@ class TrendServiceException(BaseAppException):
     def __init__(
         self,
         message: str = "Trend service request failed",
-        status_code: int = status.HTTP_502_BAD_GATEWAY,
         details: Optional[dict] = None,
     ):
-        super().__init__(message, status_code, details)
+        super().__init__(message, status.HTTP_502_BAD_GATEWAY, details)
 
 
 class TrendRateLimitException(TrendServiceException):
@@ -185,10 +184,10 @@ class TrendRateLimitException(TrendServiceException):
     def __init__(
         self,
         message: str = "Trend service rate limit hit",
-        status_code: int = status.HTTP_429_TOO_MANY_REQUESTS,
         details: Optional[dict] = None,
     ):
-        super().__init__(message, status_code, details)
+        super().__init__(message, details)
+        self.status_code = status.HTTP_429_TOO_MANY_REQUESTS
 
 
 class EnrichmentException(BaseAppException):

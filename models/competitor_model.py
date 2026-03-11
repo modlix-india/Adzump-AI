@@ -113,5 +113,3 @@ class Competitor(BaseModel):
 class CompetitorAnalysisResult(BaseModel):
     competitor_analysis: List[Competitor] = Field(default_factory=list)
     enriched_keywords: List[CompetitorKeyword] = Field(default_factory=list)
-    status: str = "success"
-    message: str = ""

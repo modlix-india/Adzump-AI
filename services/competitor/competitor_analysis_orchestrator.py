@@ -72,16 +72,6 @@ class CompetitorAnalysisOrchestrator:
                 "analysis.orchestration_complete", competitor_count=len(competitors)
             )
             return result
-        except Exception as e:
-            logger.error(
-                "analysis.orchestration_failed",
-                error=str(e),
-                client_code=auth_context.client_code,
-            )
-            return CompetitorAnalysisResult(
-                status="failed",
-                message=f"Failed to start:{str(e)}",
-            )
         finally:
             structlog.contextvars.unbind_contextvars("business_url", "client_code")
 

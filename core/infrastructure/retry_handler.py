@@ -1,7 +1,7 @@
 import asyncio
 import functools
 import random
-from typing import Callable, Type, Union, Tuple
+from typing import Callable
 
 import structlog
 
@@ -11,7 +11,7 @@ logger = structlog.get_logger(__name__)
 def async_retry(
     max_attempts: int = 3,
     initial_backoff: float = 2.0,
-    exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception,
+    exceptions: type[Exception] | tuple[type[Exception], ...] = Exception,
     retry_condition: Callable[[Exception], bool] | None = None,
     jitter: bool = True,
 ):

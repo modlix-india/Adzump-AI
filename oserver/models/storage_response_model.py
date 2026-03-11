@@ -22,9 +22,12 @@ class StorageResponse(BaseModel):
         if isinstance(data, list) and len(data) > 0:
             data = data[0]
 
-        # Standardize drilling into 'result' wrappers
-        while isinstance(data, dict) and "result" in data:
-            data = data["result"]
+        # Fixed 2-level unwrap matching the known API wrapper (result.result)
+        for _ in range(2):
+            if isinstance(data, dict) and "result" in data:
+                data = data["result"]
+            else:
+                break
 
         if data is None:
             return []
