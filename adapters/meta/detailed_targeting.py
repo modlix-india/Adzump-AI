@@ -41,6 +41,7 @@ class MetaDetailedTargetingAdapter:
         ad_account_id: str,
         search_type: str,
         client_code: str,
+        seen_ids: set = None,
     ) -> List[Dict[str, Any]]:
 
         tasks = [
@@ -57,7 +58,15 @@ class MetaDetailedTargetingAdapter:
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         resolved_items: List[Dict[str, Any]] = []
-        seen_ids = set()
+        if seen_ids is None:
+            seen_ids = set()
+
+        type_mapping = {
+            "adinterest": "interests",
+            "addemographic": "demographics",
+            "adbehavior": "behaviors"
+        }
+        mapped_type = type_mapping.get(search_type, search_type)
 
         for data in results:
             if isinstance(data, Exception) or not data:
@@ -75,8 +84,8 @@ class MetaDetailedTargetingAdapter:
                 {
                     "id": item.get("id"),
                     "name": item.get("name"),
-                    "type": item.get("type"),
-                    "path": item.get("path"),
+                    "type": mapped_type,
+                    "path": [mapped_type],
                     "audience_size_lower_bound": item.get("audience_size_lower_bound"),
                     "audience_size_upper_bound": item.get("audience_size_upper_bound"),
                     "description": item.get("description"),
@@ -98,7 +107,8 @@ class MetaDetailedTargetingAdapter:
         logger.info("Behaviors from LLM", behaviors=behaviors)
         logger.info("Demographics from LLM", demographics=demographics)
 
-        flexible_spec = []
+        audience_targeting = {}
+        seen_ids = set()
 
         if interests:
             resolved_interests = await self._resolve(
@@ -106,14 +116,11 @@ class MetaDetailedTargetingAdapter:
                 ad_account_id,
                 "adinterest",
                 client_code,
+                seen_ids,
             )
 
             if resolved_interests:
-                flexible_spec.append(
-                    {
-                        "interests": resolved_interests
-                    }
-                )
+                audience_targeting["interests"] = resolved_interests
 
 
         if behaviors:
@@ -122,14 +129,11 @@ class MetaDetailedTargetingAdapter:
                 ad_account_id,
                 "adbehavior",
                 client_code,
+                seen_ids,
             )
 
             if resolved_behaviors:
-                flexible_spec.append(
-                    {
-                        "behaviors": resolved_behaviors
-                    }
-                )
+                audience_targeting["behaviors"] = resolved_behaviors
 
 
         if demographics:
@@ -138,18 +142,15 @@ class MetaDetailedTargetingAdapter:
                 ad_account_id,
                 "addemographic",
                 client_code,
+                seen_ids,
             )
 
             if resolved_demographics:
-                flexible_spec.append(
-                    {
-                        "demographics": resolved_demographics
-                    }
-                )
+                audience_targeting["demographics"] = resolved_demographics
 
         logger.info(
-            "meta_adset_detailed.flexible_spec_built",
-            count=len(flexible_spec),
+            "meta_adset_detailed.audience_targeting_built",
+            count=len(audience_targeting),
         )
 
-        return flexible_spec
+        return audience_targeting
