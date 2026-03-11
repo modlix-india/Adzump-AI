@@ -25,7 +25,7 @@ TARGETING PRINCIPLES
 
 ---
 
-INTERESTS (max 5)
+INTERESTS (min 1, max 5)
 
 - Use well-known brands, platforms, industries, or commercial topics with high confidence of Meta availability.
 - Prefer established interests that advertisers commonly use.
@@ -38,7 +38,7 @@ Do NOT include:
 
 ---
 
-BEHAVIORS (max 5)
+BEHAVIORS (min 1, max 5)
 
 - Use ONLY well-known Meta behaviors with high confidence of availability.
 - Examples include:
@@ -54,7 +54,7 @@ Do NOT:
 
 ---
 
-DEMOGRAPHICS (max 5)
+DEMOGRAPHICS (min 1, max 5)
 
 - Prefer safer demographic categories such as:
   - Education level
@@ -84,7 +84,7 @@ OUTPUT RULES
 - No markdown.
 - No extra keys.
 - Strictly follow this structure:
-- It is acceptable to return fewer than the maximum if confidence is low.
+- It is acceptable to return fewer than the maximum if confidence is low, but you MUST return AT LEAST ONE item for interests, behaviors, and demographics.
 
 
 {{
