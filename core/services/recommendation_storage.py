@@ -212,7 +212,10 @@ class RecommendationStorageService:
             existing = await self._fetch_by_id(recommendation.id)
             if not existing:
                 logger.error(
-                    "storage_sync_failed_record_missing", record_id=recommendation.id
+                    "storage_sync_failed_record_missing",
+                    record_id=recommendation.id,
+                    client_code=auth_context.client_code,
+                    campaign_id=recommendation.campaign_id,
                 )
                 return
 
