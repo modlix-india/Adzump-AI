@@ -26,7 +26,8 @@ class CampaignMappingService:
             logger.warning("Failed to fetch AISuggestedData", client_code=client_code)
             return {}
 
-        records = self._extract_records(response.result)
+        # Standardized: Using response.content property for robust parsing (ReadPage)
+        records = response.content
         return self._build_mapping(records)
 
     async def get_campaign_mapping_with_summary(
@@ -48,13 +49,9 @@ class CampaignMappingService:
             logger.warning("Failed to fetch AISuggestedData", client_code=client_code)
             return {}
 
-        records = self._extract_records(response.result)
+        # Standardized: Using response.content property for robust parsing (ReadPage)
+        records = response.content
         return self._build_mapping_with_summary(records)
-
-    # TODO: Handle in StorageReadResponse
-    def _extract_records(self, result: list) -> list:
-        """Extract content records from nested response."""
-        return result[0].get("result", {}).get("result", {}).get("content", [])
 
     def _build_mapping(self, records: list) -> dict[str, str]:
         """Build campaign_id → product_id mapping."""

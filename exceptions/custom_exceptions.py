@@ -186,7 +186,8 @@ class TrendRateLimitException(TrendServiceException):
         message: str = "Trend service rate limit hit",
         details: Optional[dict] = None,
     ):
-        super().__init__(message, status.HTTP_429_TOO_MANY_REQUESTS, details)
+        super().__init__(message, details)
+        self.status_code = status.HTTP_429_TOO_MANY_REQUESTS
 
 
 class EnrichmentException(BaseAppException):

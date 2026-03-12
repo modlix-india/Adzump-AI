@@ -91,7 +91,8 @@ class CompetitorAnalysisOrchestrator:
         if not resp.success or not resp.result:
             raise StorageException(f"Failed to fetch record for {business_url}")
 
-        content = resp.result[0].get("result", {}).get("result", {}).get("content", [])
+        # Standardized: Using response.content property for robust parsing (ReadPage)
+        content = resp.content
         if not content:
             raise StorageException(f"Empty record for {business_url}")
 

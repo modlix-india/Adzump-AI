@@ -1,5 +1,5 @@
 import json
-from structlog import get_logger    #type: ignore
+from structlog import get_logger  # type: ignore
 from fastapi import HTTPException
 from models.business_model import WebsiteSummaryResponse, ScrapeResult
 from services.business_service import BusinessService
@@ -12,8 +12,10 @@ from oserver.models.storage_request_model import (
 )
 from oserver.services.storage_service import StorageService
 from services.final_summary_service import generate_final_summary
+from exceptions.custom_exceptions import ScraperException
 
 logger = get_logger(__name__)
+
 
 async def process_external_link(
     external_url: str,
@@ -45,9 +47,8 @@ async def process_external_link(
     record_response = await storage_service.read_page_storage(read_request)
     if not record_response.success:
         raise HTTPException(500, "Storage read failed in external summary service")
-    records = (
-        record_response.result[0].get("result", {}).get("result", {}).get("content", [])
-    )
+    # Standardized: Using response.content property for robust parsing (ReadPage)
+    records = record_response.content
     if not records:
         raise HTTPException(404, "No record found for this businessUrl")
     record = records[-1]
@@ -73,13 +74,13 @@ async def process_external_link(
             logger.info("[ExternalLink] Returning cached external summary")
 
             return WebsiteSummaryResponse(
-            storage_id=storage_id,
-            business_url=business_url,
-            external_url=external_url,
-            summary=existing_summary,
-            final_summary=record.get("finalSummary", ""),
-            locations=record.get("locations", []),
-        )
+                storage_id=storage_id,
+                business_url=business_url,
+                external_url=external_url,
+                summary=existing_summary,
+                final_summary=record.get("finalSummary", ""),
+                locations=record.get("locations", []),
+            )
         # CASE A2 — Summary missing OR rescrape=True → regenerate
         logger.info(
             "[ExternalLink] Summary missing or rescrape=True → regenerating external summary"
@@ -94,18 +95,21 @@ async def process_external_link(
 
     # Handle blocked scrapes
     if not scrape_result.success:
-        error_msg = scrape_result.error.message if scrape_result.error else "Scraper blocked"
+        error_msg = (
+            scrape_result.error.message if scrape_result.error else "Scraper blocked"
+        )
         logger.warning(f"[ExternalLink] Scraping blocked: {error_msg}")
         error_details = {
-            "block_reason": scrape_result.error.type.value if scrape_result.error else "unknown",
+            "block_reason": scrape_result.error.type.value
+            if scrape_result.error
+            else "unknown",
             "url": external_url,
             "warnings": [
-                {"type": w.type.value, "message": w.message} 
+                {"type": w.type.value, "message": w.message}
                 for w in scrape_result.warnings
-            ]
+            ],
         }
-        
-        from exceptions.custom_exceptions import ScraperException
+
         raise ScraperException(message=error_msg, details=error_details)
 
     scraped_data = scrape_result.data
@@ -121,7 +125,7 @@ async def process_external_link(
     summary_raw = await business_service.generate_website_summary(scraped_data)
     try:
         parsed = json.loads(summary_raw)
-    except:
+    except Exception:
         parsed = json.loads(summary_raw.replace("'", '"'))
     summary_text = parsed.get("summary", "")
     locations = parsed.get("locations", [])
@@ -167,10 +171,10 @@ async def process_external_link(
         merged_final_summary = record.get("finalSummary", "")
     # STEP 8: RETURN RESPONSE
     return WebsiteSummaryResponse(
-            storage_id=storage_id,
-            business_url=business_url,
-            external_url=external_url,
-            summary=summary_text,
-            final_summary=merged_final_summary,
-            locations=locations,
-        )
+        storage_id=storage_id,
+        business_url=business_url,
+        external_url=external_url,
+        summary=summary_text,
+        final_summary=merged_final_summary,
+        locations=locations,
+    )

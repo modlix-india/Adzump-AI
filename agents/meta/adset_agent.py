@@ -175,7 +175,9 @@ class MetaAdSetAgent:
         raw_output = response.choices[0].message.content
 
         if not raw_output:
-            raise AIProcessingException("Detailed targeting LLM returned empty response")
+            raise AIProcessingException(
+                "Detailed targeting LLM returned empty response"
+            )
 
         try:
             return DetailedTargeting.model_validate_json(raw_output)
@@ -185,7 +187,7 @@ class MetaAdSetAgent:
                 error=str(e),
                 raw=raw_output,
             )
-            raise AIProcessingException("Detailed targeting output invalid JSON")        
+            raise AIProcessingException("Detailed targeting output invalid JSON")
 
     async def _search_ad_locales(self, languages: list[str]) -> list[dict]:
         results = await asyncio.gather(
@@ -227,22 +229,15 @@ class MetaAdSetAgent:
 
         response = await storage_service.read_storage(payload)
 
-        if not response.success or not response.result:
+        if not response.success:
             return None
 
-        data = response.result
-
-        try:
-            if isinstance(data, list) and len(data) > 0:
-                record = data[0]["result"]["result"]
-            elif isinstance(data, dict):
-                record = data["result"]["result"]
-            else:
-                return None
-        except Exception:
+        # Standardized: Using response.content property for robust parsing
+        if not response.content:
             return None
 
-        return record.get("suggestedGeoTargets")    
+        record = response.content[0]
+        return record.get("suggestedGeoTargets")
 
     async def _build_locations(
         self,
@@ -273,9 +268,9 @@ class MetaAdSetAgent:
         logger.info(
             "meta_adset_geo.derived_allowed_region",
             allowed_region=allowed_region,
-    )    
+        )
 
-        all_valid_results = []    
+        all_valid_results = []
 
         async def resolve_target(target):
             logger.info("meta_adset_geo.resolving_target", target=target)
@@ -290,10 +285,10 @@ class MetaAdSetAgent:
 
             if not results:
                 results = await self.geo_targeting_adapter.search_locations(
-                client_code=auth_context.client_code,
-                location_name=target.get("name"),
-                limit=5,
-            )
+                    client_code=auth_context.client_code,
+                    location_name=target.get("name"),
+                    limit=5,
+                )
 
             if not results:
                 return []
@@ -312,11 +307,7 @@ class MetaAdSetAgent:
 
             return filtered
 
-        tasks = [
-            resolve_target(target)
-            for target in suggested_geo_targets
-            if target
-        ]
+        tasks = [resolve_target(target) for target in suggested_geo_targets if target]
 
         resolved_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -331,13 +322,13 @@ class MetaAdSetAgent:
             if key:
                 unique_by_key[key] = item
 
-        final_locations = list(unique_by_key.values())   
+        final_locations = list(unique_by_key.values())
 
         logger.info(
             "meta_adset_geo.resolved_valid_locations",
             count=len(final_locations),
             locations=final_locations,
-        )     
+        )
 
         if not final_locations:
             logger.info("meta_adset_geo.no_valid_locations_after_resolve")
