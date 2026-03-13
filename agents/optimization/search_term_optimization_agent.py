@@ -131,6 +131,8 @@ class SearchTermOptimizationAgent:
 
         keywords, negative_keywords = [], []
         for t, r in zip(valid_terms, results):
+            if not r or r.get("recommendation_type") in ["no_action", "neutral"]:  # Skip if no-action
+                continue
             match_type = _normalize_match_type(t["match_type"])
             rec = KeywordRecommendation(
                 text=t["search_term"],

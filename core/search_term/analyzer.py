@@ -2,10 +2,12 @@ import json
 import asyncio
 from functools import cache
 from structlog import get_logger
+from typing import Optional
 
 from services.openai_client import chat_completion
 from services.json_utils import safe_json_parse
 from utils.prompt_loader import load_prompt
+
 logger = get_logger(__name__)
 
 SEARCH_TERM_COST_PER_CONVERSION_THRESHOLD = 4000.0
@@ -30,7 +32,9 @@ def _load_prompt(file_name: str) -> str:
 class SearchTermAnalyzer:
     MODEL = "gpt-4o-mini"
 
-    async def analyze_term(self, summary: str, search_term: str, metrics: dict) -> dict:
+    async def analyze_term(
+        self, summary: str, search_term: str, metrics: dict
+    ) -> Optional[dict]:
         """Run all relevancy checks for a single search term."""
         brand_result = await self._check_relevancy(summary, search_term, "brand")
         brand_type = brand_result.get("brand", {}).get("type", "generic")
@@ -62,6 +66,10 @@ class SearchTermAnalyzer:
         suggestion_type = str(overall.get("suggestion_type", "negative"))
         match_level = str(overall.get("match_level", "No Match"))
         reason = str(overall.get("reason", ""))
+
+        if suggestion_type in ["no_action", "neutral"]:
+            logger.info("Skipping no-action search term", term=search_term)
+            return None
 
         performance_result = self._check_performance(metrics)
         if not performance_result.get("match"):
@@ -161,4 +169,3 @@ class SearchTermAnalyzer:
         except Exception as e:
             logger.exception("LLM call failed", label=label, error=str(e))
             return {}
-
