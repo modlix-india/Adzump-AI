@@ -3,6 +3,10 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator, field_validator
 
+import structlog
+
+logger = structlog.get_logger()
+
 
 class CampaignObjective(str, Enum):
     OUTCOME_LEADS = "OUTCOME_LEADS"
@@ -180,6 +184,9 @@ class LeadFormCustomQuestion(BaseModel):
                 )
 
             if len(self.options) > 5:
+                logger.warning(
+                    "Truncating options from %d to 5", len(self.options)
+                )
                 self.options = self.options[:5]
 
             if len(self.options) < 3:
@@ -203,7 +210,7 @@ class LeadFormQuestions(BaseModel):
 
 class LeadFormPrivacyPolicy(BaseModel):
     link: Optional[str] = None
-    link_text: str = Field(..., max_length=100)
+    link_text: Optional[str] = Field(None, max_length=100)
 
 
 class LeadFormCompletion(BaseModel):
