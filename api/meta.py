@@ -1,12 +1,18 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query ,Header, HTTPException, Body
 
 from agents.meta import meta_campaign_agent
 from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
 from core.models.meta import CreateCreativeRequest
 from agents.meta.creative_agent import meta_creative_agent
+from core.infrastructure.context import auth_context
 
 
+
+from adapters.meta.client import MetaClient
+from agents.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
+# from oserver.services.connection import fetch_meta_api_token
+import os
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
 
@@ -39,3 +45,22 @@ async def generate_creative_image(
 ):
     result = await meta_creative_agent.generate_image(session_id, ad_account_id)
     return success_response(data=result.model_dump(mode="json"))    
+
+@router.post("/create-ad")
+async def create_meta_ads(
+    payload: dict,
+    client_code: str = Header(..., alias="ClientCode")
+):
+    meta_client = MetaClient()
+    ad_account_id = payload["account"]["ad_account_id"]
+
+    orchestrator = MetaAdCreationOrchestrator(
+        meta_client,
+        ad_account_id,
+        client_code
+
+    )
+
+    result = await orchestrator.create_full_structure(payload)
+
+    return result
