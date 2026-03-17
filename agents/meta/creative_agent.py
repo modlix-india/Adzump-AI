@@ -66,6 +66,33 @@ class MetaCreativeAgent:
 
         summary = website_data.final_summary or website_data.summary   
 
+        logger.info(
+            "Fetched website summary",
+            storage_id=getattr(website_data, "storage_id", None),
+            summary_preview=summary[:120] if summary else None,
+        )
+
+        if not summary or len(summary) < 50:
+            logger.warning(
+                "Invalid or stale summary detected, forcing refetch from storage"
+            )
+            
+            storage_id = getattr(website_data, "storage_id", None)
+
+            if storage_id:
+                product_data = await self.business_service.fetch_product_details(
+                    storage_id
+                )
+                summary = (
+                    product_data.get("finalSummary")
+                    or product_data.get("summary")
+                )
+
+                logger.info(
+                    "Summary recovered from storage",
+                    summary_preview=summary[:120] if summary else None,
+                )        
+
         if not summary:
             raise BusinessValidationException(
                 "Missing summary in product data. Please complete website analysis."
