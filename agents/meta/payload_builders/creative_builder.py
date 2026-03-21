@@ -1,5 +1,7 @@
 from urllib.parse import urlparse
 from fastapi import HTTPException
+import re
+from agents.meta.utils.utils import build_name
 from agents.meta.payload_builders.constants import (
     VALID_CREATIVE_TYPES,
     MAX_BODIES,
@@ -11,6 +13,9 @@ from agents.meta.payload_builders.constants import (
     MAX_DESCRIPTION_CHARS,
     VALID_CALL_TO_ACTION_TYPES,
     VALID_LEAD_AD_CTA_TYPES,
+    VALID_UTM_KEYS,
+    VALID_META_MACROS,
+    DEFAULT_URL_TAGS
 )
 
 
@@ -128,6 +133,12 @@ def _validate_common_fields(creative: dict, destination_type: str):
                 status_code=400,
                 detail="creative.call_to_action.url must be a valid http/https URL"
             )
+        url_tags = creative.get("url_tags")
+        if url_tags is not None and not isinstance(url_tags, str):
+            raise HTTPException(
+                status_code=400,
+                detail="url_tags must be a string. Expected format: 'utm_source=meta&utm_medium=cpc&utm_campaign=brand_2026'"
+            )
 
 
 # URL VALIDATOR
@@ -140,9 +151,72 @@ def _is_valid_url(url: str) -> bool:
     except Exception:
         return False
 
+# URL TAGS VALIDATOR
+def _resolve_url_tags(creative: dict, destination_type: str) -> dict:
+    """
+    Resolves url_tags for the creative payload.
+    - ON_AD (Lead Ads): skip entirely
+    - User provided url_tags: validate then use theirs
+    - User did not provide: use default macro fallback
+    """
+    if destination_type == "ON_AD":
+        return {}
+
+    url_tags = creative.get("url_tags")
+
+    if not url_tags or not url_tags.strip():
+        return {"url_tags": DEFAULT_URL_TAGS}
+
+    # Must not be a full URL or malformed
+    if "://" in url_tags or url_tags.startswith("?") or "&&" in url_tags:
+        raise HTTPException(
+            status_code=400,
+            detail="url_tags is invalid. Expected format: 'utm_source=meta&utm_medium=cpc&utm_campaign=brand_2026'"
+        )
+
+    for param in url_tags.split("&"):
+        if "=" not in param:
+            raise HTTPException(
+                status_code=400,
+                detail=f"url_tags contains invalid parameter '{param}' — must be in key=value format"
+            )
+
+        key, value = param.split("=", 1)
+
+        if not key.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="url_tags contains a parameter with an empty key"
+            )
+
+        if key.strip() not in VALID_UTM_KEYS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{key}' is not a valid UTM parameter. Allowed: {sorted(VALID_UTM_KEYS)}"
+            )
+
+        if " " in value:
+            raise HTTPException(
+                status_code=400,
+                detail=f"url_tags value for '{key}' contains a space — please URL encode spaces as '%20'"
+            )
+
+        if "{{" in value or "}}" in value:
+            if value.count("{{") != value.count("}}"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"url_tags value for '{key}' has unclosed macro braces: '{value}'"
+                )
+            invalid_macros = [m for m in re.findall(r"\{\{.*?\}\}", value) if m not in VALID_META_MACROS]
+            if invalid_macros:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"'{key}' contains invalid macro(s) {invalid_macros}. Valid: {sorted(VALID_META_MACROS)}"
+                )
+
+    return {"url_tags": url_tags}
 
 # ASSET CONTENT VALIDATOR
-
 def _validate_char_limit(items: list, field_name: str, max_chars: int):
     """Validates character limit for each item in a list."""
     for i, item in enumerate(items):
@@ -243,13 +317,14 @@ def _build_dynamic_image_creative(creative: dict, destination_type: str) -> dict
 
     if descriptions:
         asset_feed["descriptions"] = [{"text": desc} for desc in descriptions]
-
+    name = build_name(creative["name"], "creative")
     return {
-        "name": creative["name"],
+        "name": name,
         "object_story_spec": {
             "page_id": creative["page_id"]
         },
-        "asset_feed_spec": asset_feed
+        "asset_feed_spec": asset_feed,
+        **_resolve_url_tags(creative, destination_type) 
     }
 
 
@@ -288,11 +363,13 @@ def _build_non_dynamic_image_creative(creative: dict, destination_type: str) -> 
 
     if descriptions:
         link_data["description"] = descriptions[0]
-
+    
+    name = build_name(creative["name"], "creative")
     return {
-        "name": creative["name"],
+        "name": name,
         "object_story_spec": {
             "page_id":   creative["page_id"],
             "link_data": {k: v for k, v in link_data.items() if v is not None}
-        }
+        },
+        **_resolve_url_tags(creative, destination_type)
     }

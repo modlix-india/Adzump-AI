@@ -16,12 +16,12 @@ def build_locale_targeting(locale_objects):
                 detail="Locale must be an object"
             )
 
-        locale_id = locale.get("id")
+        locale_id = locale.get("key")
 
         if not locale_id:
             raise HTTPException(
                 status_code=400,
-                detail="Locale missing id"
+                detail="Locale missing key"
             )
 
         if locale_id not in locale_ids:

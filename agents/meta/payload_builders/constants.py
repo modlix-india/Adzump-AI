@@ -135,3 +135,42 @@ VALID_LEAD_AD_CTA_TYPES = {
     "APPLY_NOW", "DOWNLOAD", "GET_QUOTE",
     "LEARN_MORE", "SIGN_UP", "SUBSCRIBE"
 }
+
+# URL TAGS VALIDATOR
+VALID_UTM_KEYS = {
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_content",
+    "utm_term",
+    "utm_id",
+    "utm_adset",
+    "utm_ad",
+    "utm_placement",
+    "utm_campaign_id",
+    "utm_adset_id",
+    "utm_ad_id",
+}
+
+VALID_META_MACROS = {
+    "{{site_source_name}}",
+    "{{campaign.name}}",
+    "{{campaign.id}}",
+    "{{adset.name}}",
+    "{{adset.id}}",
+    "{{ad.name}}",
+    "{{ad.id}}",
+    "{{placement}}",
+}
+
+DEFAULT_URL_TAGS = (
+    "utm_source={{site_source_name}}"
+    "&utm_medium=paid_social"
+    "&utm_campaign={{campaign.name}}"
+    "&utm_adset={{adset.name}}"
+    "&utm_ad={{ad.name}}"
+    "&utm_placement={{placement}}"
+    "&utm_campaign_id={{campaign.id}}"
+    "&utm_adset_id={{adset.id}}"
+    "&utm_ad_id={{ad.id}}"
+)

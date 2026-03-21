@@ -59,8 +59,9 @@ def build_geo_locations(location_list: list):
         "countries": set(),       # set — auto deduplicates country codes
         "cities": [],
         "regions": [],
-        "zips": set(),            # set — auto deduplicates zip codes
-        "custom_locations": []
+        "zips": [],            # set — auto deduplicates zip codes
+        "custom_locations": [],
+        "neighborhoods": [],
     }
 
     for location in location_list:
@@ -122,9 +123,21 @@ def build_geo_locations(location_list: list):
         elif location_type == "zip":
             zip_code = location.get("key")
             if not zip_code:
-                raise HTTPException(status_code=400, detail="Zip code missing")
+                raise HTTPException(status_code=400, detail="zip key missing")
 
-            geo_payload["zips"].add(str(zip_code))
+            # Meta expects {"key": "COUNTRY_CODE:ZIP_CODE"}
+            geo_payload["zips"].append(zip_code)
+
+        # NEIGHBORHOOD
+        elif location_type == "neighborhood":
+            neighborhood_key = location.get("key")
+            if not neighborhood_key:
+                raise HTTPException(
+                    status_code=400,
+                    detail="neighborhood key missing"
+                )
+
+            geo_payload["neighborhoods"].append({"key": str(neighborhood_key)})
 
         # CUSTOM LOCATION
         # Meta expects latitude, longitude with optional radius

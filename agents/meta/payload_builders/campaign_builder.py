@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from .constants import VALID_OBJECTIVES, VALID_STATUSES, VALID_SPECIAL_AD_CATEGORIES
+from agents.meta.utils.utils import build_name
 
 def build_campaign_payload(campaign: dict) -> dict:
     """
@@ -18,7 +19,7 @@ def build_campaign_payload(campaign: dict) -> dict:
             status_code=400,
             detail="name required for campaign"
         )
-    name = name.strip()
+    name = build_name(name, "campaign")
 
     # objective
     objective = campaign.get("objective")

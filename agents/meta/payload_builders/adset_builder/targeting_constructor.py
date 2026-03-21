@@ -30,6 +30,13 @@ def build_targeting(targeting_payload: dict):
     # AGE
     age_min = targeting_payload.get("age_min")
     age_max = targeting_payload.get("age_max")
+    for name, value in {"age_min": age_min, "age_max": age_max}.items():
+        if value is not None and not isinstance(value, int):
+            raise HTTPException(
+                status_code=400,
+                detail=f"{name} must be an integer"
+            )
+
 
     if age_min is not None and age_min < 13:
         raise HTTPException(

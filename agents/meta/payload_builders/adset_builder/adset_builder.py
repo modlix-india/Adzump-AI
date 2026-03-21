@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 
-from agents.meta.utils.time_utils import normalize_time
 from agents.meta.payload_builders.adset_builder.targeting_constructor import build_targeting
 from agents.meta.payload_builders.adset_builder.promoted_object_constructor import build_promoted_object
-
+from agents.meta.utils.utils import build_name , normalize_time
 from agents.meta.payload_builders.constants import (
     VALID_BUDGET_TYPES,
     MIN_DAILY_BUDGET_INR,
@@ -65,11 +64,18 @@ def normalize_budget(budget: dict) -> dict:
 
     return {"lifetime_budget": minor_units}
 
-
-#  SCHEDULE VALIDATOR 
-def validate_schedule(start_time, end_time):
+ 
+#  SCHEDULE VALIDATOR
+def validate_schedule(start_time: str, end_time: str):
+    """
+    Validates normalized time strings from normalize_time.
+    Expects Meta format: YYYY-MM-DDTHH:MM:SS±HHMM
+    """
     if not start_time and end_time:
-        raise HTTPException(status_code=400, detail="start_time is required when end_time is provided")
+        raise HTTPException(
+            status_code=400,
+            detail="start_time is required when end_time is provided"
+        )
 
     if not start_time:
         return
@@ -80,7 +86,10 @@ def validate_schedule(start_time, end_time):
         raise HTTPException(status_code=400, detail="Invalid start_time format")
 
     if start_dt < datetime.now(start_dt.tzinfo) + timedelta(seconds=SCHEDULE_BUFFER_SECONDS):
-        raise HTTPException(status_code=400, detail="start_time must be at least 60 seconds in the future")
+        raise HTTPException(
+            status_code=400,
+            detail="start_time must be at least 60 seconds in the future"
+        )
 
     if end_time:
         try:
@@ -89,15 +98,16 @@ def validate_schedule(start_time, end_time):
             raise HTTPException(status_code=400, detail="Invalid end_time format")
 
         if end_dt <= start_dt:
-            raise HTTPException(status_code=400, detail="end_time must be after start_time")
+            raise HTTPException(
+                status_code=400,
+                detail="end_time must be after start_time"
+            )
 
-
-#  BIDDING VALIDATOR 
 def validate_bidding(bidding: dict):
     if not bidding:
         raise HTTPException(status_code=400, detail="Bidding is required for adset")
 
-    billing_event = bidding.get("billing_event")
+    billing_event     = bidding.get("billing_event")
     optimization_goal = bidding.get("optimization_goal")
 
     # Validate billing_event
@@ -128,37 +138,18 @@ def validate_bidding(bidding: dict):
 
     # Validate bid_strategy requires bid_amount
     bid_strategy = bidding.get("bid_strategy")
-    bid_amount = bidding.get("bid_amount")
+    bid_amount   = bidding.get("bid_amount")
 
     if bid_strategy in BID_STRATEGIES_REQUIRING_BID_AMOUNT and bid_amount is None:
         raise HTTPException(
             status_code=400,
             detail=f"bid_amount is required for bid_strategy '{bid_strategy}'"
         )
-    if not bidding:
-        raise HTTPException(status_code=400, detail="Bidding is required for adset")
-
-    if not bidding.get("billing_event"):
-        raise HTTPException(status_code=400, detail="bidding.billing_event is required")
-
-    if not bidding.get("optimization_goal"):
-        raise HTTPException(status_code=400, detail="bidding.optimization_goal is required")
-
-    bid_strategy = bidding.get("bid_strategy")
-    bid_amount = bidding.get("bid_amount")
-
-    if bid_strategy in BID_STRATEGIES_REQUIRING_BID_AMOUNT and bid_amount is None:
-        raise HTTPException(
-            status_code=400,
-            detail=f"bid_amount is required for bid_strategy '{bid_strategy}'"
-        )
-
 
 #  PROMOTED OBJECT VALIDATOR 
 def validate_promoted_object_match(optimization_goal: str, promoted_object: dict):
     """
     Validates that promoted_object type matches the optimization_goal.
-    Meta rejects mismatches with cryptic errors — we catch it early with clear messages.
     """
 
     # Unknown optimization goal — skip validation, let Meta handle it
@@ -211,13 +202,9 @@ def build_adset_payload(adset: dict) -> dict:
         raise HTTPException(status_code=400, detail="Adset payload is required")
 
     # Name
-    business_name = adset.get("business_name")
-    if business_name:
-        name = generate_adset_name(business_name)
-    else:
-        if not adset.get("name"):
-            raise HTTPException(status_code=400, detail="Adset name is required")
-        name = adset["name"]
+    if not adset.get("name"):
+        raise HTTPException(status_code=400, detail="Adset name is required")
+    name = build_name(adset["name"], "adset")   
 
     # Budget
     budget_fields = normalize_budget(adset.get("budget"))
@@ -227,7 +214,7 @@ def build_adset_payload(adset: dict) -> dict:
     end_time_raw = adset.get("schedule", {}).get("end_time")
     start_time = normalize_time(start_time_raw)
     end_time = normalize_time(end_time_raw)
-    validate_schedule(start_time_raw, end_time_raw)
+    validate_schedule(start_time, end_time)
 
     # Lifetime budget requires end_time
     if "lifetime_budget" in budget_fields and not end_time:

@@ -3,10 +3,10 @@ from adapters.meta.exceptions import MetaAPIError
 from agents.meta.meta_payload_service import (
     MetaPayloadAssemblyService
 )
-from agents.meta.executors.campaign_executor import MetaCampaignExecutor
-from agents.meta.executors.adset_executor import MetaAdSetExecutor
-from agents.meta.executors.creative_executor import MetaCreativeExecutor
-from agents.meta.executors.ad_creation_executor import MetaAdExecutor
+from adapters.meta.executors.campaign_executor import MetaCampaignExecutor
+from adapters.meta.executors.adset_executor import MetaAdSetExecutor
+from adapters.meta.executors.creative_executor import MetaCreativeExecutor
+from adapters.meta.executors.ad_creation_executor import MetaAdExecutor
 
 logger = get_logger(__name__)
 
@@ -17,6 +17,7 @@ class MetaAdCreationOrchestrator:
         self.meta_client = meta_client
         self.ad_account_id = ad_account_id
         self.client_code = client_code
+
 
         self.campaign_executor = MetaCampaignExecutor(
             meta_client, ad_account_id, client_code
@@ -31,7 +32,7 @@ class MetaAdCreationOrchestrator:
             meta_client, ad_account_id, client_code
         )
 
-    async def create_full_structure(self, meta_input_payload: dict) -> dict:
+    async def create_full_structure(self, meta_input_payload: dict, inspect_payload: bool) -> dict:
 
         existing_ids = meta_input_payload.get("existing_ids") or {
             "campaign_id": None,
@@ -45,6 +46,13 @@ class MetaAdCreationOrchestrator:
                 meta_input_payload
             )
         )
+
+        # Inspect payload - Dry run — return assembled payloads without hitting Meta API
+        if inspect_payload:
+            return {
+                "status": "SUCCESS",
+                "payloads": assembled_payloads
+            }
 
         current_stage = "CAMPAIGN"
 

@@ -1,7 +1,6 @@
 from fastapi import HTTPException
 
-FIXED_CATEGORIES = ["interests", "behaviors", "demographics"]
-NON_DEMOGRAPHIC_TYPES = {"interests", "behaviors"}
+from agents.meta.payload_builders.constants import FIXED_CATEGORIES, NON_DEMOGRAPHIC_TYPES
 
 
 def build_entity_targeting(targeting_payload: dict) -> dict:

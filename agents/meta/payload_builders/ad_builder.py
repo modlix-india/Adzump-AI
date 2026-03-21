@@ -1,9 +1,12 @@
+from agents.meta.utils.utils import build_name
+from fastapi import HTTPException
+
 def build_ad_payload(ad: dict, destination_type: str = None, lead_gen_form_id: str = None) -> dict:
 
     creative_payload = {}  # creative_id injected later
 
     ad_payload = {
-        "name":     ad["name"],
+        "name":     build_name(ad.get("name"), "ad"),
         "creative": creative_payload,
         "status":   ad.get("status", "PAUSED")
     }

@@ -59,7 +59,7 @@ class MetaPayloadAssemblyService:
 
         # Build ad
         lead_gen_form_id = meta_input_payload["creative"].get("call_to_action").get("lead_gen_form_id")
-        ad_payload = build_ad_payload(meta_input_payload["ad"], destination_type=meta_input_payload["adset"]["destination_type"], lead_gen_form_id=lead_gen_form_id)
+        ad_payload = build_ad_payload(meta_input_payload.get("ad"), destination_type=meta_input_payload.get("adset").get("destination_type"), lead_gen_form_id=lead_gen_form_id)
         logger.info(
             "Ad payload built",
             ad_payload=ad_payload,
