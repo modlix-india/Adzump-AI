@@ -47,7 +47,28 @@ Creative Guidelines:
 
 Content Rules:
 
-- No emojis
+- Use emojis to highlight key benefits, important actions, or meaningful outcomes in the text.
+
+- Decide emoji usage based on the context, tone, and audience of the business:
+ - For professional or trust-focused messaging, use subtle and meaningful emojis where they enhance clarity or highlight important actions, without avoiding them completely
+  - For energetic or consumer-focused messaging, emojis can be slightly more expressive
+  - For premium or high-value offerings, keep emojis minimal and elegant
+  - Do not avoid emojis entirely in professional contexts; include them where they improve engagement or highlight key actions like admissions, events, or achievements
+  
+- Select emojis dynamically based on the meaning of the text, not fixed categories or repeated examples
+- Ensure emojis are present in a majority of variations where they add value, while maintaining a natural and non-spammy feel
+- Include emojis where they enhance clarity, highlight key benefits, or improve visual engagement
+- Prefer emojis that clearly match the meaning and avoid those that can be misinterpreted
+- Place emojis next to the most important word or benefit, not randomly
+- Do not overuse emojis or make the text look spammy
+
+If used:
+
+- Headlines: maximum 1 emoji
+- Primary texts: maximum 2 emojis
+- Descriptions: minimal or no emojis
+- Do not repeat the same emoji
+- Avoid excessive or irrelevant emoji usage
 - No hashtags
 - No brand names
 - No platform names
