@@ -10,6 +10,7 @@ from utils import text_utils, prompt_loader
 from services.openai_client import chat_completion
 from utils.keyword_utils import KeywordUtils
 from services.session_manager import sessions
+from core.infrastructure.session_store import get_session_store
 from fastapi import HTTPException
 from services.business_service import BusinessService
 from models.business_model import BusinessMetadata
@@ -114,7 +115,8 @@ class GoogleKeywordService:
         language_id: int = DEFAULT_LANGUAGE_ID,
         chunk_size: int = CHUNK_SIZE,
     ) -> List[KeywordSuggestion]:
-        access_token = fetch_google_api_token_simple(client_code)
+        # access_token = fetch_google_api_token_simple(client_code)
+        access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
 
         location_ids = location_ids or self.DEFAULT_LOCATION_IDS  # India
         all_suggestions: List[KeywordSuggestion] = []
@@ -428,12 +430,19 @@ class GoogleKeywordService:
         logger.info("Starting strategic keyword research pipeline")
 
         # validate the session
-        if session_id not in sessions:
-            raise HTTPException(status_code=404, detail="Invalid or expired session.")
+        session_store = get_session_store()
+        chatv2_state = session_store.get(session_id)
 
-        session = sessions[session_id]
-        login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
-        customer_id = session.get("campaign_data", {}).get("customerId")
+        if chatv2_state:
+            ad_plan = chatv2_state.get("ad_plan", {})
+            login_customer_id = ad_plan.get("loginCustomerId")
+            customer_id = ad_plan.get("customerId")
+        elif session_id in sessions:
+            session = sessions[session_id]
+            login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
+            customer_id = session.get("campaign_data", {}).get("customerId")
+        else:
+            raise HTTPException(status_code=404, detail="Invalid or expired session.")
 
         if not login_customer_id:
             raise HTTPException(
