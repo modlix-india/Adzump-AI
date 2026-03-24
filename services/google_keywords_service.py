@@ -354,7 +354,6 @@ class GoogleKeywordService:
         logger.info(
             f"Final optimization: {len(final_optimized)} keywords selected (sorted by volume)"
         )
-        logger.info(f"Final optimized keywords: {final_optimized}")
 
         return final_optimized[: self.FINAL_KEYWORD_LIMIT]
 
