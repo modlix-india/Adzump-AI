@@ -1,8 +1,8 @@
 from adapters.meta.client import meta_client
 from core.infrastructure.context import auth_context
 
-class MetaAdImageAdapter:
 
+class MetaAdImageAdapter:
     async def upload_image(
         self,
         ad_account_id: str,
@@ -10,12 +10,26 @@ class MetaAdImageAdapter:
     ) -> dict:
         account_id = ad_account_id.removeprefix("act_")
 
-        payload = {
-            "bytes": image_base64
-        }
+        payload = {"bytes": image_base64}
 
         return await meta_client.post(
             f"/act_{account_id}/adimages",
             auth_context.client_code,
             json=payload,
         )
+
+    async def get_image_url(self, ad_account_id: str, image_hash: str) -> str | None:
+        account_id = ad_account_id.removeprefix("act_")
+        result = await meta_client.get(
+            f"/act_{account_id}/adimages",
+            auth_context.client_code,
+            params={"hashes": [image_hash]},
+        )
+
+        try:
+            images = result.get("data", [])
+            if images:
+                return images[0].get("url")
+        except Exception:
+            pass
+        return None

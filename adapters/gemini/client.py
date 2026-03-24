@@ -8,6 +8,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 TIMEOUT = 60.0
 
+
 async def text_completion(
     prompt: str,
     model: str = "gemini-2.0-flash",
@@ -16,11 +17,7 @@ async def text_completion(
     Generate text completion using Gemini REST API.
     """
     url = f"{GEMINI_BASE_URL}/{model}:generateContent"
-    payload = {
-        "contents": [
-            {"parts": [{"text": prompt}]}
-        ]
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         response = await client.post(
@@ -42,17 +39,18 @@ async def generate_images(
     prompt: str,
     n: int = 1,
     model: str = "gemini-2.5-flash-image",
+    aspect_ratio: str = "1:1",
 ) -> List[bytes]:
     """
     Returns raw image BYTES.
     """
     url = f"{GEMINI_BASE_URL}/{model}:generateContent"
     payload = {
-        "contents": [
-            {"parts": [{"text": prompt}]}
-        ],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "responseModalities": ["IMAGE"],
+            "imageConfig": {
+                "aspectRatio": aspect_ratio,
+            },
         },
     }
 

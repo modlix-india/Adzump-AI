@@ -113,3 +113,20 @@ class CreateCreativeRequest(BaseModel):
 
 class CreateCreativeResponse(BaseModel):
     creativeId: str = Field(..., alias="creativeId")
+
+
+class UnifiedPosterRequest(BaseModel):
+    summary: str
+    headline: str
+    description: str
+    cta: str
+    ad_account_id: str = Field(..., alias="adAccountId")
+    aspect_ratio: Optional[Literal["1:1", "4:5", "9:16", "1.91:1"]] = Field(
+        default="1:1", 
+        alias="aspectRatio"
+    )
+
+
+class UnifiedPosterResponse(BaseModel):
+    image_hash: str
+    image_url: Optional[str] = None

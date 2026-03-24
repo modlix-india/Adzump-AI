@@ -3,9 +3,8 @@ from fastapi import APIRouter, Query
 from agents.meta import meta_campaign_agent
 from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
-from core.models.meta import CreateCreativeRequest
+from core.models.meta import CreateCreativeRequest, UnifiedPosterRequest
 from agents.meta.creative_agent import meta_creative_agent
-
 
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
@@ -33,9 +32,6 @@ async def generate_creative(session_id: str = Query(..., alias="sessionId")):
 
 
 @router.post("/creative/image/generate")
-async def generate_creative_image(
-    session_id: str = Query(..., alias="sessionId"),
-    ad_account_id: str = Query(..., alias="adAccountId")
-):
-    result = await meta_creative_agent.generate_image(session_id, ad_account_id)
-    return success_response(data=result.model_dump(mode="json"))    
+async def generate_creative_image(request: UnifiedPosterRequest):
+    result = await meta_creative_agent.generate_image(request)
+    return success_response(data=result.model_dump(mode="json"))
