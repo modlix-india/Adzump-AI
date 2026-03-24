@@ -3,7 +3,7 @@ import os
 import re
 from pydantic import ValidationError
 
-from core.models.meta import LeadFormPayload
+from core.models.lead_form import LeadFormPayload
 from services.business_service import BusinessService
 from services.session_manager import sessions
 from agents.shared.llm import chat_completion
@@ -74,35 +74,34 @@ class MetaLeadFormAgent:
 
         try:
             payload = LeadFormPayload.model_validate_json(content)
-
-            site_links = await self._fetch_site_links(website_data.storage_id)
-
-            logger.info("Fetched site links", site_links=site_links)
-
-            privacy_link = self._extract_privacy_policy(
-                site_links,
-                website_data.business_url
-            )
-
-            if privacy_link and payload.privacy_policy:
-                payload.privacy_policy.link = privacy_link
-            else:
-                if payload.privacy_policy:
-                    payload.privacy_policy.link = website_data.business_url
-                    payload.privacy_policy.link_text = (
-                        payload.privacy_policy.link_text or "Privacy Policy"
-                    )
-
-                logger.warning(
-                    "Privacy policy URL not found, falling back to business URL",
-                    session_id=session_id
-                )
-
-            return payload
-
         except ValidationError as e:
             logger.error("Failed to parse LLM output", error=str(e), raw=content)
             raise AIProcessingException("LLM output is not valid JSON")
+
+        site_links = await self._fetch_site_links(website_data.storage_id)
+
+        logger.info("Fetched site links", site_links=site_links)
+
+        privacy_link = self._extract_privacy_policy(
+            site_links,
+            website_data.business_url
+        )
+
+        if privacy_link and payload.privacy_policy:
+            payload.privacy_policy.link = privacy_link
+        else:
+            if payload.privacy_policy:
+                payload.privacy_policy.link = website_data.business_url
+                payload.privacy_policy.link_text = (
+                    payload.privacy_policy.link_text or "Privacy Policy"
+                )
+
+            logger.warning(
+                "Privacy policy URL not found, falling back to business URL",
+                session_id=session_id
+            )
+
+        return payload
 
     async def create_lead_form(
         self,
@@ -136,6 +135,10 @@ class MetaLeadFormAgent:
 
     async def _fetch_site_links(self, storage_id: str):
 
+        if not storage_id:
+            logger.warning("Storage ID is None, skipping site link fetch")
+            return []
+
         request = StorageRequest(
             storageName="AISuggestedData",
             appCode="marketingai",
@@ -145,11 +148,14 @@ class MetaLeadFormAgent:
 
         response = await self.storage_service.read_storage(request)
 
-        if not response.success or not response.content:
+        if not response.success or not response.result:
             logger.error("No site links found in storage", storage_id=storage_id)
             return []  
 
-        record = response.content[0]
+        record = response.result
+
+        if isinstance(record, list) and len(record) > 0:
+            record = record[0]
 
         data = record.get("result", {})
 
@@ -158,7 +164,7 @@ class MetaLeadFormAgent:
 
         site_links = data.get("siteLinks", [])
 
-        return site_links    
+        return site_links 
 
     def _extract_privacy_policy(self, links, base_url):
 

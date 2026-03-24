@@ -3,7 +3,8 @@ from fastapi import APIRouter, Query
 from agents.meta import meta_campaign_agent
 from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
-from core.models.meta import CreateCreativeRequest, LeadFormPayload
+from core.models.meta import CreateCreativeRequest
+from core.models.lead_form import LeadFormPayload
 from agents.meta.creative_agent import meta_creative_agent
 from agents.meta.lead_form_agent import meta_lead_form_agent
 
