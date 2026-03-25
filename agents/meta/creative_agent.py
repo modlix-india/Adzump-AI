@@ -1,8 +1,8 @@
-# from datetime import datetime
-from typing import Any
+from typing import Any, List
 import json
 import os
 import base64
+import httpx
 
 import structlog
 from pydantic import ValidationError
@@ -118,30 +118,61 @@ class MetaCreativeAgent:
             headline=request.headline,
         )
 
-        # Format the intent prompt with all ad copy
-        image_intent_raw = await chat_completion(
-            [
-                {
-                    "role": "user",
-                    "content": IMAGE_INTENT_PROMPT.format(
-                        summary=request.summary,
-                        headline=request.headline,
-                        description=request.description,
-                        cta=request.cta,
-                    ),
-                }
-            ]
-        )
-        # We expect a raw prompt back from the LLM now, not JSON
-        master_prompt = image_intent_raw.choices[0].message.content.strip()
+        # 1. Download Logo if provided (Multimodal Phase)
+        image_parts: List[bytes] = []
+        if request.logo_url:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    logo_resp = await client.get(request.logo_url)
+                    if logo_resp.status_code == 200:
+                        image_parts.append(logo_resp.content)
+                        logger.info(
+                            "Logo downloaded for multimodal generation",
+                            url=request.logo_url,
+                        )
+            except Exception as e:
+                logger.warning(
+                    "Failed to download logo, proceeding without it", error=str(e)
+                )
 
-        # Log the master prompt clearly for debug
-        logger.info("MASTER PROMPT FOR GEMINI", prompt=master_prompt)
+        # 2. Build Conditional Brand Instructions
+        brand_instructions = ""
+        if request.logo_url:
+            brand_instructions += "\n- LOGO: Incorporate the logo from the provided reference image. Place it professionally (e.g., bottom corner)."
+        if request.primary_color:
+            brand_instructions += f"\n- PRIMARY COLOR: Use {request.primary_color} for the main CTA button and bold headline elements."
+        if request.secondary_color:
+            brand_instructions += f"\n- SECONDARY COLOR: Use {request.secondary_color} for subheadings or subtle accents."
+        if request.font_family:
+            brand_instructions += f"\n- FONT STYLE: Render text using a look and feel consistent with the '{request.font_family}' typeface."
+
+        # 3. Create Narrative Master Prompt
+        PROMPT_PATH = "prompts/meta/image_scene.txt"
+        try:
+            with open(PROMPT_PATH, "r") as f:
+                template = f.read()
+
+            master_prompt = template.format(
+                summary=request.summary,
+                headline=request.headline,
+                description=request.description,
+                cta=request.cta,
+                brand_instructions=brand_instructions,
+            )
+
+            logger.info("MASTER PROMPT FOR GEMINI", prompt=master_prompt)
+
+        except Exception as e:
+            logger.error("Failed to load or format prompt template", error=str(e))
+            raise AIProcessingException(f"Prompt preparation failed: {str(e)}")
 
         try:
-            # We pass the master prompt directly to Gemini
+            # We pass the master prompt and any image parts to Gemini
             images = await generate_images(
-                master_prompt, n=1, aspect_ratio=request.aspect_ratio
+                master_prompt,
+                n=1,
+                aspect_ratio=request.aspect_ratio,
+                image_parts=image_parts,
             )
             if not images:
                 raise AIProcessingException("Image generation returned empty results")

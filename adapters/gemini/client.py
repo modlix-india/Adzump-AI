@@ -40,13 +40,25 @@ async def generate_images(
     n: int = 1,
     model: str = "gemini-2.5-flash-image",
     aspect_ratio: str = "1:1",
+    image_parts: List[bytes] | None = None,
 ) -> List[bytes]:
     """
     Returns raw image BYTES.
     """
     url = f"{GEMINI_BASE_URL}/{model}:generateContent"
+    
+    parts = [{"text": prompt}]
+    if image_parts:
+        for img in image_parts:
+            parts.append({
+                "inlineData": {
+                    "mimeType": "image/png",
+                    "data": base64.b64encode(img).decode("utf-8")
+                }
+            })
+
     payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "contents": [{"parts": parts}],
         "generationConfig": {
             "imageConfig": {
                 "aspectRatio": aspect_ratio,

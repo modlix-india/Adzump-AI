@@ -125,6 +125,11 @@ class UnifiedPosterRequest(BaseModel):
         default="1:1", 
         alias="aspectRatio"
     )
+    logo_url: Optional[str] = Field(default=None, alias="logoUrl")
+    font_family: Optional[str] = Field(default=None, alias="fontFamily")
+    primary_color: Optional[str] = Field(default=None, alias="primaryColor")
+    secondary_color: Optional[str] = Field(default=None, alias="secondaryColor")
+    asset_urls: Optional[List[str]] = Field(default_factory=list, alias="assetUrls")
 
 
 class UnifiedPosterResponse(BaseModel):

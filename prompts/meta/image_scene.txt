@@ -8,6 +8,7 @@ Business Summary: {summary}
 Headline: {headline}
 Description: {description}
 CTA: {cta}
+{brand_instructions}
 
 ---
 
