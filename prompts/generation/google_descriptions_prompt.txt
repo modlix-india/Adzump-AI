@@ -3,6 +3,7 @@ Your task is to generate high-quality ad descriptions for Google Ads.
 
 Business Summary:
 {summary}
+{requirements}
 
 Keywords to weave in naturally (at least one per description):
 {keywords}

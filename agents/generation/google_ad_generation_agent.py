@@ -20,6 +20,7 @@ class GoogleAdGenerationAgent:
         self,
         summary: str,
         keywords: list,
+        requirements: str | None = None,
     ) -> dict:
         logger.info(
             "[GoogleAdGenerationAgent] Starting parallel generation",
@@ -33,12 +34,14 @@ class GoogleAdGenerationAgent:
                 platform=_PLATFORM,
                 content_type="headlines",
                 keywords=keywords,
+                requirements=requirements,
             ),
             self.ad_text_service.generate(
                 summary=summary,
                 platform=_PLATFORM,
                 content_type="descriptions",
                 keywords=keywords,
+                requirements=requirements,
             ),
             self.age_service.generate(summary=summary, platform=_PLATFORM),
             self.gender_service.generate(summary=summary, platform=_PLATFORM),

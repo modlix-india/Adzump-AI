@@ -6,6 +6,7 @@ that adds context, a secondary benefit, or a subtle call-to-action.
 
 Business Summary:
 {summary}
+{requirements}
 
 Rules:
 - Generate exactly 8 unique description lines

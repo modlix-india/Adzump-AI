@@ -3,6 +3,7 @@ Your task is to generate high-quality ad headlines for Google Ads.
 
 Business Summary:
 {summary}
+{requirements}
 
 Positive Keywords to include (EACH headline must contain at least one keyword or meaningful sub-part):
 {keywords}

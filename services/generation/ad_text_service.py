@@ -26,6 +26,7 @@ class AdTextService:
         platform: str,
         content_type: str,
         keywords: list | None = None,
+        requirements: str | None = None,
     ) -> list[str]:
         cfg = get_platform_config(platform)
         type_cfg = cfg.get_content_type(content_type)
@@ -58,7 +59,7 @@ class AdTextService:
 
             try:
                 raw_items = await self._call_llm(
-                    summary, keywords, cfg, type_cfg, temperature
+                    summary, keywords, requirements, cfg, type_cfg, temperature
                 )
                 all_raw.extend(raw_items)
 
@@ -132,6 +133,7 @@ class AdTextService:
         self,
         summary: str,
         keywords: list | None,
+        requirements: str | None,
         cfg: PlatformConfig,
         type_cfg: ContentTypeConfig,
         temperature: float,
@@ -140,6 +142,9 @@ class AdTextService:
         prompt = template.format(
             summary=summary,
             keywords=json.dumps(keywords or [], indent=2),
+            requirements=f"\nCUSTOM INSTRUCTIONS:\n{requirements}"
+            if requirements
+            else "",
         )
         response = await chat_completion(
             messages=[{"role": "user", "content": prompt}],

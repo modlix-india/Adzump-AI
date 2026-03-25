@@ -64,6 +64,7 @@ async def generate_google_ads(request: GoogleGenerateRequest):
     result = await google_ad_generation_agent.generate(
         summary=request.summary,
         keywords=plain_keywords,
+        requirements=request.requirements,
     )
     return success_response(
         {
@@ -79,6 +80,7 @@ async def generate_google_ads(request: GoogleGenerateRequest):
 async def generate_meta_ads(request: MetaGenerateRequest):
     result = await meta_ad_generation_agent.generate(
         summary=request.summary,
+        requirements=request.requirements,
     )
     return success_response(
         {

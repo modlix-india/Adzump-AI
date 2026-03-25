@@ -19,6 +19,7 @@ class MetaAdGenerationAgent:
     async def generate(
         self,
         summary: str,
+        requirements: str | None = None,
     ) -> dict:
         logger.info(
             "[MetaAdGenerationAgent] Starting parallel generation", platform=_PLATFORM
@@ -26,13 +27,22 @@ class MetaAdGenerationAgent:
 
         headlines, descriptions, primary_text, age, gender = await asyncio.gather(
             self.ad_text_service.generate(
-                summary=summary, platform=_PLATFORM, content_type="headlines"
+                summary=summary,
+                platform=_PLATFORM,
+                content_type="headlines",
+                requirements=requirements,
             ),
             self.ad_text_service.generate(
-                summary=summary, platform=_PLATFORM, content_type="descriptions"
+                summary=summary,
+                platform=_PLATFORM,
+                content_type="descriptions",
+                requirements=requirements,
             ),
             self.ad_text_service.generate(
-                summary=summary, platform=_PLATFORM, content_type="primary_text"
+                summary=summary,
+                platform=_PLATFORM,
+                content_type="primary_text",
+                requirements=requirements,
             ),
             self.age_service.generate(summary=summary, platform=_PLATFORM),
             self.gender_service.generate(summary=summary, platform=_PLATFORM),

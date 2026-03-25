@@ -3,6 +3,7 @@ Your task is to generate high-quality ad headlines for Meta Ads.
 
 Business Summary:
 {summary}
+{requirements}
 
 Rules:
 - Generate exactly 20 unique headlines
