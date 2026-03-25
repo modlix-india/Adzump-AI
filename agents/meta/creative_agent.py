@@ -167,10 +167,18 @@ class MetaCreativeAgent:
         request: CreateCreativeRequest
     ) -> CreateCreativeResponse:
 
-        page_id = os.getenv("META_PAGE_ID")
+        session = sessions.get(request.session_id)
+        if not session:
+            raise BusinessValidationException("Session not found")
 
+        ad_plan = session.get("ad_plan") or {}
+
+        page_id = ad_plan.get("metaPageId") or session.get("metaPageId")
+
+        # TEMP: Hardcoded Meta page ID for development
         if not page_id:
-            raise BusinessValidationException("META_PAGE_ID not configured")
+            page_id = "332515906622723"
+
         if not request.creativePayload.image:
             raise BusinessValidationException(
                 "Image required before creating creative"
