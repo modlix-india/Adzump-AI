@@ -113,3 +113,4 @@ class CreateCreativeRequest(BaseModel):
 
 class CreateCreativeResponse(BaseModel):
     creativeId: str = Field(..., alias="creativeId")
+
