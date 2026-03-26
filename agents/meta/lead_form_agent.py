@@ -1,6 +1,4 @@
 import structlog
-import os
-import re
 from pydantic import ValidationError
 
 from core.models.lead_form import LeadFormPayload
@@ -25,18 +23,6 @@ LEAD_FORM_PROMPT = load_prompt("meta/lead_form.txt")
 
 
 class MetaLeadFormAgent:
-
-    FIELD_MAPPING = {
-        "email": "EMAIL",
-        "phone_number": "PHONE",
-        "full_name": "FULL_NAME",
-        "first_name": "FIRST_NAME",
-        "last_name": "LAST_NAME",
-        "city": "CITY",
-        "country": "COUNTRY",
-        "company_name": "COMPANY_NAME",
-        "job_title": "JOB_TITLE",
-    }
 
     def __init__(self):
         self.business_service = BusinessService()
@@ -88,10 +74,10 @@ class MetaLeadFormAgent:
         )
 
         if privacy_link and payload.privacy_policy:
-            payload.privacy_policy.link = privacy_link
+            payload.privacy_policy.url = privacy_link
         else:
             if payload.privacy_policy:
-                payload.privacy_policy.link = website_data.business_url
+                payload.privacy_policy.url = website_data.business_url
                 payload.privacy_policy.link_text = (
                     payload.privacy_policy.link_text or "Privacy Policy"
                 )
@@ -121,7 +107,13 @@ class MetaLeadFormAgent:
         if not page_id:
             page_id = "332515906622723"
 
-        meta_payload = self._build_meta_lead_form_payload(payload)
+        if not payload.questions:
+            raise BusinessValidationException("At least one question is required")
+
+        if not payload.name:
+            raise BusinessValidationException("Form name is required")    
+
+        meta_payload = payload.model_dump(exclude_none=True)
 
         logger.info("Creating Meta lead form", payload=meta_payload)
 
@@ -186,114 +178,6 @@ class MetaLeadFormAgent:
                 return href if href.startswith("http") else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
 
         return None
-
-    def _sanitize_option_value(self, value: str) -> str:
-        value = value.lower().replace("&", "and")
-        value = re.sub(r"[^a-z0-9]+", "_", value)
-        return value.strip("_")
-
-    def _build_category_questions(self, categories):
-
-        questions = []
-
-        for category in categories:
-            for field in category.fields:
-                meta_type = self.FIELD_MAPPING.get(field)
-
-                if meta_type:
-                    questions.append({
-                        "type": meta_type,
-                        "key": field
-                    })
-
-        return questions
-
-    def _build_custom_questions(self, custom_questions):
-
-        questions = []
-
-        for idx, q in enumerate(custom_questions):
-
-            if not q.question:
-                continue
-
-            question = {
-                "type": "CUSTOM",
-                "label": q.question,
-                "key": f"custom_{idx}"
-            }
-
-            if q.options:
-                question["options"] = [
-                    {
-                        "key": self._sanitize_option_value(opt),
-                        "value": opt
-                    }
-                    for opt in q.options
-                ]
-
-            questions.append(question)
-
-        return questions
-
-
-    def _build_meta_lead_form_payload(self, payload: LeadFormPayload) -> dict:
-
-        questions = []
-
-        if payload.questions:
-
-            if payload.questions.categories:
-                questions += self._build_category_questions(payload.questions.categories)
-
-            if payload.questions.custom_questions:
-                questions += self._build_custom_questions(payload.questions.custom_questions)
-
-        meta_payload = {
-            "name": payload.form_name,
-            "locale": "en_US",
-            "is_optimized_for_quality": True,
-            "question_page_custom_headline": "Please enter the below details.",
-            "questions": questions,
-        }
-
-        if payload.introduction:
-
-            content_items = payload.introduction.list_items or []
-
-            if not content_items and payload.introduction.paragraph:
-                content_items = [payload.introduction.paragraph]
-
-            style = "LIST_STYLE" if len(content_items) > 1 else "PARAGRAPH_STYLE"
-
-            meta_payload["context_card"] = {
-                "title": payload.introduction.headline,
-                "style": style,
-                "content": content_items,
-            }
-
-        if payload.privacy_policy and payload.privacy_policy.link:
-
-            meta_payload["privacy_policy"] = {
-                "url": payload.privacy_policy.link,
-                "link_text": payload.privacy_policy.link_text or "Privacy Policy",
-            }
-
-        meta_payload["thank_you_page"] = {
-            "title": payload.completion.headline if payload.completion else "Thank You",
-            "body": payload.completion.description if payload.completion else "We will contact you soon.",
-            "button_type": "VIEW_WEBSITE",
-            "button_text": payload.completion.call_to_action if payload.completion else "Learn More",
-            "website_url": (
-                payload.completion.link
-                if payload.completion and payload.completion.link
-                else payload.privacy_policy.link
-                if payload.privacy_policy and payload.privacy_policy.link
-                else "https://example.com"
-            ),
-        }
-
-        return meta_payload
 
 
 meta_lead_form_agent = MetaLeadFormAgent()
