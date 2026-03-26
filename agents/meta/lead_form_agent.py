@@ -73,15 +73,11 @@ class MetaLeadFormAgent:
             website_data.business_url
         )
 
-        if privacy_link and payload.privacy_policy:
-            payload.privacy_policy.url = privacy_link
-        else:
-            if payload.privacy_policy:
-                payload.privacy_policy.url = website_data.business_url
-                payload.privacy_policy.link_text = (
-                    payload.privacy_policy.link_text or "Privacy Policy"
-                )
+        payload.privacy_policy.url = (
+            privacy_link if privacy_link else website_data.business_url
+        )
 
+        if not privacy_link:
             logger.warning(
                 "Privacy policy URL not found, falling back to business URL",
                 session_id=session_id
