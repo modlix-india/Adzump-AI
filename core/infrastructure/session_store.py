@@ -14,6 +14,7 @@ from structlog import get_logger
 logger = get_logger(__name__)
 
 SESSION_TIMEOUT = timedelta(minutes=30)
+MAX_EVENT_LOG_SIZE = 500
 
 
 class SessionStore:
@@ -27,6 +28,8 @@ class SessionStore:
     def __init__(self, timeout: timedelta = SESSION_TIMEOUT):
         self._sessions: dict[str, dict] = {}
         self._timeout = timeout
+        self._cancelled: dict[str, bool] = {}
+        self._event_logs: dict[str, list[tuple[int, str]]] = {}
 
     def create(self, initial_data: Optional[dict] = None) -> str:
         """Create a new session. Returns session ID."""
@@ -71,6 +74,8 @@ class SessionStore:
         """Delete a session. Returns True if existed."""
         if session_id in self._sessions:
             del self._sessions[session_id]
+            self._cancelled.pop(session_id, None)
+            self.clear_event_log(session_id)
             logger.info("Session deleted", session_id=session_id)
             return True
         return False
@@ -84,6 +89,35 @@ class SessionStore:
         session = self._sessions.get(session_id)
         return session["last_activity"] if session else None
 
+    def mark_cancelled(self, session_id: str) -> bool:
+        """Mark session for cancellation. Returns False if session doesn't exist."""
+        if session_id not in self._sessions:
+            return False
+        self._cancelled[session_id] = True
+        return True
+
+    def is_cancelled(self, session_id: str) -> bool:
+        """Check if session has been marked for cancellation."""
+        return self._cancelled.get(session_id, False)
+
+    def clear_cancelled(self, session_id: str) -> None:
+        """Clear cancellation flag."""
+        self._cancelled.pop(session_id, None)
+
+    def append_event(self, session_id: str, seq: int, frame: str) -> None:
+        """Append an SSE frame to the session's event log for reconnection replay."""
+        log = self._event_logs.setdefault(session_id, [])
+        log.append((seq, frame))
+        if len(log) > MAX_EVENT_LOG_SIZE:
+            log.pop(0)
+
+    def get_events_after(self, session_id: str, after_id: int) -> list[str]:
+        """Return SSE frames with sequence number > after_id."""
+        return [frame for seq, frame in self._event_logs.get(session_id, []) if seq > after_id]
+
+    def clear_event_log(self, session_id: str) -> None:
+        """Remove all stored events for a session."""
+        self._event_logs.pop(session_id, None)
 
 
 # Singleton instance

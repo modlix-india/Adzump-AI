@@ -74,9 +74,10 @@ class ChatResponse(BaseModel):
     status: str
     reply: str
     collected_data: dict[str, Any]
-    progress: str
     account_selection: Optional[dict[str, Any]] = None
     location_selection: Optional[dict[str, Any]] = None
+    message_attachments: list[dict[str, Any]] = []
+    intermediate_messages: list[dict[str, Any]] = []
 
 
 class SessionResponse(BaseModel):
@@ -84,5 +85,4 @@ class SessionResponse(BaseModel):
 
     status: str
     data: Optional[dict[str, Any]]
-    progress: str
     last_activity: Optional[str] = None

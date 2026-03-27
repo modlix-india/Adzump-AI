@@ -6,20 +6,17 @@ Flow Diagram:
     Entry (_route_entry)
          │
          ├─ COMPLETED ──► END
-         ├─ CONFIRMING_LOCATION ──► confirm_location ──► predict_budget / END
+         ├─ CONFIRMING_LOCATION ──► confirm_location ──► fetch_parent_account / END
          ├─ SELECTING_PARENT_ACCOUNT ──► select_parent_account ──► fetch_account / END
          ├─ SELECTING_ACCOUNT ──► select_account ──► show_summary ──► END
          ├─ AWAITING_CONFIRMATION ──► confirm ──► END
          │
          └─ IN_PROGRESS (default):
-              collect_data
+              collect_data (budget predicted here if needed)
                    │
                    ▼ (all fields → SELECTING_PARENT_ACCOUNT)
               confirm_location
                    │ (real estate → pause for map, else passthrough)
-                   ▼
-              predict_budget
-                   │ (Google + targetLeads → predict, else passthrough)
                    ▼
               fetch_parent_account
                    │
@@ -45,7 +42,6 @@ from structlog import get_logger
 from agents.chatv2.nodes import (
     collect_data_node,
     confirm_location_node,
-    predict_budget_node,
     confirm_node,
     show_summary_node,
     fetch_parent_account_options,
@@ -60,13 +56,47 @@ logger = get_logger(__name__)
 
 COLLECT_DATA = "collect_data"
 CONFIRM_LOCATION = "confirm_location"
-PREDICT_BUDGET = "predict_budget"
 FETCH_PARENT_ACCOUNT = "fetch_parent_account"
 SELECT_PARENT_ACCOUNT = "select_parent_account"
 FETCH_ACCOUNT = "fetch_account"
 SELECT_ACCOUNT = "select_account"
 SHOW_SUMMARY = "show_summary"
 CONFIRM = "confirm"
+
+NODE_LABELS = {
+    COLLECT_DATA: "Collecting campaign details",
+    CONFIRM_LOCATION: "Confirming location",
+    FETCH_PARENT_ACCOUNT: "Loading manager accounts",
+    SELECT_PARENT_ACCOUNT: "Processing account selection",
+    FETCH_ACCOUNT: "Loading ad accounts",
+    SELECT_ACCOUNT: "Processing account selection",
+    SHOW_SUMMARY: "Preparing summary",
+    CONFIRM: "Processing confirmation",
+}
+
+
+def _wrap_node(node_name: str, node_fn):
+    """Wrap a node to auto-emit step_start/step_end progress events."""
+
+    async def wrapped(state: ChatState):
+        from langgraph.config import get_stream_writer
+
+        writer = get_stream_writer()
+        label = NODE_LABELS.get(node_name, node_name)
+        writer({"type": "progress", "node": node_name, "phase": "start", "label": label})
+        try:
+            result = await node_fn(state)
+            writer({"type": "progress", "node": node_name, "phase": "end"})
+            return result
+        except Exception:
+            writer(
+                {"type": "progress", "node": node_name, "phase": "end", "content": "Error"}
+            )
+            raise
+
+    wrapped.__name__ = node_fn.__name__
+    return wrapped
+
 
 STATUS_TO_NODE = {
     ChatStatus.COMPLETED: END,
@@ -91,15 +121,14 @@ def _build_graph() -> CompiledStateGraph:
     """Build and compile the chat state graph."""
     graph = StateGraph[ChatState, None, ChatState, ChatState](ChatState)
 
-    graph.add_node(COLLECT_DATA, collect_data_node)
-    graph.add_node(CONFIRM_LOCATION, confirm_location_node)
-    graph.add_node(PREDICT_BUDGET, predict_budget_node)
-    graph.add_node(FETCH_PARENT_ACCOUNT, fetch_parent_account_options)
-    graph.add_node(SELECT_PARENT_ACCOUNT, select_parent_account_node)
-    graph.add_node(FETCH_ACCOUNT, fetch_account_options)
-    graph.add_node(SELECT_ACCOUNT, select_account_node)
-    graph.add_node(SHOW_SUMMARY, show_summary_node)
-    graph.add_node(CONFIRM, confirm_node)
+    graph.add_node(COLLECT_DATA, _wrap_node(COLLECT_DATA, collect_data_node))
+    graph.add_node(CONFIRM_LOCATION, _wrap_node(CONFIRM_LOCATION, confirm_location_node))
+    graph.add_node(FETCH_PARENT_ACCOUNT, _wrap_node(FETCH_PARENT_ACCOUNT, fetch_parent_account_options))
+    graph.add_node(SELECT_PARENT_ACCOUNT, _wrap_node(SELECT_PARENT_ACCOUNT, select_parent_account_node))
+    graph.add_node(FETCH_ACCOUNT, _wrap_node(FETCH_ACCOUNT, fetch_account_options))
+    graph.add_node(SELECT_ACCOUNT, _wrap_node(SELECT_ACCOUNT, select_account_node))
+    graph.add_node(SHOW_SUMMARY, _wrap_node(SHOW_SUMMARY, show_summary_node))
+    graph.add_node(CONFIRM, _wrap_node(CONFIRM, confirm_node))
 
     graph.set_conditional_entry_point(
         _route_entry,
@@ -121,11 +150,6 @@ def _build_graph() -> CompiledStateGraph:
     graph.add_conditional_edges(
         CONFIRM_LOCATION,
         _route_after_location,
-        {PREDICT_BUDGET: PREDICT_BUDGET, END: END},
-    )
-    graph.add_conditional_edges(
-        PREDICT_BUDGET,
-        _route_after_predict,
         {FETCH_PARENT_ACCOUNT: FETCH_PARENT_ACCOUNT, END: END},
     )
     graph.add_conditional_edges(
@@ -163,14 +187,7 @@ def _route_after_collect(state: ChatState) -> str:
 
 
 def _route_after_location(state: ChatState) -> str:
-    """After location: proceed to budget prediction if confirmed, else pause for map."""
-    if _get_status(state) == ChatStatus.SELECTING_PARENT_ACCOUNT:
-        return PREDICT_BUDGET
-    return END
-
-
-def _route_after_predict(state: ChatState) -> str:
-    """After prediction: proceed to account fetch if budget is set, else back to collect."""
+    """After location: proceed to account fetch if confirmed, else pause for map."""
     if _get_status(state) == ChatStatus.SELECTING_PARENT_ACCOUNT:
         return FETCH_PARENT_ACCOUNT
     return END

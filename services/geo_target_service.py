@@ -21,8 +21,8 @@ class GeoTargetService:
     DEFAULT_RADIUS_KM = 15
 
     # Grid configuration
-    GRID_STEP_KM = 5  # 5km steps
-    MAX_GRID_POINTS = 40  # Safety cap
+    GRID_STEP_KM = 3  # 3km steps for better pin code coverage
+    MAX_GRID_POINTS = 80  # Safety cap
     MAX_CONCURRENT_GEOCODE = 10  # Parallel requests
     MIN_DISTANCE_KM = 2.0  # Deduplication threshold
 
@@ -197,34 +197,17 @@ class GeoTargetService:
                             if "country" in types:
                                 country_code = component.get("short_name", "IN")
 
-                    # Define target types in priority order
-                    target_types = [
-                        "sublocality_level_1",
-                        "sublocality",
-                        "neighborhood",
-                        "locality",
-                    ]
-
-                    # Find the best locality/neighborhood and also a parent city
-                    best_component = None
+                    # Extract postal code from address components
+                    postal_code = None
                     parent_city = ""
-                    best_res = None
 
                     for res in results:
                         for component in res.get("address_components", []):
                             comp_types = component.get("types", [])
 
-                            # Check if this could be our target
-                            if not best_component:
-                                matched_type = next(
-                                    (t for t in target_types if t in comp_types), None
-                                )
-                                if matched_type:
-                                    best_component = component
-                                    best_component["matched_type"] = matched_type
-                                    best_res = res
+                            if "postal_code" in comp_types and not postal_code:
+                                postal_code = component.get("long_name")
 
-                            # Check if this is a good parent city (Locality/Admin Area 2)
                             if not parent_city:
                                 if (
                                     "locality" in comp_types
@@ -232,19 +215,17 @@ class GeoTargetService:
                                 ):
                                     parent_city = component.get("long_name", "")
 
-                    if best_component and best_res:
-                        name = best_component.get("long_name")
-                        # Add parent city if it's different from the name itself
-                        search_name = name
-                        if parent_city and parent_city.lower() != name.lower():
-                            search_name = f"{name}, {parent_city}"
+                    if postal_code:
+                        search_name = postal_code
+                        if parent_city:
+                            search_name = f"{postal_code}, {parent_city}"
 
-                        geo = best_res.get("geometry", {}).get("location", {})
+                        geo = results[0].get("geometry", {}).get("location", {})
                         return {
                             "name": search_name,
                             "lat": geo.get("lat", point["lat"]),
                             "lng": geo.get("lng", point["lng"]),
-                            "type": best_component["matched_type"],
+                            "type": "postal_code",
                         }
 
                     return None
@@ -607,11 +588,11 @@ class GeoTargetService:
 
         # Pick best match per term
         for term_lower, matches in by_search_term.items():
-            # Priority: Neighborhood > Sublocality > Postal Code
+            # Priority: Postal Code > Neighborhood > Sublocality
             score_map = {
-                "Neighborhood": 1,
-                "Sublocality": 2,
-                "Postal Code": 3,
+                "Postal Code": 1,
+                "Neighborhood": 2,
+                "Sublocality": 3,
             }
 
             matches.sort(key=lambda x: score_map.get(x["target_type"], 10))

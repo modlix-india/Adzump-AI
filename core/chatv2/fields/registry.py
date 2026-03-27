@@ -23,16 +23,16 @@ FIELD_REGISTRY: dict[str, FieldDef] = {
         error_msg="Please specify 'google' or 'meta' as the platform",
         required=True,
     ),
-    "businessName": FieldDef(
-        type=str,
-        description="Name of the business/company",
-        required=True,
-    ),
     "websiteURL": FieldDef(
         type=str,
         description="Website URL (e.g., example.com or https://example.com)",
         validator="validate_website",
         error_msg="Please provide a valid URL like example.com or https://example.com",
+        required=True,
+    ),
+    "productName": FieldDef(
+        type=str,
+        description="Name of the product being marketed",
         required=True,
     ),
     "budget": FieldDef(

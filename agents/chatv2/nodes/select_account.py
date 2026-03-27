@@ -105,12 +105,20 @@ async def fetch_account_options(state: ChatState) -> dict[str, Any]:
                 "label": f"Auto-selected {config['account_label']}: {child_name}",
             }
         )
+        account_attachment = {
+            "type": "confirmed_account",
+            "name": child_name,
+            "id": children[0].get("id"),
+            "account_type": "account",
+        }
+        reply = f"Auto-selected {config['account_label']}: {child_name}"
         return {
             "ad_plan": new_ad_plan,
             "account_options": children,
             "status": status,
-            "response_message": f"Auto-selected {config['account_label']}: {child_name}",
+            "response_message": reply,
             "account_selection": None,
+            "intermediate_messages": [{"reply": reply, "attachments": [account_attachment]}],
         }
 
     writer(
@@ -121,10 +129,14 @@ async def fetch_account_options(state: ChatState) -> dict[str, Any]:
             "label": f"Found {len(children)} {config['account_label']}s",
         }
     )
+    parent_name = next(
+        (a.get("name") for a in parent_options if str(a.get("id")) == str(parent_id)),
+        parent_id,
+    )
     return {
         "account_options": children,
         "status": ChatStatus.SELECTING_ACCOUNT,
-        "response_message": f"{config['account_label'].capitalize()}s under {config['parent_label']} {parent_id}:",
+        "response_message": f"{config['account_label'].capitalize()}s under {config['parent_label']} {parent_name}:",
         "account_selection": AccountSelection.account_selection(children).model_dump(),
     }
 
@@ -199,6 +211,13 @@ async def select_account_node(state: ChatState) -> dict[str, Any]:
         else f"{config['account_label'].capitalize()} selected"
     )
 
+    account_attachment = {
+        "type": "confirmed_account",
+        "name": selected_name or selected_id,
+        "id": selected_id,
+        "account_type": "account",
+    }
+
     if all_fields_collected(new_ad_plan, config):
         writer(
             {
@@ -212,6 +231,7 @@ async def select_account_node(state: ChatState) -> dict[str, Any]:
             "ad_plan": new_ad_plan,
             "status": ChatStatus.AWAITING_CONFIRMATION,
             "account_selection": None,
+            "intermediate_messages": [{"reply": end_label, "attachments": [account_attachment]}],
         }
 
     writer(
@@ -227,6 +247,7 @@ async def select_account_node(state: ChatState) -> dict[str, Any]:
         "status": ChatStatus.IN_PROGRESS,
         "response_message": f"{config['account_label'].capitalize()} selected.",
         "account_selection": None,
+        "message_attachments": [account_attachment],
     }
 
 

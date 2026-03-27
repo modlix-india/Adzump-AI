@@ -27,14 +27,6 @@ async def show_summary_node(state: ChatState) -> dict[str, Any]:
     """Build and display campaign summary. Runs once when entering confirmation."""
     writer = get_stream_writer()
     ad_plan = dict(state["ad_plan"])
-    writer(
-        {
-            "type": "progress",
-            "node": "show_summary",
-            "phase": "start",
-            "label": "Preparing summary",
-        }
-    )
     summary = build_summary(ad_plan, state)
     writer(
         {
@@ -54,14 +46,6 @@ async def confirm_node(state: ChatState) -> dict[str, Any]:
     """Handle user response to campaign summary — confirm, modify, or change account."""
     logger.info("Entering confirm_node")
     writer = get_stream_writer()
-    writer(
-        {
-            "type": "progress",
-            "node": "confirm",
-            "phase": "start",
-            "label": "Processing confirmation",
-        }
-    )
 
     ad_plan = dict(state["ad_plan"])
 
@@ -129,7 +113,7 @@ def build_summary(ad_plan: dict, state: ChatState) -> str:
 
     field_labels = {
         "platform": "Platform",
-        "businessName": "Business Name",
+        "productName": "Product Name",
         "websiteURL": "Website",
         "budget": "Budget",
         "durationDays": "Duration",

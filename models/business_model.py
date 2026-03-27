@@ -105,6 +105,7 @@ class WebsiteSummaryResponse(BaseModel):
     unresolved_locations: Optional[List[str]] = None
     competitors: Optional[List[dict]] = None
     competitor_analysis: Optional[List[dict]] = None
+    screenshot: Optional[str] = None
 
 
 class WarningType(str, Enum):

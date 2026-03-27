@@ -1,3 +1,5 @@
+import warnings
+
 from structlog import get_logger  # type: ignore
 from typing import Optional
 from fastapi import HTTPException
@@ -13,6 +15,12 @@ from oserver.models.storage_request_model import (
     StorageReadRequest,
     StorageUpdateWithPayload,
     StorageRequestWithPayload,
+)
+
+warnings.warn(
+    "screenshot_service is deprecated. Use agents.scrape.scrape_agent instead.",
+    DeprecationWarning,
+    stacklevel=2,
 )
 
 logger = get_logger(__name__)

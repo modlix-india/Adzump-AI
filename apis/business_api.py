@@ -2,6 +2,7 @@ import os
 import tempfile
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Header, Body
+from structlog import get_logger
 from dependencies.header_dependencies import CommonHeaders, get_common_headers
 from models.business_model import ScreenshotRequest, WebsiteSummaryRequest
 from services.business_service import BusinessService
@@ -11,6 +12,8 @@ from services.screenshot_service import ScreenshotService
 from services.final_summary_service import generate_final_summary
 from utils.response_helpers import success_response
 from utils.response_helpers import error_response
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/ds/business", tags=["business"])
 
@@ -118,3 +121,53 @@ async def generate_final_summary_endpoint(
         x_forwarded_port=headers.x_forwarded_port,
     )
     return success_response(result)
+
+
+@router.post("/websiteSummary/stream")
+async def website_summary_stream(payload: WebsiteSummaryRequest = Body(...)):
+    """SSE streaming endpoint for website scrape + summary pipeline."""
+    from agents.scrape.scrape_agent import scrape_agent
+    from core.streaming.sse import sse_response
+
+    return sse_response(
+        scrape_agent.process_stream(payload.business_url, rescrape=payload.rescrape)
+    )
+
+
+@router.post("/screenshot/stream")
+async def screenshot_stream(payload: ScreenshotRequest = Body(...)):
+    """SSE streaming endpoint for screenshot capture."""
+    from agents.scrape.scrape_agent import scrape_agent
+    from core.streaming.sse import sse_response
+
+    return sse_response(
+        scrape_agent.process_stream(
+            payload.business_url, retake_screenshot=payload.retake
+        )
+    )
+
+
+@router.post("/generate/external-summary/stream")
+async def external_summary_stream(payload: WebsiteSummaryRequest = Body(...)):
+    """SSE streaming endpoint for external link scrape + summary."""
+    from agents.scrape.scrape_agent import scrape_agent
+    from core.streaming.sse import sse_response
+
+    return sse_response(
+        scrape_agent.process_stream(
+            payload.business_url,
+            rescrape=payload.rescrape,
+            external_url=payload.external_url,
+        )
+    )
+
+
+@router.post("/generate/final-summary/stream")
+async def final_summary_stream(
+    business_url: str = Body(..., embed=True),
+):
+    """SSE streaming endpoint for final summary generation."""
+    from agents.scrape.scrape_agent import scrape_agent
+    from core.streaming.sse import sse_response
+
+    return sse_response(scrape_agent.process_stream(business_url))

@@ -82,11 +82,19 @@ async def fetch_parent_account_options(state: ChatState) -> dict[str, Any]:
         new_ad_plan = dict(state["ad_plan"])
         new_ad_plan[config["parent_id_field"]] = parent_id
 
+        account_attachment = {
+            "type": "confirmed_account",
+            "name": parent_name,
+            "id": parent_id,
+            "account_type": "parent",
+        }
+        reply = f"Found 1 {label} — auto-selected {parent_name}"
         return {
             "ad_plan": new_ad_plan,
             "parent_account_options": parents,
             "status": ChatStatus.SELECTING_ACCOUNT,
-            "response_message": f"Auto-selected {label}: {parent_name}",
+            "response_message": reply,
+            "intermediate_messages": [{"reply": reply, "attachments": [account_attachment]}],
         }
 
     writer(
@@ -175,10 +183,18 @@ async def select_parent_account_node(state: ChatState) -> dict[str, Any]:
             "label": f"Selected: {selected_name}",
         }
     )
+    account_attachment = {
+        "type": "confirmed_account",
+        "name": selected_name,
+        "id": selected_id,
+        "account_type": "parent",
+    }
+    reply = f"Selected {config['parent_label']}: {selected_name}"
     return {
         "ad_plan": new_ad_plan,
         "status": ChatStatus.SELECTING_ACCOUNT,
-        "response_message": f"Selected {config['parent_label']}: {selected_name}",
+        "response_message": reply,
+        "intermediate_messages": [{"reply": reply, "attachments": [account_attachment]}],
     }
 
 

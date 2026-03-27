@@ -12,6 +12,7 @@ class StreamEvent(BaseModel):
 
     event: EventType
     data: dict[str, Any]
+    id: str | None = None
 
     def to_sse(self) -> str:
         return f"event: {self.event}\ndata: {self.model_dump_json()}\n\n"
@@ -42,8 +43,11 @@ def status_event(status: str, progress: str, node: str = "") -> StreamEvent:
     )
 
 
-def data_event(data_type: str, payload: dict) -> StreamEvent:
-    return StreamEvent(event="data", data={"type": data_type, "payload": payload})
+def data_event(
+    data_type: str, payload: "dict | BaseModel", id: str | None = None
+) -> StreamEvent:
+    serialized = payload.model_dump() if isinstance(payload, BaseModel) else payload
+    return StreamEvent(event="data", data={"type": data_type, "payload": serialized}, id=id)
 
 
 def error_event(

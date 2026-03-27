@@ -53,13 +53,6 @@ async def _handle_first_entry(
     scrape_result = await _wait_for_scrape(session_id)
 
     if not scrape_result or not _is_real_estate(scrape_result):
-        writer(
-            {
-                "type": "progress",
-                "node": "confirm_location",
-                "phase": "end",
-            }
-        )
         return {}
 
     ad_plan = dict(state.get("ad_plan") or {})
@@ -134,7 +127,7 @@ async def _handle_user_response(
             "area_location": None,
             "geo_targets": geo_targets,
         }
-        reply = "Location updated. Proceeding with campaign setup."
+        reply = f"Location saved ({coordinates['lat']:.4f}, {coordinates['lng']:.4f}). Now setting up your ad accounts."
     else:
         existing_selection = state.get("location_selection") or {}
         ad_plan["location"] = {
@@ -145,15 +138,18 @@ async def _handle_user_response(
                 existing_selection.get("coordinates")
             ),
         }
-        reply = "Location confirmed. Proceeding with campaign setup."
+        loc_name = existing_selection.get("product_location") or existing_selection.get("area_location") or "your location"
+        reply = f"Location confirmed: {loc_name}. Now setting up your ad accounts."
 
-    writer(
-        {
-            "type": "progress",
-            "node": "confirm_location",
-            "phase": "end",
-        }
-    )
+    location = ad_plan.get("location", {})
+    attachment = {
+        "type": "confirmed_location",
+        "label": location.get("product_location")
+            or location.get("area_location")
+            or "Selected location",
+    }
+    if location.get("coordinates"):
+        attachment["coordinates"] = location["coordinates"]
 
     return {
         "status": ChatStatus.SELECTING_PARENT_ACCOUNT,
@@ -161,6 +157,7 @@ async def _handle_user_response(
         "messages": [AIMessage(content=reply)],
         "ad_plan": ad_plan,
         "location_selection": None,
+        "intermediate_messages": [{"reply": reply, "attachments": [attachment]}],
     }
 
 
@@ -185,10 +182,10 @@ async def _wait_for_scrape(
 
 
 def _is_real_estate(result: WebsiteSummaryResponse) -> bool:
-    """Check if the scraped business is real estate."""
+    """Check if the scraped business is in the real estate category."""
     if not result.business_type:
         return False
-    return result.business_type.strip().lower() == REAL_ESTATE_TYPE
+    return REAL_ESTATE_TYPE in result.business_type.strip().lower()
 
 
 def _get_last_user_message(state: ChatState) -> str:

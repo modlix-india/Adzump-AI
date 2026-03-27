@@ -13,7 +13,7 @@ PLATFORM_CONFIG = {
         "progress_load_children": "Loading Google customer accounts",
         "progress_select_account": "Selecting Google customer account",
         "required_fields": [
-            "businessName",
+            "productName",
             "websiteURL",
             "budget",
             "durationDays",
@@ -34,7 +34,7 @@ PLATFORM_CONFIG = {
         "progress_load_children": "Loading Meta ad accounts",
         "progress_select_account": "Selecting Meta ad account",
         "required_fields": [
-            "businessName",
+            "productName",
             "websiteURL",
             "budget",
             "durationDays",

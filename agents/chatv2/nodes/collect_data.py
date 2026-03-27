@@ -29,30 +29,21 @@ async def collect_data_node(state: ChatState) -> dict[str, Any]:
     """Collect campaign business data through AI-powered conversation."""
     logger.info("Entering collect_data_node")
     writer = get_stream_writer()
-    writer(
-        {
-            "type": "progress",
-            "node": "collect_data",
-            "phase": "start",
-            "label": "Collecting campaign details",
-        }
-    )
 
     ad_plan = dict(state.get("ad_plan") or {})
+    session_id = get_config()["configurable"]["thread_id"]
+
     messages = [
         SystemMessage(content=_get_system_prompt()),
         *state["messages"],
-        SystemMessage(content=_build_context(ad_plan)),
+        SystemMessage(content=_build_context(ad_plan, session_id)),
     ]
 
-    tool_choice = "required" if ad_plan else "auto"
     reply_text, tool_calls, response = await get_llm_adapter().chat_with_tools(
         messages=messages,
         tools=get_collection_tools(),
-        tool_choice=tool_choice,
+        tool_choice="auto",
     )
-
-    session_id = get_config()["configurable"]["thread_id"]
 
     _emit_reasoning(writer, tool_calls)
     ad_plan, tool_result = await _process_tool_call(
@@ -65,6 +56,7 @@ async def collect_data_node(state: ChatState) -> dict[str, Any]:
         ad_plan = await _fallback_url_extract(state, ad_plan, writer, session_id)
 
     if _has_all_fields(ad_plan):
+        ad_plan = _predict_budget_if_needed(ad_plan, writer)
         new_status = ChatStatus.SELECTING_PARENT_ACCOUNT
         platform = ad_plan.get("platform", "google")
         label = "Meta" if platform == "meta" else "Google"
@@ -76,8 +68,13 @@ async def collect_data_node(state: ChatState) -> dict[str, Any]:
                 "content": f"All details collected! Moving to {label} account selection...",
             }
         )
-        # Skip follow-up LLM call — next node will provide the response
-        response_message = ""
+        # Use LLM's reply if it produced one, otherwise brief acknowledgment
+        if reply_text.strip():
+            response_message = reply_text.strip()
+        elif tool_calls:
+            response_message = f"Got it! Setting up your {label} campaign..."
+        else:
+            response_message = ""
     else:
         if tool_result:
             reply_text = await _get_followup_response(
@@ -173,14 +170,13 @@ async def _get_followup_response(
 
 async def _get_continuation_response(state: ChatState, ad_plan: dict) -> str:
     """Get AI response when tool succeeded but LLM didn't provide conversational reply."""
-    context = _build_context(ad_plan)
     required = _get_dynamic_required(ad_plan)
     missing = [f for f in required if f not in ad_plan]
     messages = [
         SystemMessage(content=_get_system_prompt()),
         *state["messages"],
         SystemMessage(
-            content=f"[SYSTEM] Tool call succeeded. {context} Acknowledge what was saved and ask for the next missing field ({missing[0] if missing else 'none'})."
+            content=f"[SYSTEM] Tool call succeeded. Acknowledge what was saved and continue. Still need: {missing if missing else 'nothing — all fields collected'}."
         ),
     ]
 
@@ -244,21 +240,101 @@ def _start_background_scrape(session_id: str, url: str) -> None:
     )
 
 
-def _build_context(ad_plan: dict) -> str:
-    """Build context message with collected values and missing fields."""
+def _build_context(ad_plan: dict, session_id: str) -> str:
+    """Build context with collected fields + scrape intelligence for LLM."""
     required = _get_dynamic_required(ad_plan)
     collected = {f: ad_plan[f] for f in required if f in ad_plan}
     missing = [f for f in required if f not in ad_plan]
     total = len(required)
     n = len(collected)
+
+    parts = []
     if not collected:
-        return (
-            "[CONTEXT] No fields collected yet. This is the start of the conversation."
+        parts.append("[CONTEXT] No fields collected yet.")
+    else:
+        parts.append(
+            f"[CONTEXT] Collected ({n}/{total}): {json.dumps(collected)}. "
+            f"Still need: {missing}."
         )
-    return (
-        f"[CONTEXT] Collected ({n}/{total}): {json.dumps(collected)}. "
-        f"Still need: {missing}."
-    )
+
+    scrape = _get_scrape_context(ad_plan, session_id)
+    if scrape:
+        parts.append(scrape)
+
+    return "\n\n".join(parts)
+
+
+def _get_scrape_context(ad_plan: dict, session_id: str) -> str | None:
+    """Extract business intelligence from scrape for LLM context."""
+    from agents.chatv2.scrape_manager import get_scrape_task_manager
+
+    ws = ad_plan.get("websiteSummary")
+    if isinstance(ws, dict) and "error" not in ws:
+        return _format_scrape_for_llm(ws)
+
+    mgr = get_scrape_task_manager()
+    partial = mgr.get_partial_summary(session_id)
+    if partial:
+        return (
+            "[SCRAPE_DATA] (partial — analysis ongoing)\n"
+            f"Summary: {partial.get('summary', '')}"
+        )
+
+    if mgr.has_active_scrape(session_id):
+        return "[SCRAPE_DATA] Website analysis in progress. Infer what you can from the user's message."
+
+    return None
+
+
+def _format_scrape_for_llm(summary: dict) -> str:
+    """Format full scrape result as LLM context."""
+    parts = ["[SCRAPE_DATA]"]
+    if summary.get("business_type"):
+        parts.append(f"Business type: {summary['business_type']}")
+    if summary.get("summary"):
+        parts.append(f"About: {summary['summary'][:500]}")
+
+    loc = summary.get("location")
+    if isinstance(loc, dict):
+        loc_parts = [v for k, v in loc.items() if v and isinstance(v, str)]
+        if loc_parts:
+            parts.append(f"Location: {', '.join(loc_parts[:3])}")
+
+    geo = summary.get("suggested_geo_targets")
+    if geo:
+        names = [g.get("name", "") for g in geo[:5] if g.get("name")]
+        if names:
+            parts.append(f"Geo targets: {', '.join(names)}")
+
+    return "\n".join(parts)
+
+
+def _predict_budget_if_needed(ad_plan: dict, writer: Callable) -> dict:
+    """Predict budget from targetLeads when Google + no budget. Returns updated ad_plan."""
+    if ad_plan.get("platform") != "google":
+        return ad_plan
+    if "budget" in ad_plan or "targetLeads" not in ad_plan:
+        return ad_plan
+
+    import math
+    from mlops.google_search.budget_prediction.api import get_initialized_predictor
+
+    predictor = get_initialized_predictor()
+    if not predictor.is_ready():
+        logger.warning("budget_predictor_not_ready")
+        return ad_plan
+
+    target_leads = ad_plan["targetLeads"]
+    duration_days = ad_plan["durationDays"]
+    result = predictor.predict(conversions=target_leads, duration_days=duration_days)
+
+    raw = result.suggested_budget / duration_days
+    daily_budget = int(math.ceil(raw / 1000) * 1000) if raw > 1000 else int(math.ceil(raw / 100) * 100)
+    ad_plan = {**ad_plan, "budget": str(daily_budget)}
+
+    writer({"type": "field_update", "field": "budget", "value": str(daily_budget), "status": "valid"})
+    logger.info("budget_predicted", target_leads=target_leads, daily_budget=daily_budget)
+    return ad_plan
 
 
 _URL_RE = re.compile(
