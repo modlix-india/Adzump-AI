@@ -22,8 +22,9 @@ class MetaClient:
         client_code: str,
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        access_token: str | None = None,
     ) -> dict[str, Any]:
-        token = self._get_meta_api_token(client_code)
+        token = access_token or self._get_meta_api_token(client_code)
         url = f"{self.BASE_URL}{endpoint}"
         response = await http_request(
             "POST",
@@ -40,8 +41,9 @@ class MetaClient:
         endpoint: str,
         client_code: str,
         params: dict[str, Any] | None = None,
+        access_token: str | None = None,
     ) -> dict[str, Any]:
-        token = self._get_meta_api_token(client_code)
+        token = access_token or self._get_meta_api_token(client_code)
         url = f"{self.BASE_URL}{endpoint}"
         response = await http_request(
             "GET",

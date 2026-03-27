@@ -1,3 +1,5 @@
+import os
+from typing import Optional
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_openai import ChatOpenAI
 from openai import APIConnectionError, APIError, APITimeoutError, RateLimitError
@@ -22,8 +24,18 @@ class OpenAIChatAdapter:
     Catches all OpenAI errors at source and converts to AIProcessingException.
     """
 
-    def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.0) -> None:
-        self._llm = ChatOpenAI(model=model, temperature=temperature, timeout=60)
+    def __init__(self, model: Optional[str] = None, temperature: float = 0.0) -> None:
+
+        env_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        base_url = os.getenv("OPENAI_BASE_URL")
+
+        self._llm = ChatOpenAI(
+            model=model or env_model,
+            temperature=temperature,
+            timeout=120,
+            base_url=base_url,
+        )
+        logger.info("Initializing LLM adapter", model=self._llm.model_name, base_url=base_url)
 
     async def chat_with_tools(
         self,

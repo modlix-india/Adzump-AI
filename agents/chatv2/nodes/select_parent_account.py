@@ -82,11 +82,25 @@ async def fetch_parent_account_options(state: ChatState) -> dict[str, Any]:
         new_ad_plan = dict(state["ad_plan"])
         new_ad_plan[config["parent_id_field"]] = parent_id
 
+        # Record auto-selection if not already recorded
+        auto_selected = list(state.get("auto_selected_assets", []))
+        if not any(a["id"] == str(parent_id) for a in auto_selected):
+            auto_selected.append({
+                "label": config["parent_label"],
+                "name": parent_name,
+                "id": str(parent_id)
+            })
+
+        prev_msg = state.get("response_message", "")
+        new_msg = f"Auto-selected {label}: {parent_name}"
+        full_msg = f"{prev_msg}\n{new_msg}".strip() if prev_msg else new_msg
+
         return {
             "ad_plan": new_ad_plan,
             "parent_account_options": parents,
             "status": ChatStatus.SELECTING_ACCOUNT,
-            "response_message": f"Auto-selected {label}: {parent_name}",
+            "response_message": full_msg,
+            "auto_selected_assets": auto_selected,
         }
 
     writer(
@@ -167,6 +181,13 @@ async def select_parent_account_node(state: ChatState) -> dict[str, Any]:
         selected_id,
     )
 
+    # Record selection for summary
+    auto_selected = list(state.get("auto_selected_assets", []))
+    if not any(a["id"] == str(selected_id) for a in auto_selected):
+        auto_selected.append(
+            {"label": config["parent_label"], "name": selected_name, "id": str(selected_id)}
+        )
+
     writer(
         {
             "type": "progress",
@@ -179,6 +200,8 @@ async def select_parent_account_node(state: ChatState) -> dict[str, Any]:
         "ad_plan": new_ad_plan,
         "status": ChatStatus.SELECTING_ACCOUNT,
         "response_message": f"Selected {config['parent_label']}: {selected_name}",
+        "account_selection": None,
+        "auto_selected_assets": auto_selected,
     }
 
 
