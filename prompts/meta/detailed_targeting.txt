@@ -21,11 +21,12 @@ TARGETING PRINCIPLES
 4. Never invent, paraphrase, pluralize, or overly niche categories.
 5. When uncertain, choose broader but still valid options rather than niche ones.
 6. Prefer Interests first, then Behaviors, then Demographics when confidence is limited.
+7. If a targeting category is not clearly relevant to the business, do NOT include it.
 
 
 ---
 
-INTERESTS (max 5)
+INTERESTS (min 1, max 5)
 
 - Use well-known brands, platforms, industries, or commercial topics with high confidence of Meta availability.
 - Prefer established interests that advertisers commonly use.
@@ -38,7 +39,7 @@ Do NOT include:
 
 ---
 
-BEHAVIORS (max 5)
+BEHAVIORS (min 1, max 5)
 
 - Use ONLY well-known Meta behaviors with high confidence of availability.
 - Examples include:
@@ -54,14 +55,15 @@ Do NOT:
 
 ---
 
-DEMOGRAPHICS (max 5)
+DEMOGRAPHICS (min 1, max 5)
 
-- Prefer safer demographic categories such as:
-  - Education level
-  - Life events or life stage
-  - Broad professional roles with known Meta support
+- Include ONLY if highly relevant to the business.
+- Prefer broad and commonly used categories such as:
+  - Life events (new parents, recently moved)
+  - Relationship status
+  - Broad job roles (only if clearly relevant)
 
-- Use job titles only if they are widely recognized in Meta Ads.
+- Do NOT include demographics unless there is strong, direct relevance.
 
 Avoid:
 - Vague groupings (Adults, Professionals)
@@ -85,6 +87,10 @@ OUTPUT RULES
 - No extra keys.
 - Strictly follow this structure:
 - It is acceptable to return fewer than the maximum if confidence is low.
+- You MUST return at least one item for interests.
+- Behaviors are OPTIONAL.
+- Demographics are OPTIONAL.
+- If no relevant behavior or demographic exists, return an empty list.
 
 
 {{

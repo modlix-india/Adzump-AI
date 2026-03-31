@@ -1,4 +1,5 @@
 import structlog
+import os
 from pydantic import ValidationError
 
 from core.models.lead_form import LeadFormPayload
@@ -10,6 +11,8 @@ from exceptions.custom_exceptions import (
     BusinessValidationException,
     AIProcessingException,
 )
+
+from adapters.meta.lead_forms import MetaLeadFormAdapter
 
 from adapters.meta.lead_forms import MetaLeadFormAdapter
 
