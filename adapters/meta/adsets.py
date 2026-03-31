@@ -17,7 +17,7 @@ class MetaAdSetAdapter:
         requested = language_name.strip().lower()
         for item in response.get("data", []):
             if item.get("name", "").lower().startswith(requested):
-                return {"id": item.get("key"), "name": item.get("name")}
+                return {"key": item.get("key"), "name": item.get("name")}
         return None
 
     async def create(
