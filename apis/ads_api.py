@@ -19,6 +19,9 @@ from services import create_campaign_service, chat_service
 # TODO: Remove age optimization import - replaced by api/optimization.py
 from services.age_optimization_service import generate_age_optimizations
 from services.ads_service import AdAssetsGenerator
+from agents.generation.google_ad_generation_agent import google_ad_generation_agent
+from agents.generation.meta_ad_generation_agent import meta_ad_generation_agent
+from pydantic import BaseModel
 
 
 router = APIRouter(prefix="/api/ds/ads", tags=["ads"])
@@ -31,14 +34,63 @@ async def create_ad_assets(
     summary: str = Body(...), positive_keywords: List[Dict[str, Any]] = Body(...)
 ):
     result = await ad_assets_generator.generate(summary, positive_keywords)
-    return success_response({
-        "headlines": result.get("headlines", []),
-        "descriptions": result.get("descriptions", []),
-        "audience": {
-            "gender": result.get("audience", {}).get("gender", []),
-            "age_range": result.get("audience", {}).get("age_range", []),
-        },
-    })
+    return success_response(
+        {
+            "headlines": result.get("headlines", []),
+            "descriptions": result.get("descriptions", []),
+            "audience": {
+                "gender": result.get("audience", {}).get("gender", []),
+                "age_range": result.get("audience", {}).get("age_range", []),
+            },
+        }
+    )
+
+
+class GoogleGenerateRequest(BaseModel):
+    summary: str
+    keywords: List[Dict[str, Any]]
+    requirements: str | None = None
+
+
+class MetaGenerateRequest(BaseModel):
+    summary: str
+    requirements: str | None = None
+
+
+@router.post("/generate/google")
+async def generate_google_ads(request: GoogleGenerateRequest):
+    # Extract plain keyword strings from rich objects
+    plain_keywords = [kw["keyword"] for kw in request.keywords if "keyword" in kw]
+    result = await google_ad_generation_agent.generate(
+        summary=request.summary,
+        keywords=plain_keywords,
+        requirements=request.requirements,
+    )
+    return success_response(
+        {
+            "headlines": result.get("headlines", []),
+            "descriptions": result.get("descriptions", []),
+            "age": result.get("age", {}),
+            "gender": result.get("gender", {}),
+        }
+    )
+
+
+@router.post("/generate/meta")
+async def generate_meta_ads(request: MetaGenerateRequest):
+    result = await meta_ad_generation_agent.generate(
+        summary=request.summary,
+        requirements=request.requirements,
+    )
+    return success_response(
+        {
+            "headlines": result.get("headlines", []),
+            "primary_text": result.get("primary_text", []),
+            "descriptions": result.get("descriptions", []),
+            "age": result.get("age", {}),
+            "gender": result.get("gender", {}),
+        }
+    )
 
 
 gks = GoogleKeywordService()
