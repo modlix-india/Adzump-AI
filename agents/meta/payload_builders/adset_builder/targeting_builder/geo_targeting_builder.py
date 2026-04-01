@@ -1,45 +1,9 @@
 from fastapi import HTTPException
-from agents.meta.payload_builders.constants import VALID_DISTANCE_UNITS, MAX_RADIUS_KM, MAX_RADIUS_MILES, MIN_RADIUS_KM, MIN_RADIUS_MILES
+from agents.meta.payload_builders.constants import MIN_RADIUS_KM
 
-# HELPERS
-def _validate_radius(radius, distance_unit, location_type: str):
-    """
-    Shared radius validation for city and custom location types.
-    Validates distance_unit is provided, is valid,
-    and radius is within Meta's allowed min/max range.
-    """
-
-    # distance_unit is required when radius is provided
-    if not distance_unit:
-        raise HTTPException(
-            status_code=400,
-            detail=f"distance_unit is required when radius is provided for {location_type}"
-        )
-
-    # distance_unit must be kilometer or mile
-    if distance_unit not in VALID_DISTANCE_UNITS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"distance_unit must be one of {VALID_DISTANCE_UNITS}"
-        )
-
-    # Validate kilometer range
-    if distance_unit == "kilometer":
-        if radius < MIN_RADIUS_KM:
-            radius = MIN_RADIUS_KM
-        if radius > MAX_RADIUS_KM:
-            radius = MAX_RADIUS_KM
-
-    # Validate mile range
-    if distance_unit == "mile":
-        if radius < MIN_RADIUS_MILES:
-            radius = MIN_RADIUS_MILES
-        if radius > MAX_RADIUS_MILES:
-            radius = MAX_RADIUS_MILES
-
-    return radius   
 
 # BUILDER
+
 
 def build_geo_locations(location_list: list):
     """
@@ -49,30 +13,23 @@ def build_geo_locations(location_list: list):
     """
 
     if not location_list:
-        raise HTTPException(
-            status_code=400,
-            detail="Locations are required"
-        )
+        raise HTTPException(status_code=400, detail="Locations are required")
 
     # Initialize all supported geo location buckets
     geo_payload = {
-        "countries": set(),       # set — auto deduplicates country codes
+        "countries": set(),  # set — auto deduplicates country codes
         "cities": [],
         "regions": [],
-        "zips": [],            # set — auto deduplicates zip codes
+        "zips": [],  # set — auto deduplicates zip codes
         "custom_locations": [],
         "neighborhoods": [],
     }
 
     for location in location_list:
-
         location_type = location.get("type")
 
         if not location_type:
-            raise HTTPException(
-                status_code=400,
-                detail="Location type is required"
-            )
+            raise HTTPException(status_code=400, detail="Location type is required")
 
         # COUNTRY
         # Meta expects a list of country codes e.g. ["IN", "US"]
@@ -98,8 +55,6 @@ def build_geo_locations(location_list: list):
             distance_unit = location.get("distance_unit")
 
             if radius:
-                # Validate radius is within Meta's allowed range
-                _validate_radius(radius, distance_unit, "city")
                 city_payload["radius"] = radius
                 city_payload["distance_unit"] = distance_unit
             else:
@@ -119,23 +74,18 @@ def build_geo_locations(location_list: list):
             geo_payload["regions"].append({"key": str(region_key)})
 
         # ZIP
-        # Meta expects zip/postal codes as strings
         elif location_type == "zip":
             zip_code = location.get("key")
             if not zip_code:
                 raise HTTPException(status_code=400, detail="zip key missing")
-
-            # Meta expects {"key": "COUNTRY_CODE:ZIP_CODE"}
-            geo_payload["zips"].append(zip_code)
+            zip = {"key": zip_code}
+            geo_payload["zips"].append(zip)
 
         # NEIGHBORHOOD
         elif location_type == "neighborhood":
             neighborhood_key = location.get("key")
             if not neighborhood_key:
-                raise HTTPException(
-                    status_code=400,
-                    detail="neighborhood key missing"
-                )
+                raise HTTPException(status_code=400, detail="neighborhood key missing")
 
             geo_payload["neighborhoods"].append({"key": str(neighborhood_key)})
 
@@ -149,20 +99,15 @@ def build_geo_locations(location_list: list):
             if latitude is None or longitude is None:
                 raise HTTPException(
                     status_code=400,
-                    detail="Custom location requires latitude and longitude"
+                    detail="Custom location requires latitude and longitude",
                 )
 
-            custom_location = {
-                "latitude": latitude,
-                "longitude": longitude
-            }
+            custom_location = {"latitude": latitude, "longitude": longitude}
 
             radius = location.get("radius")
             distance_unit = location.get("distance_unit")
 
             if radius:
-                # Validate radius — same rules as city radius
-                _validate_radius(radius, distance_unit, "custom location")
                 custom_location["radius"] = radius
                 custom_location["distance_unit"] = distance_unit
 
@@ -171,7 +116,7 @@ def build_geo_locations(location_list: list):
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported location type: '{location_type}'. Supported: country, city, region, zip, custom"
+                detail=f"Unsupported location type: '{location_type}'. Supported: country, city, region, zip, custom",
             )
 
     # Convert sets to lists — Meta expects arrays not sets
@@ -179,8 +124,4 @@ def build_geo_locations(location_list: list):
     geo_payload["zips"] = list(geo_payload["zips"])
 
     # Strip empty arrays — Meta rejects keys with empty arrays
-    return {
-        key: value
-        for key, value in geo_payload.items()
-        if value
-    }
+    return {key: value for key, value in geo_payload.items() if value}

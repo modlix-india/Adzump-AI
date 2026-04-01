@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from agents.meta.payload_builders.constants import SCHEDULE_BUFFER_SECONDS
+from core.models.meta import AdCreationStage
 
 
 def normalize_time(date_str: Optional[str]) -> Optional[str]:
@@ -16,10 +17,12 @@ def normalize_time(date_str: Optional[str]) -> Optional[str]:
 
     try:
         parsed_date = datetime.fromisoformat(date_str).date()
-        today       = datetime.now().date()
+        today = datetime.now().date()
 
         if parsed_date == today:
-            dt = datetime.now().astimezone() + timedelta(seconds=SCHEDULE_BUFFER_SECONDS + 10)
+            dt = datetime.now().astimezone() + timedelta(
+                seconds=SCHEDULE_BUFFER_SECONDS + 10
+            )
         else:
             dt = datetime.combine(parsed_date, datetime.min.time()).astimezone()
 
@@ -29,26 +32,22 @@ def normalize_time(date_str: Optional[str]) -> Optional[str]:
         return date_str  # let validate_schedule raise 400
 
 
-def build_name(name: str, entity_type: str, date: datetime = None) -> str:
+def build_name(name: str, entity_type: AdCreationStage, date: datetime = None) -> str:
     """
     Formatted string e.g., "name - entity_type dd/mm/yy"
     """
-    ENTITY_LABELS = {
-        "campaign": "Campaign",
-        "adset":    "Adset",
-        "creative": "Creative",
-        "ad":       "Ad",
-    }
-
-    entity_type = entity_type.lower().strip()
-    
-    if entity_type not in ENTITY_LABELS:
-        raise ValueError(f"Invalid entity_type '{entity_type}'. Must be one of: {list(ENTITY_LABELS.keys())}")
+    if not isinstance(entity_type, AdCreationStage):
+        try:
+            entity_type = AdCreationStage(entity_type.upper().strip())
+        except ValueError:
+            raise ValueError(
+                f"Invalid entity_type '{entity_type}'. Must be a valid AdCreationStage."
+            )
 
     if date is None:
         date = datetime.today()
 
     date_str = date.strftime("%d/%m/%y")
-    label = ENTITY_LABELS[entity_type]
+    label = entity_type.value.capitalize()
 
     return f"{name} - {label} {date_str}"

@@ -1,39 +1,30 @@
+from core.models.meta import CreateMetaAdRequest
 from structlog import get_logger
-from adapters.meta.exceptions import MetaAPIError
-from agents.meta.meta_payload_service import (
-    MetaPayloadAssemblyService
-)
-from adapters.meta.executors.campaign_executor import MetaCampaignExecutor
-from adapters.meta.executors.adset_executor import MetaAdSetExecutor
-from adapters.meta.executors.creative_executor import MetaCreativeExecutor
-from adapters.meta.executors.ad_creation_executor import MetaAdExecutor
+from adapters.meta.exceptions import MetaAdCreationError
+from agents.meta.meta_payload_service import MetaPayloadAssemblyService
+from adapters.meta.meta_ad_executor import MetaAdExecutor
+from core.models.meta import AdCreationStage
 
 logger = get_logger(__name__)
 
 
 class MetaAdCreationOrchestrator:
-
-    def __init__(self, meta_client, ad_account_id: str, client_code: str):
+    def __init__(self, meta_client, ad_account_id: str):
         self.meta_client = meta_client
         self.ad_account_id = ad_account_id
-        self.client_code = client_code
 
-
-        self.campaign_executor = MetaCampaignExecutor(
-            meta_client, ad_account_id, client_code
-        )
-        self.adset_executor = MetaAdSetExecutor(
-            meta_client, ad_account_id, client_code
-        )
-        self.creative_executor = MetaCreativeExecutor(
-            meta_client, ad_account_id, client_code
-        )
-        self.ad_executor = MetaAdExecutor(
-            meta_client, ad_account_id, client_code
+        self.meta_executor = MetaAdExecutor(
+            meta_client,
+            ad_account_id,
         )
 
-    async def create_full_structure(self, meta_input_payload: dict, inspect_payload: bool) -> dict:
+    async def create_full_structure(
+        self, meta_input_payload: CreateMetaAdRequest, inspect_payload: bool
+    ) -> dict:
 
+        meta_input_payload = meta_input_payload.model_dump(
+            mode="json", exclude_none=True
+        )
         existing_ids = meta_input_payload.get("existing_ids") or {
             "campaign_id": None,
             "adset_id": None,
@@ -41,98 +32,82 @@ class MetaAdCreationOrchestrator:
             "ad_id": None,
         }
 
-        assembled_payloads = (
-            MetaPayloadAssemblyService.assemble_meta_payloads(
-                meta_input_payload
-            )
-        )
-
-        # Inspect payload - Dry run — return assembled payloads without hitting Meta API
-        if inspect_payload:
-            return {
-                "status": "SUCCESS",
-                "payloads": assembled_payloads
-            }
-
-        current_stage = "CAMPAIGN"
+        current_stage = AdCreationStage.ASSEMBLY
 
         try:
-            # Campaign
+            assembled_payloads = MetaPayloadAssemblyService.assemble_meta_payloads(
+                meta_input_payload
+            )
+
+            # Inspect payload - Dry run — return assembled payloads without hitting Meta API
+            if inspect_payload:
+                return {"status": "SUCCESS", "payloads": assembled_payloads}
+
+            current_stage = AdCreationStage.CAMPAIGN
             if not existing_ids["campaign_id"]:
-                existing_ids["campaign_id"] = (
-                    await self.campaign_executor.create_campaign(
-                        assembled_payloads["campaign_payload"]
-                    )
+                existing_ids["campaign_id"] = await self.meta_executor.create_campaign(
+                    assembled_payloads["campaign_payload"]
                 )
 
                 logger.info(
                     "Campaign created",
-                    campaign_id=existing_ids["campaign_id"]
+                    ad_account_id=self.ad_account_id,
+                    campaign_id=existing_ids["campaign_id"],
                 )
 
-            current_stage = "ADSET"
+            current_stage = AdCreationStage.ADSET
 
             # AdSet
             if not existing_ids["adset_id"]:
-                existing_ids["adset_id"] = (
-                    await self.adset_executor.create_adset(
-                        assembled_payloads["adset_payload"],
-                        existing_ids["campaign_id"]
-                    )
+                adset_payload = assembled_payloads["adset_payload"]
+                adset_payload["campaign_id"] = existing_ids["campaign_id"]
+
+                existing_ids["adset_id"] = await self.meta_executor.create_adset(
+                    adset_payload
                 )
 
                 logger.info(
                     "Adset created",
-                    adset_id=existing_ids["adset_id"]
+                    ad_account_id=self.ad_account_id,
+                    adset_id=existing_ids["adset_id"],
                 )
-                
 
-            current_stage = "CREATIVE"
+            current_stage = AdCreationStage.CREATIVE
 
             # Creative
             if not existing_ids["creative_id"]:
-                existing_ids["creative_id"] = (
-                    await self.creative_executor.create_creative(
-                        assembled_payloads["creative_payload"]
-                    )
+                existing_ids["creative_id"] = await self.meta_executor.create_creative(
+                    assembled_payloads["creative_payload"]
                 )
 
                 logger.info(
                     "Creative created",
-                    creative_id=existing_ids["creative_id"]
+                    ad_account_id=self.ad_account_id,
+                    creative_id=existing_ids["creative_id"],
                 )
 
-            current_stage = "AD"
+            current_stage = AdCreationStage.AD
 
             # Ad
             if not existing_ids["ad_id"]:
-                existing_ids["ad_id"] = (
-                    await self.ad_executor.create_ad(
-                        assembled_payloads["ad_payload"],
-                        existing_ids["adset_id"],
-                        existing_ids["creative_id"]
-                    )
-                )
+                ad_payload = {
+                    **assembled_payloads["ad_payload"],
+                    "adset_id": existing_ids["adset_id"],
+                    "creative": {"creative_id": existing_ids["creative_id"]},
+                }
+                existing_ids["ad_id"] = await self.meta_executor.create_ad(ad_payload)
 
                 logger.info(
                     "Ad created",
-                    ad_id=existing_ids["ad_id"]
+                    ad_account_id=self.ad_account_id,
+                    ad_id=existing_ids["ad_id"],
                 )
 
-            return {
-                "status": "SUCCESS",
-                "ids": existing_ids
-            }
+            return {"status": "SUCCESS", "ids": existing_ids}
 
-        except MetaAPIError as exc:
-            return {
-                "status": "FAILED",
-                "failed_stage": current_stage,
-                "error": {
-                    "message": exc.message,
-                    "status_code": exc.status_code,
-                    "meta_error": exc.error_data.get("error", {})
-                },
-                "ids": existing_ids
-            }
-
+        except Exception as exc:
+            raise MetaAdCreationError(
+                failed_stage=current_stage.value,
+                existing_ids=existing_ids,
+                original_exc=exc,
+            ) from exc

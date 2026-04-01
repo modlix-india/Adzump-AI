@@ -23,12 +23,20 @@ def setup_exception_handlers(app):
         request: Request, exc: RequestValidationError
     ):
         logger.warning(f"Validation error at {request.url.path}: {exc.errors()}")
+        formatted_errors = [
+            {
+                "loc": err.get("loc", []),
+                "msg": err.get("msg"),
+                "type": err.get("type", "value_error"),
+            }
+            for err in exc.errors()
+        ]
         return JSONResponse(
             content={
                 "success": False,
                 "data": None,
                 "error": "Invalid or missing request fields",
-                "details": exc.errors(),
+                "details": formatted_errors,
             },
             status_code=422,
         )
