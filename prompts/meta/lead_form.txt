@@ -46,6 +46,15 @@ If content has:
 - 1 item → style = PARAGRAPH_STYLE
 - 2–5 items → style = LIST_STYLE
 
+IMPORTANT:
+
+- Each content bullet MUST be under 80 characters
+- Keep bullets short, crisp, and benefit-focused
+- Avoid long sentences and extra descriptions
+- Prefer phrases over full sentences
+- DO NOT exceed 80 characters under any condition
+- If any bullet exceeds 80 characters, rewrite it to fit within limit
+
 ---
 
 QUESTIONS

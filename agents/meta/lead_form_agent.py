@@ -62,6 +62,9 @@ class MetaLeadFormAgent:
 
         try:
             payload = LeadFormPayload.model_validate_json(content)
+            if len(payload.name) > 50:
+                payload.name = payload.name[:50]
+                payload.name = re.sub(r'\s+\S*$', '', payload.name)
         except ValidationError as e:
             logger.error("Failed to parse LLM output", error=str(e), raw=content)
             raise AIProcessingException("LLM output is not valid JSON")
