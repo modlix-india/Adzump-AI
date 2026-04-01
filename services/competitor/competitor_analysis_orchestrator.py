@@ -1,7 +1,8 @@
+from __future__ import annotations
 import asyncio
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Any
 from structlog import get_logger  # type: ignore
-import structlog.contextvars
+import structlog.contextvars as sl_contextvars
 
 from oserver.services.storage_service import storage_service
 from oserver.models.storage_request_model import (
@@ -22,6 +23,7 @@ from exceptions.custom_exceptions import StorageException
 # Local sub-module imports
 from .competitor_discovery_service import competitor_discovery_service
 from .competitor_insight_service import competitor_insight_service
+from utils.competitor_extraction import filter_already_analyzed_competitors
 
 logger = get_logger(__name__)
 
@@ -38,46 +40,55 @@ class CompetitorAnalysisOrchestrator:
     async def start_competitor_analysis(
         self,
         business_url: str,
-        customer_id: Optional[str] = None,
-        login_customer_id: Optional[str] = None,
+        customer_id: str,
+        login_customer_id: str,
+        force_fresh_analysis: bool = False,
     ) -> CompetitorAnalysisResult:
         """Main entry point to start the competitor analysis process."""
-        structlog.contextvars.bind_contextvars(
+        sl_contextvars.bind_contextvars(
             business_url=business_url, client_code=auth_context.client_code
         )
-        logger.info("analysis.orchestration_started")
+        logger.info("Competitor analysis.orchestration_started")
 
         try:
-            # Load Initial Info
-            record, storage_id, brand_info = await self._load_business_info(
-                business_url
+            # Load Initial User Context
+            (
+                record,
+                storage_id,
+                user_business_info,
+            ) = await self._load_user_business_context(business_url=business_url)
+
+            # Instantiate strict Pydantic models at the database(storage) boundary (standardized)
+            raw_comps, existing_comps = CompetitorAnalysisResult.load_from_record(
+                record
             )
 
             # Find Keywords (Now includes per-competitor enrichment)
             competitors = await self._find_competitor_keywords(
-                record, brand_info, customer_id, login_customer_id
+                raw_competitors=raw_comps,
+                existing_analysis=existing_comps,
+                customer_id=customer_id,
+                login_customer_id=login_customer_id,
+                force_fresh_analysis=force_fresh_analysis,
             )
 
             # Global Aggregation & Trend Analysis
-            result = await self._add_metrics_and_save(
-                competitors,
-                record,
-                brand_info,
-                storage_id,
-                customer_id,
-                login_customer_id,
+            result = await self._enrich_competitor_keyword_with_trends_and_save(
+                competitors=competitors,
+                user_business_info=user_business_info,
+                storage_id=storage_id,
             )
 
             logger.info(
-                "analysis.orchestration_complete", competitor_count=len(competitors)
+                "Competitor analysis.orchestration_complete", competitor_count=len(competitors)
             )
             return result
         finally:
-            structlog.contextvars.unbind_contextvars("business_url", "client_code")
+            sl_contextvars.unbind_contextvars("business_url", "client_code")
 
-    async def _load_business_info(
+    async def _load_user_business_context(
         self, business_url: str
-    ) -> Tuple[Dict[str, Any], str, BusinessMetadata]:
+    ) -> tuple[dict[str, Any], str, BusinessMetadata]:
         """Fetch business record and resolve info context."""
         # 1. Fetch from storage
         read_req = StorageReadRequest(
@@ -86,7 +97,7 @@ class CompetitorAnalysisOrchestrator:
             clientCode=auth_context.client_code,
             filter=StorageFilter(field="businessUrl", value=business_url),
         )
-        resp = await storage_service.read_page_storage(read_req)
+        resp = await storage_service.read_page_storage(request=read_req)
 
         if not resp.success or not resp.result:
             raise StorageException(f"Failed to fetch record for {business_url}")
@@ -101,67 +112,107 @@ class CompetitorAnalysisOrchestrator:
         if not storage_id:
             raise StorageException(f"Record for {business_url} missing ID")
 
-        # 2. Resolve Brand Metadata & USPs in parallel
+        # 2. Resolve User Brand Metadata & USPs in parallel
         summary = record.get("final_summary") or record.get("summary")
         if not summary:
-            brand_info = BusinessMetadata.from_raw_data(record)
+            user_business_info = BusinessMetadata.from_raw_data(record)
         else:
-            logger.info("analysis.resolving_metadata")
-            brand_info, usps = await asyncio.gather(
-                self.business_service.extract_business_metadata(summary, business_url),
-                self.business_service.extract_business_unique_features(summary),
+            user_business_info, usps = await asyncio.gather(
+                self.business_service.extract_business_metadata(
+                    scraped_data=summary, url=business_url
+                ),
+                self.business_service.extract_business_unique_features(
+                    scraped_data=summary
+                ),
                 return_exceptions=True,
             )
-            if isinstance(brand_info, Exception):
-                brand_info = BusinessMetadata.from_raw_data(record)
+            if isinstance(user_business_info, Exception):
+                user_business_info = BusinessMetadata.from_raw_data(record)
             if not isinstance(usps, Exception):
-                brand_info.unique_features = usps or brand_info.unique_features
+                user_business_info.unique_features = (
+                    usps or user_business_info.unique_features
+                )
+            user_business_info.business_summary = summary
 
-        return record, storage_id, brand_info
+        return record, storage_id, user_business_info
 
     async def _find_competitor_keywords(
         self,
-        record: Dict[str, Any],
-        brand_info: BusinessMetadata,
-        customer_id: Optional[str] = None,
-        login_customer_id: Optional[str] = None,
-    ) -> List[Competitor]:
-        """Parallel keyword discovery across all listed competitors."""
-        raw_competitors = record.get("competitors", [])
+        raw_competitors: list[Competitor],
+        existing_analysis: list[Competitor],
+        customer_id: str,
+        login_customer_id: str,
+        force_fresh_analysis: bool = False,
+    ) -> list[Competitor]:
+        """Parallel keyword discovery across all listed competitors with smart skipping."""
         if not raw_competitors:
-            logger.warning("analysis.no_competitors_found")
+            logger.warning("Competitor analysis.no_competitors_found")
             return []
 
-        logger.info("analysis.discovery_started", count=len(raw_competitors))
+        # Identify "already-done" competitors vs "to-discover"
+        to_discover, already_done_list = filter_already_analyzed_competitors(
+            raw_competitors=raw_competitors,
+            existing_analysis=existing_analysis,
+            force_fresh_analysis=force_fresh_analysis,
+        )
+
+        if not to_discover:
+            logger.info(
+                "Competitor analysis.discovery_skipped",
+                total=len(raw_competitors),
+                msg="All competitors already analyzed",
+            )
+            return already_done_list
+
+        logger.info(
+            "Competitor analysis.discovery_started",
+            to_discover_count=len(to_discover),
+            skipped_count=len(already_done_list),
+            force_fresh=force_fresh_analysis,
+        )
+
+        # Discover only what's needed
         results = await asyncio.gather(
             *[
                 competitor_discovery_service.find_keywords_for_competitor(
                     competitor_info=competitor,
-                    record=record,
-                    brand_info=brand_info,
                     customer_id=customer_id,
                     login_customer_id=login_customer_id,
                 )
-                for competitor in raw_competitors
+                for competitor in to_discover
             ],
             return_exceptions=True,
         )
-        return [res for res in results if isinstance(res, Competitor)]
+
+        # Merge results
+        valid_results = already_done_list
+        for i, res in enumerate(results):
+            if isinstance(res, Exception):
+                url = to_discover[i].url
+                logger.error(
+                    "Competitor analysis.discovery_failed",
+                    url=url,
+                    error=str(res),
+                )
+            else:
+                valid_results.append(res)
+
+        return valid_results
 
     def _build_global_dedup(
-        self, competitors: List[Competitor]
-    ) -> Dict[str, CompetitorKeyword]:
+        self, competitors: list[Competitor]
+    ) -> dict[str, CompetitorKeyword]:
         """Deduplicate keywords across all competitors before enrichment."""
-        deduped: Dict[str, CompetitorKeyword] = {}
+        deduped: dict[str, CompetitorKeyword] = {}
         for comp in competitors:
             for kw in comp.extracted_keywords:
                 key = kw.keyword.strip().lower()
-                if key not in deduped or kw.relevance > deduped[key].relevance:
+                if key not in deduped or kw.volume > deduped[key].volume:
                     deduped[key] = kw
 
         total_before = sum(len(c.extracted_keywords) for c in competitors)
         logger.info(
-            "analysis.dedup_complete",
+            "Competitor analysis.dedup_complete",
             before=total_before,
             after=len(deduped),
         )
@@ -169,8 +220,8 @@ class CompetitorAnalysisOrchestrator:
 
     def _propagate_metrics_to_competitors(
         self,
-        competitors: List[Competitor],
-        enriched_map: Dict[str, CompetitorKeyword],
+        competitors: list[Competitor],
+        enriched_map: dict[str, CompetitorKeyword],
     ) -> None:
         """Write enriched metrics back to each competitor's keyword list, preserving strategic context."""
         for comp in competitors:
@@ -178,7 +229,7 @@ class CompetitorAnalysisOrchestrator:
             for kw in comp.extracted_keywords:
                 key = kw.keyword.strip().lower()
                 if key in enriched_map:
-                    # ONLY propagate technical metrics, keep competitor-specific AI strategy
+                    # Propagate technical AND global AI grading metrics
                     enriched = enriched_map[key]
                     updated_kw = kw.model_copy(
                         update={
@@ -186,6 +237,10 @@ class CompetitorAnalysisOrchestrator:
                             "competition": enriched.competition,
                             "competitionIndex": enriched.competitionIndex,
                             "trend_direction": enriched.trend_direction,
+                            "opportunity_score": enriched.opportunity_score,
+                            "recommended_action": enriched.recommended_action,
+                            "reasoning": enriched.reasoning,
+                            "competitor_advantage": enriched.competitor_advantage,
                         }
                     )
                     updated_keywords.append(updated_kw)
@@ -197,61 +252,52 @@ class CompetitorAnalysisOrchestrator:
                 reverse=True,
             )
 
-    async def _add_metrics_and_save(
+    async def _enrich_competitor_keyword_with_trends_and_save(
         self,
-        competitors: List[Competitor],
-        record: Dict[str, Any],
-        brand_info: BusinessMetadata,
+        competitors: list[Competitor],
+        user_business_info: BusinessMetadata,
         storage_id: str,
-        customer_id: Optional[str],
-        login_customer_id: Optional[str],
     ) -> CompetitorAnalysisResult:
         """Deduplicate globally, perform Trend Analysis on top keywords, and persist."""
 
         # Global Deduplication
-        # Discovery keywords now already have Volume/Competition from Step 2.
+        # Discovery keywords now already have Volume/Competition from competitor_discovery_service.
         deduped_map = self._build_global_dedup(competitors)
         unique_list = list(deduped_map.values())
 
-        enriched_keywords: List[CompetitorKeyword] = []
+        enriched_keywords: list[CompetitorKeyword] = unique_list
 
-        if unique_list and customer_id and login_customer_id:
+        if unique_list:
             try:
                 # Final Trend Analysis & Global Scoring
-                # Rationale: We only do Trends on the top unique candidates to save time.
                 enriched_keywords = (
-                    await competitor_insight_service.add_volume_and_trends(
+                    await competitor_insight_service.enrich_competitor_keyword_trends(
                         keywords=unique_list,
-                        customer_id=customer_id,
-                        login_customer_id=login_customer_id,
-                        skip_trends=False,  # Final pass includes Trends
                     )
                 )
 
-                brand_info.business_summary = (
-                    record.get("final_summary") or record.get("summary") or ""
-                )
-
-                # Global strategic grading against the user's business
+                # Global strategic grading against the target user's business
                 enriched_keywords = (
                     await competitor_insight_service.rate_keyword_potential(
-                        enriched_keywords, brand_info
+                        enriched_keywords=enriched_keywords,
+                        business_metadata=user_business_info,
+                        competitor_names=[c.name for c in competitors],
                     )
                 )
 
                 # Ensure per-competitor lists stay in sync with final global list
+                # Finally, sort by Opportunity Score (Descending) and then Volume for UI presentation
+                enriched_keywords.sort(key=lambda x: (x.opportunity_score, x.volume), reverse=True)
+
                 final_map = {kw.keyword.lower(): kw for kw in enriched_keywords}
                 self._propagate_metrics_to_competitors(competitors, final_map)
 
             except Exception as e:
-                logger.error("analysis.aggregation_failed", error=str(e))
+                logger.error("Competitor analysis.aggregation_failed", error=str(e))
+                # Fallback: maintain volume sorting even on partial failure
                 enriched_keywords = sorted(
-                    unique_list, key=lambda x: x.relevance, reverse=True
+                    unique_list, key=lambda x: x.volume, reverse=True
                 )
-        else:
-            enriched_keywords = sorted(
-                unique_list, key=lambda x: x.relevance, reverse=True
-            )
 
         result = CompetitorAnalysisResult(
             competitor_analysis=competitors, enriched_keywords=enriched_keywords
@@ -263,7 +309,7 @@ class CompetitorAnalysisOrchestrator:
             dataObject=result.model_dump(),
             appCode=self.APP_CODE,
         )
-        await storage_service.update_storage(update_req)
+        await storage_service.update_storage(request=update_req)
         return result
 
 
