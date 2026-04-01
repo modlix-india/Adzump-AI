@@ -1,4 +1,6 @@
 import structlog
+from datetime import datetime
+import re
 from pydantic import ValidationError
 
 from core.models.lead_form import LeadFormPayload
@@ -60,6 +62,9 @@ class MetaLeadFormAgent:
 
         try:
             payload = LeadFormPayload.model_validate_json(content)
+            if len(payload.name) > 50:
+                payload.name = payload.name[:50]
+                payload.name = re.sub(r'\s+\S*$', '', payload.name)
         except ValidationError as e:
             logger.error("Failed to parse LLM output", error=str(e), raw=content)
             raise AIProcessingException("LLM output is not valid JSON")
@@ -82,6 +87,13 @@ class MetaLeadFormAgent:
                 "Privacy policy URL not found, falling back to business URL",
                 session_id=session_id
             )
+
+        phone = self._extract_phone(summary)
+        phone = self._normalize_phone(phone)
+
+        if phone:
+            payload.thank_you_page.business_phone_number = phone
+            payload.thank_you_page.button_type = "CALL_BUSINESS"    
 
         return payload
 
@@ -108,6 +120,15 @@ class MetaLeadFormAgent:
 
         if not payload.name:
             raise BusinessValidationException("Form name is required")    
+
+        clean_name = re.sub(r'[^a-zA-Z0-9 ]', '', payload.name)
+
+        now = datetime.now()
+        date_part = now.strftime("%d%b")   
+        time_part = now.strftime("%H%M%S")    
+        payload.name = f"{clean_name[:30]}_{date_part}_{time_part}"    
+
+        logger.info("Final Lead Form Name", name=payload.name)
 
         meta_payload = payload.model_dump(exclude_none=True)
 
@@ -174,6 +195,34 @@ class MetaLeadFormAgent:
                 return href if href.startswith("http") else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
 
         return None
+
+    def _extract_phone(self, text: str) -> str | None:
+        matches = re.findall(r'\+\d[\d\s\-\(\)]{7,15}', text)
+        if matches:
+            return matches[0]
+
+        matches = re.findall(r'0[\d\s\-\(\)]{9,15}', text)
+        if matches:
+            return matches[0]
+        match = re.search(r'\b\d{10}\b', text)
+        return match.group(0) if match else None
+
+    def _normalize_phone(self, phone: str | None) -> str | None:
+        if not phone:
+            return None
+
+        phone = re.sub(r"[^\d+]", "", phone)
+
+        if phone.startswith("+"):
+            return phone
+
+        if phone.startswith("0"):
+            phone = phone[1:]
+
+        if phone.isdigit():
+            return "+91" + phone
+
+        return phone    
 
 
 meta_lead_form_agent = MetaLeadFormAgent()
