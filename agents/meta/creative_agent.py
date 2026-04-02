@@ -146,13 +146,14 @@ class MetaCreativeAgent:
         if request.font_family:
             brand_instructions += f"\n- FONT STYLE: Render text using a look and feel consistent with the '{request.font_family}' typeface."
 
-        # 3. Create Narrative Master Prompt
+        # 3. First Pass: Use a Text Model (Strategist) to generate a narrative scene prompt
+        # This pass handles the strategy, layout reasoning, and copy orchestration
         PROMPT_PATH = "prompts/meta/image_scene.txt"
         try:
             with open(PROMPT_PATH, "r") as f:
                 template = f.read()
 
-            master_prompt = template.format(
+            strategist_input = template.format(
                 summary=request.summary,
                 headline=request.headline,
                 description=request.description,
@@ -160,16 +161,26 @@ class MetaCreativeAgent:
                 brand_instructions=brand_instructions,
             )
 
-            logger.info("MASTER PROMPT FOR GEMINI", prompt=master_prompt)
+            logger.info("Requesting narrative scene refinement from Strategist LLM")
+            strategist_resp = await chat_completion(
+                messages=[{"role": "user", "content": strategist_input}]
+            )
+            refined_scene_prompt = strategist_resp.choices[0].message.content.strip()
+
+            # Log the refined prompt clearly for debug
+            logger.info(
+                "STRATEGIST REFINED PROMPT", refined_prompt=refined_scene_prompt
+            )
 
         except Exception as e:
-            logger.error("Failed to load or format prompt template", error=str(e))
+            logger.error("Failed to load or refine prompt template", error=str(e))
             raise AIProcessingException(f"Prompt preparation failed: {str(e)}")
 
+        # 4. Second Pass: Use the Image Model (Renderer) to generate the actual pixels
         try:
-            # We pass the master prompt and any image parts to Gemini
+            # We pass the refined narrative AND any reference images (Logo) to Gemini 2.5
             images = await generate_images(
-                master_prompt,
+                refined_scene_prompt,
                 n=1,
                 aspect_ratio=request.aspect_ratio,
                 image_parts=image_parts,
