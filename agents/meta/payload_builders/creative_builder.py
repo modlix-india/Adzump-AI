@@ -1,5 +1,6 @@
 from agents.meta.utils.payload_helpers import build_name
 from core.models.meta import (
+    CreativePayload,
     DestinationType,
     AdCreationStage,
     CreativeType,
@@ -7,24 +8,25 @@ from core.models.meta import (
 )
 
 
-def build_creative_payload(meta_input_payload: dict, is_dynamic: bool) -> dict:
+def build_creative_payload(
+    creative: CreativePayload, is_dynamic: bool
+) -> dict:
     """
     Routes to the correct builder based on creative type and dynamic flag.
     Validation is handled by Pydantic models centrally.
     """
-    creative = meta_input_payload.get("creative")
-    destination_type = meta_input_payload.get("adset").get("destination_type")
-
-    creative_type = creative.get("type")
+    creative_dict = creative.model_dump(mode="json", exclude_none=True)
+    creative_type = creative_dict.get("type")
+    destination_type = creative.destination_type
 
     if is_dynamic and destination_type == DestinationType.ON_AD:
         raise ValueError("Dynamic creative not supported for ON_AD")
 
     if creative_type == CreativeType.IMAGE:
         if is_dynamic:
-            return _build_dynamic_image_creative(creative, destination_type)
+            return _build_dynamic_image_creative(creative_dict, destination_type)
         else:
-            return _build_non_dynamic_image_creative(creative, destination_type)
+            return _build_non_dynamic_image_creative(creative_dict, destination_type)
 
     # VIDEO and CAROUSEL — extendable here
     return {}

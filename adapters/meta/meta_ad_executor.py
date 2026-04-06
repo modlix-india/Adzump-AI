@@ -1,5 +1,6 @@
 from core.infrastructure.context import auth_context
 from adapters.meta.exceptions import MetaAPIContractError
+from core.models.meta import AdCreationStage
 
 
 class MetaAdExecutor:
@@ -21,18 +22,13 @@ class MetaAdExecutor:
 
         return entity_id
 
-    async def create_campaign(self, payload: dict) -> str:
-        endpoint = f"/act_{self.ad_account_id}/campaigns"
-        return await self._post_and_extract_id(endpoint, payload)
+    STAGE_MAP = {
+        AdCreationStage.CAMPAIGN: "campaigns",
+        AdCreationStage.ADSET: "adsets",
+        AdCreationStage.CREATIVE: "adcreatives",
+        AdCreationStage.AD: "ads",
+    }
 
-    async def create_adset(self, payload: dict) -> str:
-        endpoint = f"/act_{self.ad_account_id}/adsets"
-        return await self._post_and_extract_id(endpoint, payload)
-
-    async def create_creative(self, payload: dict) -> str:
-        endpoint = f"/act_{self.ad_account_id}/adcreatives"
-        return await self._post_and_extract_id(endpoint, payload)
-
-    async def create_ad(self, payload: dict) -> str:
-        endpoint = f"/act_{self.ad_account_id}/ads"
+    async def create_entity(self, stage: AdCreationStage, payload: dict) -> str:
+        endpoint = f"/act_{self.ad_account_id}/{self.STAGE_MAP[stage]}"
         return await self._post_and_extract_id(endpoint, payload)

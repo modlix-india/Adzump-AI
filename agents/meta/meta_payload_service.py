@@ -1,8 +1,11 @@
 from structlog import get_logger
-from agents.meta.payload_builders.campaign_builder import build_campaign_payload
+from core.models.meta import CreateMetaAdRequest, CreativePayload, AssembledMetaPayloads
+from agents.meta.payload_builders.basic_entity_builders import (
+    build_campaign_payload,
+    build_ad_payload,
+)
 from agents.meta.payload_builders.adset_builder.adset_builder import build_adset_payload
 from agents.meta.payload_builders.creative_builder import build_creative_payload
-from agents.meta.payload_builders.ad_builder import build_ad_payload
 
 logger = get_logger(__name__)
 
@@ -14,10 +17,12 @@ class MetaPayloadAssemblyService:
     """
 
     @staticmethod
-    def assemble_meta_payloads(meta_input_payload: dict) -> dict:
-        campaign_input = meta_input_payload.get("campaign")
-        adset_input = meta_input_payload.get("adset")
-        creative_input = meta_input_payload.get("creative")
+    def assemble_meta_payloads(
+        meta_request: CreateMetaAdRequest,
+    ) -> AssembledMetaPayloads:
+        campaign_input = meta_request.campaign
+        adset_input = meta_request.adset
+        creative_input = meta_request.creative
 
         # Detect dynamic creative
         is_dynamic_creative = MetaPayloadAssemblyService._is_dynamic_creative(
@@ -40,7 +45,8 @@ class MetaPayloadAssemblyService:
 
         # Build creative (pass dynamic flag)
         creative_payload = build_creative_payload(
-            meta_input_payload, is_dynamic=is_dynamic_creative
+            creative_input,
+            is_dynamic=is_dynamic_creative,
         )
         logger.info(
             "Creative payload built",
@@ -50,20 +56,20 @@ class MetaPayloadAssemblyService:
 
         # Build ad
 
-        ad_payload = build_ad_payload(meta_input_payload.get("ad"))
+        ad_payload = build_ad_payload(meta_request.ad)
         logger.info(
             "Ad payload built", ad_payload=ad_payload, is_dynamic=is_dynamic_creative
         )
 
-        return {
-            "campaign_payload": campaign_payload,
-            "adset_payload": adset_payload,
-            "creative_payload": creative_payload,
-            "ad_payload": ad_payload,
-        }
+        return AssembledMetaPayloads(
+            campaign_payload=campaign_payload,
+            adset_payload=adset_payload,
+            creative_payload=creative_payload,
+            ad_payload=ad_payload,
+        )
 
     @staticmethod
-    def _is_dynamic_creative(creative: dict) -> bool:
+    def _is_dynamic_creative(creative: CreativePayload) -> bool:
         """
         Detects whether creative should be dynamic.
         Rule:
@@ -71,8 +77,8 @@ class MetaPayloadAssemblyService:
         """
 
         return (
-            len(creative.get("primary_texts", [])) > 1
-            or len(creative.get("headlines", [])) > 1
-            or len(creative.get("image_hashes", [])) > 1
-            or len(creative.get("descriptions", [])) > 1
+            len(creative.primary_texts) > 1
+            or len(creative.headlines) > 1
+            or len(creative.image_hashes) > 1
+            or (creative.descriptions is not None and len(creative.descriptions) > 1)
         )

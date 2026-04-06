@@ -1,4 +1,7 @@
-from core.models.meta import PromotedObjectType, BudgetType, AdCreationStage
+from core.models.meta import (
+    AdCreationStage,
+    AdSetPayload,
+)
 
 from agents.meta.payload_builders.adset_builder.targeting_builder import (
     geo_targeting_builder,
@@ -6,7 +9,6 @@ from agents.meta.payload_builders.adset_builder.targeting_builder import (
 from agents.meta.payload_builders.adset_builder.targeting_builder import (
     entity_targeting_builder,
 )
-from agents.meta.payload_builders.constants import INR_TO_MINOR_UNIT
 from agents.meta.utils.payload_helpers import build_name, normalize_time
 from structlog import get_logger
 
@@ -40,59 +42,21 @@ def _build_targeting(targeting: dict) -> dict:
     return meta_targeting
 
 
-def map_promoted_object(promoted_object: dict):
-    if not promoted_object:
-        return None
-
-    object_type = promoted_object.get("type")
-
-    if object_type == PromotedObjectType.PAGE:
-        return {"page_id": str(promoted_object.get("page_id"))}
-
-    if object_type == PromotedObjectType.PIXEL:
-        return {
-            "pixel_id": str(promoted_object.get("pixel_id")),
-            "custom_event_type": promoted_object.get("event"),
-        }
-
-    if object_type == PromotedObjectType.APP:
-        return {
-            "application_id": str(promoted_object.get("application_id")),
-            "object_store_url": promoted_object.get("object_store_url"),
-        }
-
-    return None
-
-
-def normalize_budget(budget: dict | None) -> dict:
-    """
-    Only transformation — assumes validation already done in model.
-    Converts INR → Meta minor units.
-    """
-    amount = budget.get("amount")
-    budget_type = budget.get("type")
-
-    minor_units = int(amount * INR_TO_MINOR_UNIT)
-
-    if budget_type == BudgetType.DAILY:
-        return {"daily_budget": minor_units}
-
-    if budget_type == BudgetType.LIFETIME:
-        return {"lifetime_budget": minor_units}
-
-    return {}
-
-
-def build_adset_payload(adset: dict, is_dynamic_creative: bool) -> dict:
+def build_adset_payload(adset: AdSetPayload, is_dynamic_creative: bool) -> dict:
     """
     Pure transformation layer — no validation.
     """
-    schedule = adset.get("schedule")
-    bidding = adset.get("bidding")
+    promoted_object_payload = (
+        adset.promoted_object.to_meta_payload() if adset.promoted_object else None
+    )
+
+    adset_dict = adset.model_dump(mode="json", exclude_none=True)
+    schedule = adset_dict.get("schedule")
+    bidding = adset_dict.get("bidding")
 
     payload = {
-        "name": build_name(adset.get("name"), AdCreationStage.ADSET),
-        "destination_type": adset.get("destination_type"),
+        "name": build_name(adset_dict.get("name"), AdCreationStage.ADSET),
+        "destination_type": adset_dict.get("destination_type"),
         "is_dynamic_creative": is_dynamic_creative,
         "start_time": normalize_time(schedule.get("start_time", ""))
         if schedule
@@ -102,10 +66,11 @@ def build_adset_payload(adset: dict, is_dynamic_creative: bool) -> dict:
         "optimization_goal": bidding.get("optimization_goal"),
         "bid_strategy": bidding.get("bid_strategy"),
         "bid_amount": bidding.get("bid_amount"),
-        "targeting": _build_targeting(adset.get("targeting")),
-        "promoted_object": map_promoted_object(adset.get("promoted_object")),
-        "status": adset.get("status"),
-        **normalize_budget(adset.get("budget")),
+        "targeting": _build_targeting(adset_dict.get("targeting")),
+        "promoted_object": promoted_object_payload,
+        "status": adset_dict.get("status"),
+        **adset.budget.to_meta_payload(),
+        "campaign_id": adset.campaign_id,
     }
     return {
         key: value

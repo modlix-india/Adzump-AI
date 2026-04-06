@@ -1,6 +1,7 @@
 from enum import Enum
-from typing import List, Literal, Optional, Dict, Any, Annotated, Union
+from typing import List, Literal, Optional, Dict, Any, Annotated, Set
 from datetime import date, datetime
+import re
 
 from pydantic import BaseModel, Field, model_validator, field_validator
 from agents.meta.payload_builders import constants as meta_constants
@@ -36,7 +37,7 @@ CountryCode = Annotated[
 ]
 
 
-class CampaignStatus(str, Enum):
+class Status(str, Enum):
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
 
@@ -44,7 +45,7 @@ class CampaignStatus(str, Enum):
 class CampaignPayload(BaseModel):
     name: str
     objective: CampaignObjective
-    status: CampaignStatus
+    status: Status
     special_ad_categories: Optional[List[SpecialAdCategory]] = None
     special_ad_category_country: Optional[List[CountryCode]] = None
 
@@ -65,8 +66,8 @@ class AdSetPayload(BaseModel):
 
 # it should be delete after adset builder is merged
 class CreateAdSetRequest(BaseModel):
-    ad_account_id: str = Field(..., alias="adAccountId")
-    campaign_id: str = Field(..., alias="campaignId")
+    ad_account_id: str = Field(..., alias="adAccountId", min_length=1)
+    campaign_id: str = Field(..., alias="campaignId", min_length=1)
     adset_payload: AdSetPayload = Field(..., alias="adsetPayload")
 
 
@@ -141,14 +142,6 @@ class CreateCreativeResponse(BaseModel):
     creativeId: str = Field(..., alias="creativeId")
 
 
-class SpecialAdCategory(str, Enum):
-    NONE = "NONE"
-    EMPLOYMENT = "EMPLOYMENT"
-    HOUSING = "HOUSING"
-    CREDIT = "CREDIT"
-    ISSUES_ELECTIONS_POLITICS = "ISSUES_ELECTIONS_POLITICS"
-
-
 # AdSet
 class Gender(str, Enum):
     MALE = "MALE"
@@ -213,6 +206,8 @@ class BillingEvent(str, Enum):
 
 class BidStrategy(str, Enum):
     LOWEST_COST_WITHOUT_CAP = "LOWEST_COST_WITHOUT_CAP"
+    LOWEST_COST_WITH_BID_CAP = "LOWEST_COST_WITH_BID_CAP"
+    LOWEST_COST_WITH_MIN_ROAS = "LOWEST_COST_WITH_MIN_ROAS"
     COST_CAP = "COST_CAP"
     TARGET_COST = "TARGET_COST"
 
@@ -222,6 +217,27 @@ class DestinationType(str, Enum):
     APP = "APP"
     MESSENGER = "MESSENGER"
     ON_AD = "ON_AD"
+    ON_POST = "ON_POST"
+    ON_VIDEO = "ON_VIDEO"
+    ON_PAGE = "ON_PAGE"
+    ON_EVENT = "ON_EVENT"
+    WHATSAPP = "WHATSAPP"
+    IMAGINE = "IMAGINE"
+    FACEBOOK = "FACEBOOK"
+    FACEBOOK_LIVE = "FACEBOOK_LIVE"
+    SHOP_AUTOMATIC = "SHOP_AUTOMATIC"
+    INSTAGRAM_LIVE = "INSTAGRAM_LIVE"
+    FACEBOOK_PAGE = "FACEBOOK_PAGE"
+    INSTAGRAM_DIRECT = "INSTAGRAM_DIRECT"
+    INSTAGRAM_PROFILE = "INSTAGRAM_PROFILE"
+    APPLINKS_AUTOMATIC = "APPLINKS_AUTOMATIC"
+    INSTAGRAM_PROFILE_AND_FACEBOOK_PAGE = "INSTAGRAM_PROFILE_AND_FACEBOOK_PAGE"
+    MESSAGING_MESSENGER_WHATSAPP = "MESSAGING_MESSENGER_WHATSAPP"
+    MESSAGING_INSTAGRAM_DIRECT_MESSENGER = "MESSAGING_INSTAGRAM_DIRECT_MESSENGER"
+    MESSAGING_INSTAGRAM_DIRECT_MESSENGER_WHATSAPP = (
+        "MESSAGING_INSTAGRAM_DIRECT_MESSENGER_WHATSAPP"
+    )
+    MESSAGING_INSTAGRAM_DIRECT_WHATSAPP = "MESSAGING_INSTAGRAM_DIRECT_WHATSAPP"
 
 
 # Promoted Object
@@ -266,26 +282,32 @@ class CreativeFormat(str, Enum):
     POST = "POST"
 
 
+class NonDemographicType(str, Enum):
+    interests = "interests"
+    behaviors = "behaviors"
+
+
 # MODELS
-
-
-# Account
-class AccountPayload(BaseModel):
-    ad_account_id: str
 
 
 # Existing IDs
 class ExistingIdsPayload(BaseModel):
-    campaign_id: str = None
-    adset_id: str = None
-    creative_id: str = None
-    ad_id: str = None
+    campaign_id: Optional[str] = None
+    adset_id: Optional[str] = None
+    creative_id: Optional[str] = None
+    ad_id: Optional[str] = None
+
+
+class CreativeRef(BaseModel):
+    creative_id: str
 
 
 # Ad
 class AdPayload(BaseModel):
     name: str
-    status: CampaignStatus
+    status: Status
+    adset_id: Optional[str] = None
+    creative: Optional[CreativeRef] = None
 
 
 # Schedule
@@ -309,6 +331,10 @@ class Schedule(BaseModel):
 
     @model_validator(mode="after")
     def validate_dates(self):
+        current_date = datetime.now().date()
+        if self.start_time < current_date:
+            raise ValueError("start_time cannot be in the past")
+
         if self.end_time and self.end_time < self.start_time:
             raise ValueError("end_time must be after start_time")
         return self
@@ -319,18 +345,32 @@ class Locale(BaseModel):
     name: str
 
 
+class Location(BaseModel):
+    key: str
+    name: str
+    type: str
+    radius: Optional[int] = None
+    distance_unit: Optional[str] = None
+
+
+class TargetingEntity(BaseModel):
+    id: str
+    name: str
+    type: str
+
+
 # Targeting (Flexible)
 class Targeting(BaseModel):
-    locations: List[Dict[str, Any]]
+    locations: list[Location]
 
-    locales: Optional[List[Locale]] = None
-    behaviors: Optional[List[Dict[str, Any]]] = None
-    interests: Optional[List[Dict[str, Any]]] = None
-    demographics: Optional[List[Dict[str, Any]]] = None
+    locales: Optional[list[Locale]] = None
+    behaviors: Optional[list[TargetingEntity]] = None
+    interests: Optional[list[TargetingEntity]] = None
+    demographics: Optional[list[TargetingEntity]] = None
 
     age_min: Optional[int] = Field(None, ge=18, le=65)
     age_max: Optional[int] = Field(None, ge=18, le=65)
-    genders: Optional[List[Gender]] = None
+    genders: Optional[list[Gender]] = None
 
     @field_validator("locations")
     @classmethod
@@ -339,11 +379,49 @@ class Targeting(BaseModel):
             raise ValueError("At least one location is required")
         return v
 
+    @model_validator(mode="after")
+    @classmethod
+    def validate_targeting(cls, values):
+        interests = getattr(values, "interests", []) or []
+        behaviors = getattr(values, "behaviors", []) or []
+        demographics = getattr(values, "demographics", []) or []
+
+        # Validate type of interests and behaviors
+        for i in interests:
+            if i.type != NonDemographicType.interests:
+                raise ValueError(f"Invalid type '{i.type}' in interests")
+
+        for b in behaviors:
+            if b.type != NonDemographicType.behaviors:
+                raise ValueError(f"Invalid type '{b.type}' in behaviors")
+
+        # Validate demographics do not contain interests/behaviors
+        for d in demographics:
+            if d.type in NonDemographicType.__members__:
+                raise ValueError(f"Invalid type '{d.type}' in demographics")
+
+        # Deduplicate IDs across all groups
+        seen_ids: Set[str] = set()
+        for group in [interests, behaviors, demographics]:
+            for e in group:
+                if e.id in seen_ids:
+                    raise ValueError(
+                        f"Duplicate targeting id '{e.id}' found across groups"
+                    )
+                seen_ids.add(e.id)
+
+        return values
+
 
 # Budget
 class Budget(BaseModel):
     amount: int = Field(..., gt=0)
     type: BudgetType
+
+    def to_meta_payload(self) -> dict:
+        minor_units = int(self.amount * meta_constants.INR_TO_MINOR_UNIT)
+        key = "daily_budget" if self.type == BudgetType.DAILY else "lifetime_budget"
+        return {key: minor_units}
 
 
 # Bidding
@@ -396,11 +474,29 @@ class PromotedObject(BaseModel):
 
         return self
 
+    def to_meta_payload(self) -> dict:
+        if self.type == PromotedObjectType.PAGE:
+            return {"page_id": str(self.page_id)}
+
+        elif self.type == PromotedObjectType.PIXEL:
+            return {
+                "pixel_id": str(self.pixel_id),
+                "custom_event_type": self.event.value if self.event else None,
+            }
+
+        elif self.type == PromotedObjectType.APP:
+            return {
+                "application_id": str(self.application_id),
+                "object_store_url": self.object_store_url,
+            }
+
+        return {}
+
 
 # AdSet
 class AdSetPayload(BaseModel):
     name: str
-    status: CampaignStatus
+    status: Status
 
     schedule: Optional[Schedule] = None
     targeting: Targeting
@@ -410,6 +506,7 @@ class AdSetPayload(BaseModel):
     budget: Budget
     bidding: Bidding
     promoted_object: PromotedObject
+    campaign_id: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_lifetime_budget_requires_schedule(self):
@@ -468,8 +565,6 @@ class WebsiteCreative(BaseCreative):
     @field_validator("url_tags", mode="before")
     @classmethod
     def validate_url_tags(cls, value: Optional[str]) -> Optional[str]:
-        import re
-
         if not value:
             return value
 
@@ -515,17 +610,21 @@ class LeadGenCreative(BaseCreative):
 # FINAL CREATIVE PAYLOAD (UNION)
 
 CreativePayload = Annotated[
-    Union[
-        WebsiteCreative,
-        LeadGenCreative,
-    ],
+    WebsiteCreative | LeadGenCreative,
     Field(discriminator="destination_type"),
 ]
 
 
+class AssembledMetaPayloads(BaseModel):
+    campaign_payload: Dict[str, Any]
+    adset_payload: Dict[str, Any]
+    creative_payload: Dict[str, Any]
+    ad_payload: Dict[str, Any]
+
+
 # Root Request
 class CreateMetaAdRequest(BaseModel):
-    account: AccountPayload
+    ad_account_id: str
 
     campaign: CampaignPayload
     adset: AdSetPayload
