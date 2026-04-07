@@ -64,11 +64,21 @@ class MetaLeadFormAgent:
         try:
             data = json.loads(content)
 
-            if "name" in data and len(data["name"]) > 50:
-                data["name"] = data["name"][:50]
-                data["name"] = re.sub(r'\s+\S*$', '', data["name"])
-
             payload = LeadFormPayload.model_validate(data)
+
+            business_name = self.extract_business_name(summary, website_data.business_url)
+
+            now = datetime.now()
+            date_part = now.strftime("%d/%m/%Y")
+            time_part = now.strftime("%H:%M:%S")
+
+            full_name = f"{business_name} {date_part} {time_part}"
+
+            if len(full_name) > 50:
+                full_name = full_name[:50]
+                full_name = re.sub(r'\s+\S*$', '', full_name)
+
+            payload.name = full_name
         except Exception as e:
             logger.error("Failed to parse LLM output", error=str(e), raw=content)
             raise AIProcessingException("LLM output is not valid JSON")
@@ -131,15 +141,7 @@ class MetaLeadFormAgent:
 
         if not payload.name:
             raise BusinessValidationException("Form name is required")    
-
-        clean_name = re.sub(r'[^a-zA-Z0-9 ]', '', payload.name)
-        clean_name = re.sub(r'\s+', ' ', clean_name).strip()
-
-        now = datetime.now()
-        date_part = now.strftime("%d%b")   
-        time_part = now.strftime("%H%M%S")    
-        payload.name = f"{clean_name[:30]}_{date_part}_{time_part}"    
-
+             
         logger.info("Final Lead Form Name", name=payload.name)
 
         meta_payload = payload.model_dump(exclude_none=True)
@@ -238,6 +240,24 @@ class MetaLeadFormAgent:
             return "+91" + phone[-10:]
 
         return None
+
+    def extract_business_name(self, summary: str, website_url: str) -> str:
+
+        first_line = summary.split(".")[0]
+
+        ignore_words = {"Experience", "Discover", "Welcome", "Introducing", "Explore"}
+
+        matches = re.findall(r'([A-Z][a-zA-Z&]+(?:\s[A-Z][a-zA-Z&]+)*)', first_line)
+
+        for match in matches:
+            if match not in ignore_words and len(match) > 2:
+                return match.strip()
+
+        if website_url:
+            domain = website_url.replace("https://", "").replace("http://", "").split("/")[0]
+            return domain.split(".")[0].title()
+
+        return "LeadForm"    
 
 
 meta_lead_form_agent = MetaLeadFormAgent()

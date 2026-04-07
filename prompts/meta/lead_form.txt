@@ -31,6 +31,13 @@ Rules:
 - true → HIGHER_INTENT (for consultation, booking, high-value services)
 - false → MORE_VOLUME (for general leads)
 
+
+NAME RULE:
+
+- name must be ONLY the business name
+- extract exact brand name from summary
+- keep it under 25 characters
+
 ---
 
 CONTEXT CARD
