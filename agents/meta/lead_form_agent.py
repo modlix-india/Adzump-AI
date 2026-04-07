@@ -247,10 +247,10 @@ class MetaLeadFormAgent:
 
         ignore_words = {"Experience", "Discover", "Welcome", "Introducing", "Explore"}
 
-        matches = re.findall(r'([A-Z][a-zA-Z&]+(?:\s[A-Z][a-zA-Z&]+)*)', first_line)
+        matches = re.findall(r'([A-Z][a-zA-Z]+(?:\s(?:and|&|of|the|[A-Z][a-zA-Z]+))*)', first_line)
 
         for match in matches:
-            if match not in ignore_words and len(match) > 2:
+            if match.split()[0] not in ignore_words and len(match) > 2:
                 return match.strip()
 
         if website_url:
