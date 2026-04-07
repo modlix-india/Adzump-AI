@@ -11,6 +11,9 @@ INPUT
 Business Summary:
 {summary}
 
+Website URL:
+{website_url}
+
 ---
 
 TASK
@@ -27,6 +30,13 @@ FORM SETTINGS
 Rules:
 - true → HIGHER_INTENT (for consultation, booking, high-value services)
 - false → MORE_VOLUME (for general leads)
+
+
+NAME RULE:
+
+- name must be ONLY the business name
+- extract exact brand name from summary
+- keep it under 25 characters
 
 ---
 
@@ -152,6 +162,13 @@ If CALL_BUSINESS:
 - include:
   - country_code = "IN"
   - business_phone_number
+
+IMPORTANT:
+
+- website_url MUST ALWAYS be exactly: {website_url}
+- DO NOT modify domain
+- DO NOT guess or change TLD (.com, .ai, etc.)
+
 
 ---
 

@@ -1,6 +1,7 @@
 import structlog
 from datetime import datetime
 import re
+import json
 from pydantic import ValidationError
 
 from core.models.lead_form import LeadFormPayload
@@ -47,7 +48,7 @@ class MetaLeadFormAgent:
 
         logger.info("Generating Meta lead form", session_id=session_id)
 
-        prompt = LEAD_FORM_PROMPT.format(summary=summary)
+        prompt = LEAD_FORM_PROMPT.format(summary=summary, website_url=website_data.business_url)
 
         messages = [
             {"role": "system", "content": "You are a backend API. Always return valid JSON only."},
@@ -61,11 +62,24 @@ class MetaLeadFormAgent:
             raise AIProcessingException("LLM returned empty response")
 
         try:
-            payload = LeadFormPayload.model_validate_json(content)
-            if len(payload.name) > 50:
-                payload.name = payload.name[:50]
-                payload.name = re.sub(r'\s+\S*$', '', payload.name)
-        except ValidationError as e:
+            data = json.loads(content)
+
+            payload = LeadFormPayload.model_validate(data)
+
+            business_name = self.extract_business_name(summary, website_data.business_url)
+
+            now = datetime.now()
+            date_part = now.strftime("%d/%m/%Y")
+            time_part = now.strftime("%H:%M:%S")
+
+            full_name = f"{business_name} {date_part} {time_part}"
+
+            if len(full_name) > 50:
+                full_name = full_name[:50]
+                full_name = re.sub(r'\s+\S*$', '', full_name)
+
+            payload.name = full_name
+        except Exception as e:
             logger.error("Failed to parse LLM output", error=str(e), raw=content)
             raise AIProcessingException("LLM output is not valid JSON")
 
@@ -93,7 +107,14 @@ class MetaLeadFormAgent:
 
         if phone:
             payload.thank_you_page.business_phone_number = phone
-            payload.thank_you_page.button_type = "CALL_BUSINESS"    
+            payload.thank_you_page.button_type = "CALL_BUSINESS"  
+            payload.thank_you_page.country_code = "IN" 
+
+        else:
+            payload.thank_you_page.button_type = "VIEW_WEBSITE"
+
+        if payload.thank_you_page.button_type == "VIEW_WEBSITE":
+            payload.thank_you_page.website_url = website_data.business_url
 
         return payload
 
@@ -120,14 +141,7 @@ class MetaLeadFormAgent:
 
         if not payload.name:
             raise BusinessValidationException("Form name is required")    
-
-        clean_name = re.sub(r'[^a-zA-Z0-9 ]', '', payload.name)
-
-        now = datetime.now()
-        date_part = now.strftime("%d%b")   
-        time_part = now.strftime("%H%M%S")    
-        payload.name = f"{clean_name[:30]}_{date_part}_{time_part}"    
-
+             
         logger.info("Final Lead Form Name", name=payload.name)
 
         meta_payload = payload.model_dump(exclude_none=True)
@@ -194,18 +208,18 @@ class MetaLeadFormAgent:
             if any(k in href.lower() or k in text for k in ["policy", "terms", "legal"]):
                 return href if href.startswith("http") else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
 
-        return None
+        return None        
 
     def _extract_phone(self, text: str) -> str | None:
         matches = re.findall(r'\+\d[\d\s\-\(\)]{7,15}', text)
         if matches:
             return matches[0]
 
-        matches = re.findall(r'0[\d\s\-\(\)]{9,15}', text)
+        matches = re.findall(r'\b(?:\d[\s\-\(\)]*){10,12}\b', text)
         if matches:
-            return matches[0]
-        match = re.search(r'\b\d{10}\b', text)
-        return match.group(0) if match else None
+            return max(matches, key=len)
+
+        return None
 
     def _normalize_phone(self, phone: str | None) -> str | None:
         if not phone:
@@ -213,16 +227,37 @@ class MetaLeadFormAgent:
 
         phone = re.sub(r"[^\d+]", "", phone)
 
-        if phone.startswith("+"):
+        if phone.startswith("+91"):
             return phone
+
+        if phone.startswith("+"):
+            phone = phone.lstrip("+")
 
         if phone.startswith("0"):
             phone = phone[1:]
 
         if phone.isdigit():
-            return "+91" + phone
+            return "+91" + phone[-10:]
 
-        return phone    
+        return None
+
+    def extract_business_name(self, summary: str, website_url: str) -> str:
+
+        first_line = summary.split(".")[0]
+
+        ignore_words = {"Experience", "Discover", "Welcome", "Introducing", "Explore"}
+
+        matches = re.findall(r'([A-Z][a-zA-Z]+(?:\s(?:and|&|of|the|[A-Z][a-zA-Z]+))*)', first_line)
+
+        for match in matches:
+            if match.split()[0] not in ignore_words and len(match) > 2:
+                return match.strip()
+
+        if website_url:
+            domain = website_url.replace("https://", "").replace("http://", "").split("/")[0]
+            return domain.split(".")[0].title()
+
+        return "LeadForm"    
 
 
 meta_lead_form_agent = MetaLeadFormAgent()
