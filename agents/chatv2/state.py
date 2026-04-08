@@ -18,6 +18,7 @@ class ChatState(TypedDict):
     response_message: str
     account_selection: Optional[dict[str, Any]]
     location_selection: Optional[dict[str, Any]]
+    auto_selected_assets: list[dict[str, str]]
 
 
 def create_initial_state() -> ChatState:
@@ -31,4 +32,5 @@ def create_initial_state() -> ChatState:
         response_message="",
         account_selection=None,
         location_selection=None,
+        auto_selected_assets=[],
     )
