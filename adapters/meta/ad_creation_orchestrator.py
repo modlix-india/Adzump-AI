@@ -42,70 +42,66 @@ class MetaAdCreationOrchestrator:
                     "payloads": assembled_payloads.model_dump(),
                 }
 
-            current_stage = AdCreationStage.CAMPAIGN
-            if not existing_ids["campaign_id"]:
-                existing_ids["campaign_id"] = await meta_executor.create_entity(
-                    AdCreationStage.CAMPAIGN, assembled_payloads.campaign_payload
-                )
+            async def create_campaign_and_adset():
+                # 1. Campaign
+                campaign_id = existing_ids["campaign_id"]
+                if not campaign_id:
+                    campaign_id = await meta_executor.create_entity(
+                        AdCreationStage.CAMPAIGN, assembled_payloads.campaign_payload
+                    )
+                    logger.info(
+                        "Campaign created",
+                        ad_account_id=ad_account_id,
+                        campaign_id=campaign_id,
+                    )
+                    existing_ids["campaign_id"] = campaign_id
 
-                logger.info(
-                    "Campaign created",
-                    ad_account_id=ad_account_id,
-                    campaign_id=existing_ids["campaign_id"],
-                )
-
-            current_stage = AdCreationStage.ADSET
-
-            async def create_adset():
-                if existing_ids["adset_id"]:
-                    return existing_ids["adset_id"]
-
-                payload = assembled_payloads.adset_payload
-                payload["campaign_id"] = existing_ids["campaign_id"]
-
-                return await meta_executor.create_entity(
-                    AdCreationStage.ADSET, payload
-                )
+                # 2. AdSet
+                adset_id = existing_ids["adset_id"]
+                if not adset_id:
+                    payload = assembled_payloads.adset_payload
+                    payload["campaign_id"] = campaign_id
+                    adset_id = await meta_executor.create_entity(
+                        AdCreationStage.ADSET, payload
+                    )
+                    logger.info(
+                        "Adset created",
+                        ad_account_id=ad_account_id,
+                        adset_id=adset_id,
+                    )
+                    existing_ids["adset_id"] = adset_id
+                
+                return campaign_id, adset_id
 
             async def create_creative():
-                if existing_ids["creative_id"]:
-                    return existing_ids["creative_id"]
+                creative_id = existing_ids["creative_id"]
+                if not creative_id:
+                    creative_id = await meta_executor.create_entity(
+                        AdCreationStage.CREATIVE, assembled_payloads.creative_payload
+                    )
+                    logger.info(
+                        "Creative created",
+                        ad_account_id=ad_account_id,
+                        creative_id=creative_id,
+                    )
+                    existing_ids["creative_id"] = creative_id
 
-                return await meta_executor.create_entity(
-                    AdCreationStage.CREATIVE, assembled_payloads.creative_payload
-                )
+                return creative_id
 
             results = await asyncio.gather(
-                create_adset(),
+                create_campaign_and_adset(),
                 create_creative(),
                 return_exceptions=True,
             )
 
-            adset_result, creative_result = results
-
-            # Handle AdSet
-            if isinstance(adset_result, Exception):
-                current_stage = AdCreationStage.ADSET
-                raise adset_result
-            else:
-                existing_ids["adset_id"] = adset_result
-                logger.info(
-                    "Adset created",
-                    ad_account_id=ad_account_id,
-                    adset_id=existing_ids["adset_id"],
+            # Check for exceptions across all parallel paths
+            failed_result = next((res for res in results if isinstance(res, Exception)), None)
+            if failed_result:
+                current_stage = (
+                    AdCreationStage.CREATIVE if failed_result is results[1] 
+                    else (AdCreationStage.ADSET if existing_ids["campaign_id"] else AdCreationStage.CAMPAIGN)
                 )
-
-            # Handle Creative
-            if isinstance(creative_result, Exception):
-                current_stage = AdCreationStage.CREATIVE
-                raise creative_result
-            else:
-                existing_ids["creative_id"] = creative_result
-                logger.info(
-                    "Creative created",
-                    ad_account_id=ad_account_id,
-                    creative_id=existing_ids["creative_id"],
-                )
+                raise failed_result
 
             current_stage = AdCreationStage.AD
 

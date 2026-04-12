@@ -298,16 +298,14 @@ class ExistingIdsPayload(BaseModel):
     ad_id: Optional[str] = None
 
 
-class CreativeRef(BaseModel):
-    creative_id: str
-
-
 # Ad
 class AdPayload(BaseModel):
     name: str
     status: Status
     adset_id: Optional[str] = None
-    creative: Optional[CreativeRef] = None
+    creative: Optional[Dict[str, Annotated[str, Field(min_length=1)]]] = (
+        None  # creative_id: str
+    )
 
 
 # Schedule
@@ -415,7 +413,7 @@ class Targeting(BaseModel):
 
 # Budget
 class Budget(BaseModel):
-    amount: int = Field(..., gt=0)
+    amount: int = Field(..., gt=100)
     type: BudgetType
 
     def to_meta_payload(self) -> dict:
@@ -448,11 +446,11 @@ class Bidding(BaseModel):
 class PromotedObject(BaseModel):
     type: PromotedObjectType
 
-    pixel_id: Optional[str] = None
+    pixel_id: Optional[str] = Field(default=None, min_length=1)
     event: Optional[ConversionEvent] = None
-    application_id: Optional[str] = None
-    object_store_url: Optional[str] = None
-    page_id: Optional[str] = None
+    application_id: Optional[str] = Field(default=None, min_length=1)
+    object_store_url: Optional[str] = Field(default=None, min_length=1)
+    page_id: Optional[str] = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_required_fields(self):
@@ -506,7 +504,7 @@ class AdSetPayload(BaseModel):
     budget: Budget
     bidding: Bidding
     promoted_object: PromotedObject
-    campaign_id: Optional[str] = None
+    campaign_id: Optional[str] = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_lifetime_budget_requires_schedule(self):
@@ -529,16 +527,16 @@ class WebsiteCTA(BaseModel):
 
 class LeadGenCTA(BaseModel):
     type: CallToAction
-    lead_gen_form_id: str
-    url: None = None  # not allowed
+    lead_gen_form_id: str = Field(..., min_length=1)
+    url: str = Field(..., min_length=1)
 
 
 # BASE CREATIVE
 class BaseCreative(BaseModel):
     name: str
     type: CreativeType
-    page_id: str
-    instagram_user_id: Optional[str] = None
+    page_id: str = Field(..., min_length=1)
+    instagram_user_id: Optional[str] = Field(default=None, min_length=1)
     destination_type: DestinationType
     image_hashes: List[str] = Field(
         ..., min_length=1, max_length=meta_constants.MAX_IMAGES
@@ -624,7 +622,7 @@ class AssembledMetaPayloads(BaseModel):
 
 # Root Request
 class CreateMetaAdRequest(BaseModel):
-    ad_account_id: str
+    ad_account_id: str = Field(..., min_length=1)
 
     campaign: CampaignPayload
     adset: AdSetPayload

@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Query, Depends
-
+from fastapi import APIRouter, Query
 from agents.meta import meta_campaign_agent
 from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
@@ -7,7 +6,6 @@ from agents.meta.creative_agent import meta_creative_agent
 from core.models.meta import CreateMetaAdRequest
 
 
-from adapters.meta.client import meta_client
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
 
 
@@ -53,5 +51,7 @@ async def create_meta_ads(
     Creates a full Meta ad structure (campaign → ad set → ad).
     Requires 'ClientCode' header for authentication context.
     """
-    result = await MetaAdCreationOrchestrator.create_full_structure(payload, inspect_payload)
+    result = await MetaAdCreationOrchestrator.create_full_structure(
+        payload, inspect_payload
+    )
     return success_response(data=result)
