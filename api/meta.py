@@ -5,6 +5,10 @@ from utils.response_helpers import success_response
 from agents.meta.creative_agent import meta_creative_agent
 from core.models.meta import CreateMetaAdRequest
 
+from core.models.meta import CreateCreativeRequest
+from core.models.lead_form import LeadFormPayload
+from agents.meta.creative_agent import meta_creative_agent
+from agents.meta.lead_form_agent import meta_lead_form_agent
 
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
 
@@ -54,4 +58,20 @@ async def create_meta_ads(
     result = await MetaAdCreationOrchestrator.create_full_structure(
         payload, inspect_payload
     )
+    return success_response(data=result)
+    return success_response(data=result.model_dump(mode="json"))    
+
+
+@router.post("/lead-form/generate")
+async def generate_lead_form(session_id: str = Query(..., alias="sessionId")):
+    result = await meta_lead_form_agent.generate_payload(session_id)
+    return success_response(data=result.model_dump(mode="json"))
+
+
+@router.post("/lead-form/create")
+async def create_lead_form(
+    payload: LeadFormPayload,
+    session_id: str = Query(..., alias="sessionId")
+):
+    result = await meta_lead_form_agent.create_lead_form(session_id, payload)
     return success_response(data=result)

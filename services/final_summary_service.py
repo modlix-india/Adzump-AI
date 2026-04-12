@@ -44,22 +44,12 @@ async def generate_final_summary(
     if not existing_data.success:
         raise HTTPException(500, "Failed to read storage for final summary")
 
-    try:
-        records = (
-            existing_data.result[0]
-            .get("result", {})
-            .get("result", {})
-            .get("content", [])
-        )
+    # Standardized: Using response.content property for robust parsing (ReadPage)
+    records = existing_data.content
+    if not records:
+        raise HTTPException(404, "No product data found for this businessUrl")
 
-        if not records:
-            raise HTTPException(404, "No product data found for this businessUrl")
-
-        record = records[-1]
-
-    except Exception as e:
-        logger.error(f"[FinalSummary] Error parsing storage response: {e}")
-        raise HTTPException(500, "Invalid storage response structure")
+    record = records[-1]
 
     storage_id = record.get("_id")
 
