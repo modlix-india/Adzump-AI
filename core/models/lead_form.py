@@ -1,4 +1,5 @@
 from typing import List, Optional, Literal
+from enum import Enum
 from pydantic import BaseModel, Field
 
 
@@ -24,12 +25,17 @@ class PrivacyPolicy(BaseModel):
     url: str
     link_text: str
 
+class ThankYouPageButtonType(str, Enum):
+    VIEW_WEBSITE = "VIEW_WEBSITE"
+    CALL_BUSINESS = "CALL_BUSINESS"
+
+
 
 class ThankYouPage(BaseModel):
     title: str
     body: str
     button_text: str
-    button_type: Literal["VIEW_WEBSITE", "CALL_BUSINESS"]
+    button_type: ThankYouPageButtonType
     website_url: Optional[str] = None
     country_code: Optional[str] = None
     business_phone_number: Optional[str] = None

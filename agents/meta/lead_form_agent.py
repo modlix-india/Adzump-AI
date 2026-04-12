@@ -1,10 +1,11 @@
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 import json
+from json import JSONDecodeError
 from pydantic import ValidationError
 
-from core.models.lead_form import LeadFormPayload
+from core.models.lead_form import LeadFormPayload, ThankYouPageButtonType
 from services.business_service import BusinessService
 from services.session_manager import sessions
 from agents.shared.llm import chat_completion
@@ -12,11 +13,12 @@ from utils.prompt_loader import load_prompt
 from exceptions.custom_exceptions import (
     BusinessValidationException,
     AIProcessingException,
+    SessionException
 )
 
 from adapters.meta.lead_forms import MetaLeadFormAdapter
 
-from oserver.services.storage_service import StorageService
+from oserver.services.storage_service import storage_service
 from oserver.models.storage_request_model import StorageRequest
 from core.infrastructure.context import auth_context
 
@@ -24,18 +26,23 @@ logger = structlog.get_logger()
 
 LEAD_FORM_PROMPT = load_prompt("meta/lead_form.txt")
 
+DEFAULT_COUNTRY_CODE = "IN"
+DEFAULT_PHONE_PREFIX = "+91"
+STORAGE_NAME = "AISuggestedData"
+APP_CODE = "marketingai"
+
 
 class MetaLeadFormAgent:
 
     def __init__(self):
         self.business_service = BusinessService()
-        self.storage_service = StorageService()
+        self.storage_service = storage_service
         self.lead_form_adapter = MetaLeadFormAdapter()
 
     async def generate_payload(self, session_id: str) -> LeadFormPayload:
 
         if session_id not in sessions:
-            raise BusinessValidationException("Session not found")
+            raise SessionException(session_id=session_id)
 
         website_data = await self.business_service.fetch_website_data(session_id)
 
@@ -55,7 +62,20 @@ class MetaLeadFormAgent:
             {"role": "user", "content": prompt},
         ]
 
-        response = await chat_completion(messages)
+        response = None
+        max_retries = 2
+
+        for attempt in range(max_retries):
+            try:
+                response = await chat_completion(
+                    messages,
+                    response_format={"type": "json_object"}
+                )
+                break
+            except Exception as e:
+                logger.warning("LLM call failed, retrying...", attempt=attempt, error=str(e))
+                if attempt == max_retries - 1:
+                    raise AIProcessingException("LLM call failed after retries")
         content = response.choices[0].message.content
 
         if not content:
@@ -63,25 +83,28 @@ class MetaLeadFormAgent:
 
         try:
             data = json.loads(content)
+        except JSONDecodeError as e:
+            logger.error("Invalid JSON from LLM", error=str(e), raw=content)
+            raise AIProcessingException("LLM returned invalid JSON")
 
+        try:
             payload = LeadFormPayload.model_validate(data)
+        except ValidationError as e:
+            logger.error("LLM JSON structure mismatch", error=str(e), data=data)
+            raise AIProcessingException("LLM returned incorrect data structure")
 
-            business_name = self.extract_business_name(summary, website_data.business_url)
+        base_name = (payload.name or "").strip()
 
-            now = datetime.now()
-            date_part = now.strftime("%d/%m/%Y")
-            time_part = now.strftime("%H:%M:%S")
+        if not base_name:
+            base_name = self.extract_business_name(summary, website_data.business_url)
 
-            full_name = f"{business_name} {date_part} {time_part}"
+        base_name = base_name[:25]
 
-            if len(full_name) > 50:
-                full_name = full_name[:50]
-                full_name = re.sub(r'\s+\S*$', '', full_name)
+        now = datetime.now(timezone.utc)
+        date_part = now.strftime("%d/%m/%Y")
+        time_part = now.strftime("%H:%M:%S")
 
-            payload.name = full_name
-        except Exception as e:
-            logger.error("Failed to parse LLM output", error=str(e), raw=content)
-            raise AIProcessingException("LLM output is not valid JSON")
+        payload.name = f"{base_name} {date_part} {time_part}"
 
         site_links = await self._fetch_site_links(website_data.storage_id)
 
@@ -92,9 +115,7 @@ class MetaLeadFormAgent:
             website_data.business_url
         )
 
-        payload.privacy_policy.url = (
-            privacy_link if privacy_link else website_data.business_url
-        )
+        payload.privacy_policy.url = privacy_link or website_data.business_url
 
         if not privacy_link:
             logger.warning(
@@ -102,18 +123,17 @@ class MetaLeadFormAgent:
                 session_id=session_id
             )
 
-        phone = self._extract_phone(summary)
-        phone = self._normalize_phone(phone)
+        normalized_phone = self._normalize_phone(self._extract_phone(summary))
 
-        if phone:
-            payload.thank_you_page.business_phone_number = phone
-            payload.thank_you_page.button_type = "CALL_BUSINESS"  
-            payload.thank_you_page.country_code = "IN" 
+        if normalized_phone:
+            payload.thank_you_page.business_phone_number = normalized_phone
+            payload.thank_you_page.button_type = ThankYouPageButtonType.CALL_BUSINESS 
+            payload.thank_you_page.country_code = DEFAULT_COUNTRY_CODE
 
         else:
-            payload.thank_you_page.button_type = "VIEW_WEBSITE"
+            payload.thank_you_page.button_type = ThankYouPageButtonType.VIEW_WEBSITE
 
-        if payload.thank_you_page.button_type == "VIEW_WEBSITE":
+        if payload.thank_you_page.button_type == ThankYouPageButtonType.VIEW_WEBSITE:
             payload.thank_you_page.website_url = website_data.business_url
 
         return payload
@@ -124,9 +144,10 @@ class MetaLeadFormAgent:
         payload: LeadFormPayload,
     ) -> dict:
 
-        session = sessions.get(session_id)
-        if not session:
-            raise BusinessValidationException("Session not found")
+        if session_id not in sessions:
+            raise SessionException(session_id=session_id)
+        
+        session = sessions[session_id]
         
         ad_plan = session.get("ad_plan") or {}
 
@@ -163,40 +184,32 @@ class MetaLeadFormAgent:
             return []
 
         request = StorageRequest(
-            storageName="AISuggestedData",
-            appCode="marketingai",
+            storageName=STORAGE_NAME,
+            appCode=APP_CODE,
             dataObjectId=storage_id,
             clientCode=auth_context.client_code,
         )
 
         response = await self.storage_service.read_storage(request)
 
-        if not response.success or not response.result:
+        if not response.success or not response.content:
             logger.error("No site links found in storage", storage_id=storage_id)
             return []  
 
-        record = response.result
-
-        if isinstance(record, list) and len(record) > 0:
-            record = record[0]
-
-        data = record.get("result", {})
-
-        while isinstance(data, dict) and "result" in data:
-            data = data["result"]
-
-        site_links = data.get("siteLinks", [])
-
-        return site_links 
+        record = response.content[0]
+        return record.get("siteLinks", [])
 
     def _extract_privacy_policy(self, links, base_url):
 
-        if not links:
+        if not links or not base_url:
             return None
 
         for link in links:
             href = (link.get("href") or "").strip()
             text = (link.get("text") or "").lower()
+
+            if not href or href == "#":
+                continue
 
             if "privacy" in href.lower() or "privacy" in text:
                 return href if href.startswith("http") else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
@@ -204,6 +217,9 @@ class MetaLeadFormAgent:
         for link in links:
             href = (link.get("href") or "").strip()
             text = (link.get("text") or "").lower()
+
+            if not href or href == "#":
+                continue
 
             if any(k in href.lower() or k in text for k in ["policy", "terms", "legal"]):
                 return href if href.startswith("http") else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
@@ -227,31 +243,15 @@ class MetaLeadFormAgent:
 
         phone = re.sub(r"[^\d+]", "", phone)
 
-        if phone.startswith("+91"):
+        if phone.startswith("+"):
             return phone
 
-        if phone.startswith("+"):
-            phone = phone.lstrip("+")
-
-        if phone.startswith("0"):
-            phone = phone[1:]
-
-        if phone.isdigit():
-            return "+91" + phone[-10:]
+        if phone.isdigit() and len(phone[-10:]) == 10:
+            return DEFAULT_PHONE_PREFIX + phone[-10:]
 
         return None
 
     def extract_business_name(self, summary: str, website_url: str) -> str:
-
-        first_line = summary.split(".")[0]
-
-        ignore_words = {"Experience", "Discover", "Welcome", "Introducing", "Explore"}
-
-        matches = re.findall(r'([A-Z][a-zA-Z]+(?:\s(?:and|&|of|the|[A-Z][a-zA-Z]+))*)', first_line)
-
-        for match in matches:
-            if match.split()[0] not in ignore_words and len(match) > 2:
-                return match.strip()
 
         if website_url:
             domain = website_url.replace("https://", "").replace("http://", "").split("/")[0]
