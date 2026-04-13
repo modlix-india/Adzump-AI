@@ -3,7 +3,7 @@ from typing import List, Literal, Optional, Dict, Any, Annotated, Set
 from datetime import date, datetime
 import re
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
 from agents.meta.payload_builders import constants as meta_constants
 
 
@@ -355,6 +355,7 @@ class TargetingEntity(BaseModel):
     id: str
     name: str
     type: str
+    model_config = ConfigDict(extra="allow")
 
 
 # Targeting (Flexible)
@@ -631,3 +632,40 @@ class CreateMetaAdRequest(BaseModel):
     ad: AdPayload
 
     existing_ids: ExistingIdsPayload
+
+
+# Detailed Targeting Enums
+class TargetingCategory(str, Enum):
+    INTERESTS = "interests"
+    DEMOGRAPHICS = "demographics"
+    BEHAVIORS = "behaviors"
+
+
+# LLM response models
+class TargetingSeedsResponse(BaseModel):
+    """Parsed LLM response for seed generation."""
+
+    seeds: List[str]
+
+
+class TargetingFilterResponse(BaseModel):
+    """Parsed LLM response for candidate filtering."""
+
+    selected_ids: List[str]
+
+
+# Per-category output
+class CategoryTargetingResult(BaseModel):
+    """Filtered targeting results for a single category."""
+
+    category: str
+    items: List[TargetingEntity]
+
+
+# Final agent output
+class MetaTargetingSuggestionResult(BaseModel):
+    """Complete output returned by the orchestrator."""
+
+    interests: List[TargetingEntity] = []
+    demographics: List[TargetingEntity] = []
+    behaviours: List[TargetingEntity] = []

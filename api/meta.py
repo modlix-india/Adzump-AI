@@ -7,6 +7,7 @@ from core.models.meta import CreateMetaAdRequest
 
 
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
+from agents.meta.detailed_targeting_agent import meta_detailed_targeting_agent
 
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
@@ -55,3 +56,17 @@ async def create_meta_ads(
         payload, inspect_payload
     )
     return success_response(data=result)
+
+
+@router.post("/targeting-suggestions")
+async def generate_meta_targeting_suggestions(
+    session_id: str = Query(..., alias="sessionId"),
+    ad_account_id: str = Query(..., alias="adAccountId"),
+):
+    result = (
+        await meta_detailed_targeting_agent.generate_detailed_targeting_suggestions(
+            session_id=session_id,
+            ad_account_id=ad_account_id,
+        )
+    )
+    return success_response(data=result.model_dump(mode="json"))
