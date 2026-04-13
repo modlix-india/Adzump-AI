@@ -4,7 +4,7 @@ from typing import Literal, Any, Annotated
 from datetime import date, datetime
 import re
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
 from core.models import meta_constants
 
 
@@ -327,7 +327,7 @@ class Schedule(BaseModel):
                     return datetime.fromisoformat(value).date()
                 except Exception:
                     raise ValueError("Date must be in format dd/mm/yyyy or YYYY-MM-DD")
- 
+
         return value
 
     @model_validator(mode="after")
@@ -617,14 +617,53 @@ class AssembledMetaPayloads(BaseModel):
 
 class MetaAdCreationRequest(BaseModel):
     """Unified request model for creating a full Meta Ad structure."""
+
     ad_account_id: str = Field(..., min_length=1)
     campaign: CampaignPayload
     adset: AdSetPayload
     creative: CreativePayload
     ad: AdPayload
     existing_ids: ExistingIdsPayload | None = None
- 
- 
+
+
 class MetaAdCreationResponse(BaseModel):
     """Unified response model containing the final state of all created/recovered IDs."""
+
     ids: ExistingIdsPayload
+
+
+# Detailed Targeting Enums
+class TargetingCategory(str, Enum):
+    INTERESTS = "interests"
+    DEMOGRAPHICS = "demographics"
+    BEHAVIORS = "behaviors"
+
+
+# LLM response models
+class TargetingSeedsResponse(BaseModel):
+    """Parsed LLM response for seed generation."""
+
+    seeds: List[str]
+
+
+class TargetingFilterResponse(BaseModel):
+    """Parsed LLM response for candidate filtering."""
+
+    selected_ids: List[str]
+
+
+# Per-category output
+class CategoryTargetingResult(BaseModel):
+    """Filtered targeting results for a single category."""
+
+    category: str
+    items: List[TargetingEntity]
+
+
+# Final agent output
+class MetaTargetingSuggestionResult(BaseModel):
+    """Complete output returned by the orchestrator."""
+
+    interests: List[TargetingEntity] = []
+    demographics: List[TargetingEntity] = []
+    behaviours: List[TargetingEntity] = []

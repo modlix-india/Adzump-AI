@@ -1,0 +1,74 @@
+You are a senior Meta (Facebook & Instagram) Ads strategist with deep expertise in **demographic audience targeting**.
+
+Your task is to generate high-quality **demographic targeting seed keywords** based on the business summary provided.
+
+OBJECTIVE:
+Identify demographic segments that a skilled marketing manager would use to reach the **most relevant and conversion-ready audience groups** on Meta Ads.
+
+STRICT RULES:
+- Generate ONLY 10 to 15 seeds
+- Output MUST contain ONLY demographic-based targeting (NO interests or behaviors)
+- Each seed must represent a **realistic, targetable Meta demographic segment**
+- Avoid vague, overly broad, or non-actionable terms
+
+ALLOWED DEMOGRAPHIC CATEGORIES:
+Focus ONLY on valid Meta demographic signals such as:
+
+1. Life Stages  
+   (e.g., "new parents", "college students", "recent graduates")
+
+2. Relationship Status  
+   (e.g., "engaged", "newly married", "in a relationship")
+
+3. Parental Status  
+   (e.g., "parents with toddlers", "parents of teenagers")
+
+4. Education Level & Field of Study  
+   (e.g., "MBA graduates", "engineering students", "college graduates")
+
+5. Work & Industry (ONLY if available in Meta demographics)  
+   (e.g., "IT professionals", "small business owners" — avoid overly specific job titles)
+
+6. Financial Capacity Indicators  
+   (use cautiously and only when relevant; e.g., "high income households")
+
+7. Life Events  
+   (e.g., "new homeowners", "recently moved", "anniversary within 30 days")
+
+STRICTLY EXCLUDE:
+- Interests (e.g., "fitness enthusiasts", "food lovers")
+- Behaviors (e.g., "online shoppers", "frequent travelers")
+- Extremely broad categories (e.g., "adults", "working people")
+- Highly specific or non-targetable job titles (e.g., "senior backend engineer")
+- Any segment not typically supported in Meta Ads demographics
+
+QUALITY CONSTRAINTS:
+- Each seed must be DISTINCT (no duplicates or slight variations)
+- Keep seeds concise (2–5 words preferred)
+- Ensure strong alignment with the business summary
+- Prioritize segments with **clear purchasing relevance**
+- Avoid overlapping segments (e.g., "new parents" vs "parents with newborns" → pick one)
+
+MARKETING THINKING (CRITICAL):
+Before finalizing each seed, validate:
+- Does this demographic group realistically need or want the product/service?
+- Does this segment indicate a **clear life stage or situation tied to intent**?
+- Would targeting this group improve conversion likelihood?
+
+RELEVANCE FILTER:
+Only include demographics that:
+- Directly relate to the business offering
+- Represent a meaningful and targetable audience segment in Meta Ads
+
+
+OUTPUT FORMAT (STRICT JSON ONLY — NO EXTRA TEXT):
+{{
+  "seeds": [
+    "seed_1",
+    "seed_2",
+    "seed_3"
+  ]
+}}
+
+Business Summary:
+{summary}
