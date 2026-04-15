@@ -1,5 +1,6 @@
 import structlog
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import re
 import json
 from json import JSONDecodeError
@@ -13,7 +14,7 @@ from utils.prompt_loader import load_prompt
 from exceptions.custom_exceptions import (
     BusinessValidationException,
     AIProcessingException,
-    SessionException
+    SessionException,
 )
 
 from adapters.meta.lead_forms import MetaLeadFormAdapter
@@ -33,10 +34,8 @@ APP_CODE = "marketingai"
 
 
 class MetaLeadFormAgent:
-
     def __init__(self):
         self.business_service = BusinessService()
-        self.storage_service = storage_service
         self.lead_form_adapter = MetaLeadFormAdapter()
 
     async def generate_payload(self, session_id: str) -> LeadFormPayload:
@@ -55,52 +54,82 @@ class MetaLeadFormAgent:
 
         logger.info("Generating Meta lead form", session_id=session_id)
 
-        prompt = LEAD_FORM_PROMPT.format(summary=summary, website_url=website_data.business_url)
+        prompt = LEAD_FORM_PROMPT.format(
+            summary=summary, website_url=website_data.business_url
+        )
 
         messages = [
-            {"role": "system", "content": "You are a backend API. Always return valid JSON only."},
+            {
+                "role": "system",
+                "content": "You are a backend API. Always return valid JSON only.",
+            },
             {"role": "user", "content": prompt},
         ]
 
-        response = None
-        max_retries = 2
+        payload = None
+        max_retries = 3
 
         for attempt in range(max_retries):
             try:
                 response = await chat_completion(
-                    messages,
-                    response_format={"type": "json_object"}
+                    messages, response_format={"type": "json_object"}
                 )
+                content = response.choices[0].message.content
+
+                if not content:
+                    raise AIProcessingException("LLM returned empty response")
+
+                data = json.loads(content)
+                payload = LeadFormPayload.model_validate(data)
+
+                if payload.enable_otp_verification:
+                    if not payload.is_optimized_for_quality:
+                        payload.enable_otp_verification = False
+
+                    else:
+                        has_phone = any(q.type == "PHONE" for q in payload.questions)
+
+                        if not has_phone:
+                            payload.enable_otp_verification = False
+
                 break
-            except Exception as e:
-                logger.warning("LLM call failed, retrying...", attempt=attempt, error=str(e))
+
+            except (JSONDecodeError, ValidationError) as e:
+                logger.warning(
+                    "LLM validation failed, retrying...",
+                    attempt=attempt,
+                    error=str(e),
+                )
                 if attempt == max_retries - 1:
-                    raise AIProcessingException("LLM call failed after retries")
-        content = response.choices[0].message.content
+                    raise AIProcessingException(
+                        f"LLM call failed after retries: {str(e)}"
+                    )
 
-        if not content:
-            raise AIProcessingException("LLM returned empty response")
-
-        try:
-            data = json.loads(content)
-        except JSONDecodeError as e:
-            logger.error("Invalid JSON from LLM", error=str(e), raw=content)
-            raise AIProcessingException("LLM returned invalid JSON")
-
-        try:
-            payload = LeadFormPayload.model_validate(data)
-        except ValidationError as e:
-            logger.error("LLM JSON structure mismatch", error=str(e), data=data)
-            raise AIProcessingException("LLM returned incorrect data structure")
+                messages.append({"role": "assistant", "content": content or "{}"})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"Your last response failed validation with this error: {str(e)}. Please fix the JSON structure to satisfy the schema.",
+                    }
+                )
 
         base_name = (payload.name or "").strip()
 
         if not base_name:
-            base_name = self.extract_business_name(summary, website_data.business_url)
+            base_name = self.get_fallback_business_name(
+                summary, website_data.business_url
+            )
 
         base_name = base_name[:25]
 
-        now = datetime.now(timezone.utc)
+        timezone_str = getattr(auth_context, "timezone", "UTC")
+
+        try:
+            tz = ZoneInfo(timezone_str)
+        except Exception:
+            tz = ZoneInfo("UTC")
+
+        now = datetime.now(tz)
         date_part = now.strftime("%d/%m/%Y")
         time_part = now.strftime("%H:%M:%S")
 
@@ -111,8 +140,7 @@ class MetaLeadFormAgent:
         logger.info("Fetched site links", site_links=site_links)
 
         privacy_link = self._extract_privacy_policy(
-            site_links,
-            website_data.business_url
+            site_links, website_data.business_url
         )
 
         payload.privacy_policy.url = privacy_link or website_data.business_url
@@ -120,14 +148,14 @@ class MetaLeadFormAgent:
         if not privacy_link:
             logger.warning(
                 "Privacy policy URL not found, falling back to business URL",
-                session_id=session_id
+                session_id=session_id,
             )
 
         normalized_phone = self._normalize_phone(self._extract_phone(summary))
 
         if normalized_phone:
             payload.thank_you_page.business_phone_number = normalized_phone
-            payload.thank_you_page.button_type = ThankYouPageButtonType.CALL_BUSINESS 
+            payload.thank_you_page.button_type = ThankYouPageButtonType.CALL_BUSINESS
             payload.thank_you_page.country_code = DEFAULT_COUNTRY_CODE
 
         else:
@@ -135,6 +163,12 @@ class MetaLeadFormAgent:
 
         if payload.thank_you_page.button_type == ThankYouPageButtonType.VIEW_WEBSITE:
             payload.thank_you_page.website_url = website_data.business_url
+
+        if payload.thank_you_page.button_type == ThankYouPageButtonType.CALL_BUSINESS:
+            payload.thank_you_page.button_text = "Call Now"
+
+        elif payload.thank_you_page.button_type == ThankYouPageButtonType.VIEW_WEBSITE:
+            payload.thank_you_page.button_text = "Visit Website"
 
         return payload
 
@@ -146,9 +180,9 @@ class MetaLeadFormAgent:
 
         if session_id not in sessions:
             raise SessionException(session_id=session_id)
-        
+
         session = sessions[session_id]
-        
+
         ad_plan = session.get("ad_plan") or {}
 
         page_id = ad_plan.get("metaPageId") or session.get("metaPageId")
@@ -157,15 +191,14 @@ class MetaLeadFormAgent:
         if not page_id:
             page_id = "332515906622723"
 
-        if not payload.questions:
-            raise BusinessValidationException("At least one question is required")
-
-        if not payload.name:
-            raise BusinessValidationException("Form name is required")    
-             
         logger.info("Final Lead Form Name", name=payload.name)
 
         meta_payload = payload.model_dump(exclude_none=True)
+
+        if "enable_otp_verification" in meta_payload:
+            if payload.enable_otp_verification:
+                meta_payload["phone_verification"] = True
+            del meta_payload["enable_otp_verification"]
 
         logger.info("Creating Meta lead form", payload=meta_payload)
 
@@ -190,11 +223,11 @@ class MetaLeadFormAgent:
             clientCode=auth_context.client_code,
         )
 
-        response = await self.storage_service.read_storage(request)
+        response = await storage_service.read_storage(request)
 
         if not response.success or not response.content:
             logger.error("No site links found in storage", storage_id=storage_id)
-            return []  
+            return []
 
         record = response.content[0]
         return record.get("siteLinks", [])
@@ -212,7 +245,11 @@ class MetaLeadFormAgent:
                 continue
 
             if "privacy" in href.lower() or "privacy" in text:
-                return href if href.startswith("http") else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
+                return (
+                    href
+                    if href.startswith("http")
+                    else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
+                )
 
         for link in links:
             href = (link.get("href") or "").strip()
@@ -221,17 +258,23 @@ class MetaLeadFormAgent:
             if not href or href == "#":
                 continue
 
-            if any(k in href.lower() or k in text for k in ["policy", "terms", "legal"]):
-                return href if href.startswith("http") else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
+            if any(
+                k in href.lower() or k in text for k in ["policy", "terms", "legal"]
+            ):
+                return (
+                    href
+                    if href.startswith("http")
+                    else f"{base_url.rstrip('/')}/{href.lstrip('/')}"
+                )
 
-        return None        
+        return None
 
     def _extract_phone(self, text: str) -> str | None:
-        matches = re.findall(r'\+\d[\d\s\-\(\)]{7,15}', text)
+        matches = re.findall(r"\+\d[\d\s\-\(\)]{7,15}", text)
         if matches:
             return matches[0]
 
-        matches = re.findall(r'\b(?:\d[\s\-\(\)]*){10,12}\b', text)
+        matches = re.findall(r"\b(?:\d[\s\-\(\)]*){10,12}\b", text)
         if matches:
             return max(matches, key=len)
 
@@ -251,13 +294,15 @@ class MetaLeadFormAgent:
 
         return None
 
-    def extract_business_name(self, summary: str, website_url: str) -> str:
+    def get_fallback_business_name(self, summary: str, website_url: str) -> str:
 
         if website_url:
-            domain = website_url.replace("https://", "").replace("http://", "").split("/")[0]
+            domain = (
+                website_url.replace("https://", "").replace("http://", "").split("/")[0]
+            )
             return domain.split(".")[0].title()
 
-        return "LeadForm"    
+        return "LeadForm"
 
 
 meta_lead_form_agent = MetaLeadFormAgent()

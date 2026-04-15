@@ -178,6 +178,27 @@ IMPORTANT:
 
 ---
 
+OTP VERIFICATION LOGIC
+
+- Add field: "enable_otp_verification"
+
+Rules:
+- Only applicable when is_optimized_for_quality = true
+- true → enable OTP
+- false → disable OTP
+
+Enable OTP ONLY for:
+- real estate
+- finance
+- hiring
+- consultation
+- bookings
+
+Otherwise:
+- set enable_otp_verification = false
+
+---
+
 STRICT OUTPUT RULES
 
 - Return ONLY valid JSON
@@ -196,6 +217,7 @@ Return ONLY valid JSON.
 {{
   "name": "",
   "is_optimized_for_quality": false,
+  "enable_otp_verification": false,
   "context_card": {{
     "content": [],
     "style": "",
