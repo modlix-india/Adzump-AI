@@ -195,12 +195,42 @@ class MetaLeadFormAgent:
 
         meta_payload = payload.model_dump(exclude_none=True)
 
-        if "enable_otp_verification" in meta_payload:
-            if payload.enable_otp_verification:
-                meta_payload["phone_verification"] = True
-            del meta_payload["enable_otp_verification"]
+        enable_otp = getattr(payload, "enable_otp_verification", False)
 
-        logger.info("Creating Meta lead form", payload=meta_payload)
+        meta_payload["is_optimized_for_quality"] = payload.is_optimized_for_quality
+        meta_payload["is_phone_sms_verify_enabled"] = (
+            bool(enable_otp) and payload.is_optimized_for_quality
+        )
+
+        for field in [
+            "enable_otp_verification",
+            "intent",
+            "is_verification_required",
+            "block_display_for_review",
+        ]:
+            meta_payload.pop(field, None)
+
+        questions = meta_payload.get("questions", [])
+        has_phone = False
+        for q in questions:
+            if isinstance(q, dict) and q.get("type") == "PHONE":
+                has_phone = True
+                q.pop("is_required", None)
+                break
+
+        if enable_otp and not has_phone:
+            logger.warning(
+                "OTP verification enabled but no PHONE field found. "
+                "Meta will likely ignore is_phone_sms_verify_enabled."
+            )
+
+        logger.info(
+            "Creating Meta lead form",
+            name=payload.name,
+            is_optimized_for_quality=True,
+            is_phone_sms_verify_enabled=bool(enable_otp),
+            has_phone_field=has_phone,
+        )
 
         result = await self.lead_form_adapter.create(
             client_code=auth_context.client_code,
