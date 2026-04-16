@@ -1,13 +1,11 @@
-from fastapi import APIRouter, Query
-
+from fastapi import APIRouter, Query, Request
+from core.infrastructure.context import auth_context
 from agents.meta import meta_campaign_agent
 from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
-from core.models.meta import CreateCreativeRequest
 from core.models.lead_form import LeadFormPayload
 from agents.meta.creative_agent import meta_creative_agent
 from agents.meta.lead_form_agent import meta_lead_form_agent
-
 
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
@@ -37,22 +35,26 @@ async def generate_creative(session_id: str = Query(..., alias="sessionId")):
 @router.post("/creative/image/generate")
 async def generate_creative_image(
     session_id: str = Query(..., alias="sessionId"),
-    ad_account_id: str = Query(..., alias="adAccountId")
+    ad_account_id: str = Query(..., alias="adAccountId"),
 ):
     result = await meta_creative_agent.generate_image(session_id, ad_account_id)
-    return success_response(data=result.model_dump(mode="json"))    
+    return success_response(data=result.model_dump(mode="json"))
 
 
 @router.post("/lead-form/generate")
-async def generate_lead_form(session_id: str = Query(..., alias="sessionId")):
+async def generate_lead_form(
+    request: Request, session_id: str = Query(..., alias="sessionId")
+):
+    timezone_str = request.headers.get("x-timezone", "UTC")
+    auth_context.timezone = timezone_str
+
     result = await meta_lead_form_agent.generate_payload(session_id)
     return success_response(data=result.model_dump(mode="json"))
 
 
 @router.post("/lead-form/create")
 async def create_lead_form(
-    payload: LeadFormPayload,
-    session_id: str = Query(..., alias="sessionId")
+    payload: LeadFormPayload, session_id: str = Query(..., alias="sessionId")
 ):
     result = await meta_lead_form_agent.create_lead_form(session_id, payload)
     return success_response(data=result)

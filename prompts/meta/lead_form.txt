@@ -11,6 +11,9 @@ INPUT
 Business Summary:
 {summary}
 
+Website URL:
+{website_url}
+
 ---
 
 TASK
@@ -21,12 +24,18 @@ Generate a complete Meta Lead Form payload.
 
 FORM SETTINGS
 
-- name (MAX 50 CHARACTERS)
 - is_optimized_for_quality
 
 Rules:
 - true → HIGHER_INTENT (for consultation, booking, high-value services)
 - false → MORE_VOLUME (for general leads)
+
+
+NAME RULE:
+
+- name must be ONLY the business name
+- extract exact brand name from summary
+- keep it under 25 characters
 
 ---
 
@@ -80,8 +89,12 @@ city → CITY
 country → COUNTRY  
 company_name → COMPANY_NAME  
 job_title → JOB_TITLE  
-whatsapp_number → WHATSAPP_NUMBER  
 marital_status → MARITIAL_STATUS  
+
+IMPORTANT:
+
+- Do NOT use WHATSAPP_NUMBER as a standard field
+- If WhatsApp number is required, ask it as a CUSTOM SHORT_ANSWER question
 
 ---
 
@@ -127,6 +140,9 @@ Fields required:
 - url → use business website if available
 - link_text → short brand name or "Privacy Policy"
 
+Rules:
+- link_text must be under 70 characters
+
 ---
 
 THANK YOU PAGE
@@ -149,9 +165,37 @@ If VIEW_WEBSITE:
 - include "website_url"
 
 If CALL_BUSINESS:
-- include:
-  - country_code = "IN"
-  - business_phone_number
+- set only button_type = CALL_BUSINESS
+- DO NOT generate business_phone_number
+- DO NOT generate country_code
+
+IMPORTANT:
+
+- website_url MUST ALWAYS be exactly: {website_url}
+- DO NOT modify domain
+- DO NOT guess or change TLD (.com, .ai, etc.)
+
+
+---
+
+OTP VERIFICATION LOGIC
+
+- Add field: "enable_otp_verification"
+
+Rules:
+- Only applicable when is_optimized_for_quality = true
+- true → enable OTP
+- false → disable OTP
+
+Enable OTP ONLY for:
+- real estate
+- finance
+- hiring
+- consultation
+- bookings
+
+Otherwise:
+- set enable_otp_verification = false
 
 ---
 
@@ -173,6 +217,7 @@ Return ONLY valid JSON.
 {{
   "name": "",
   "is_optimized_for_quality": false,
+  "enable_otp_verification": false,
   "context_card": {{
     "content": [],
     "style": "",
