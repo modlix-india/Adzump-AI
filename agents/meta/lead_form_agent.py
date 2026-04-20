@@ -1,12 +1,16 @@
 import structlog
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import re
 import json
 from json import JSONDecodeError
 from pydantic import ValidationError
-
-from core.models.lead_form import LeadFormPayload, ThankYouPageButtonType
+from core.models.lead_form import (
+    LeadFormPayload,
+    ThankYouPageButtonType,
+    QuestionType,
+    LeadFormCreateResponse,
+)
 from services.business_service import BusinessService
 from services.session_manager import sessions
 from agents.shared.llm import chat_completion
@@ -16,21 +20,20 @@ from exceptions.custom_exceptions import (
     AIProcessingException,
     SessionException,
 )
-
 from adapters.meta.lead_forms import MetaLeadFormAdapter
-
 from oserver.services.storage_service import storage_service
 from oserver.models.storage_request_model import StorageRequest
 from core.infrastructure.context import auth_context
 
 logger = structlog.get_logger()
-
 LEAD_FORM_PROMPT = load_prompt("meta/lead_form.txt")
 
 DEFAULT_COUNTRY_CODE = "IN"
 DEFAULT_PHONE_PREFIX = "+91"
 STORAGE_NAME = "AISuggestedData"
 APP_CODE = "marketingai"
+MAX_LLM_RETRIES = 3
+MAX_BRAND_NAME_LENGTH = 25
 
 
 class MetaLeadFormAgent:
@@ -52,10 +55,38 @@ class MetaLeadFormAgent:
                 "Missing summary in product data. Please complete website analysis."
             )
 
-        logger.info("Generating Meta lead form", session_id=session_id)
+        logger.info(
+            "Generating Meta lead form",
+            session_id=session_id,
+            client_code=auth_context.client_code,
+        )
+
+        payload = await self._get_lead_form_from_llm(summary, website_data.business_url)
+
+        self._apply_timestamped_name(payload, summary, website_data.business_url)
+
+        await self._apply_privacy_policy(payload, website_data, session_id)
+
+        self._set_thank_you_page_config(payload, summary, website_data.business_url)
+
+        return payload
+
+    async def _get_lead_form_from_llm(
+        self, summary: str, website_url: str
+    ) -> LeadFormPayload:
+        question_mapping_str = "\n".join(
+            f"{q.name.lower()} → {q.value}"
+            for q in QuestionType
+            if q != QuestionType.CUSTOM
+        )
+
+        button_types_str = "\n".join(bt.value for bt in ThankYouPageButtonType)
 
         prompt = LEAD_FORM_PROMPT.format(
-            summary=summary, website_url=website_data.business_url
+            summary=summary,
+            website_url=website_url,
+            question_mapping=question_mapping_str,
+            button_types=button_types_str,
         )
 
         messages = [
@@ -66,8 +97,8 @@ class MetaLeadFormAgent:
             {"role": "user", "content": prompt},
         ]
 
-        payload = None
-        max_retries = 3
+        max_retries = MAX_LLM_RETRIES
+        content = None
 
         for attempt in range(max_retries):
             try:
@@ -82,17 +113,23 @@ class MetaLeadFormAgent:
                 data = json.loads(content)
                 payload = LeadFormPayload.model_validate(data)
 
+                if (
+                    not payload.question_page_custom_headline
+                    or not payload.question_page_custom_headline.strip()
+                ):
+                    payload.question_page_custom_headline = "Share your details"
+
                 if payload.enable_otp_verification:
                     if not payload.is_optimized_for_quality:
                         payload.enable_otp_verification = False
-
                     else:
-                        has_phone = any(q.type == "PHONE" for q in payload.questions)
-
+                        has_phone = any(
+                            q.type == QuestionType.PHONE for q in payload.questions
+                        )
                         if not has_phone:
                             payload.enable_otp_verification = False
 
-                break
+                return payload
 
             except (JSONDecodeError, ValidationError) as e:
                 logger.warning(
@@ -113,21 +150,20 @@ class MetaLeadFormAgent:
                     }
                 )
 
+    def _apply_timestamped_name(
+        self, payload: LeadFormPayload, summary: str, website_url: str
+    ):
         base_name = (payload.name or "").strip()
 
         if not base_name:
-            base_name = self.get_fallback_business_name(
-                summary, website_data.business_url
-            )
+            base_name = self.get_fallback_business_name(summary, website_url)
 
-        base_name = base_name[:25]
-
-        timezone_str = getattr(auth_context, "timezone", "UTC")
+        base_name = base_name[:MAX_BRAND_NAME_LENGTH]
 
         try:
-            tz = ZoneInfo(timezone_str)
-        except Exception:
-            tz = ZoneInfo("UTC")
+            tz = ZoneInfo(auth_context.timezone)
+        except ZoneInfoNotFoundError:
+            tz = ZoneInfo("Asia/Kolkata")
 
         now = datetime.now(tz)
         date_part = now.strftime("%d/%m/%Y")
@@ -135,8 +171,10 @@ class MetaLeadFormAgent:
 
         payload.name = f"{base_name} {date_part} {time_part}"
 
+    async def _apply_privacy_policy(
+        self, payload: LeadFormPayload, website_data, session_id: str
+    ):
         site_links = await self._fetch_site_links(website_data.storage_id)
-
         logger.info("Fetched site links", site_links=site_links)
 
         privacy_link = self._extract_privacy_policy(
@@ -151,24 +189,37 @@ class MetaLeadFormAgent:
                 session_id=session_id,
             )
 
-        normalized_phone = self._normalize_phone(self._extract_phone(summary))
-
-        if normalized_phone:
-            payload.thank_you_page.business_phone_number = normalized_phone
-            payload.thank_you_page.button_type = ThankYouPageButtonType.CALL_BUSINESS
-            payload.thank_you_page.country_code = DEFAULT_COUNTRY_CODE
-
-        else:
-            payload.thank_you_page.button_type = ThankYouPageButtonType.VIEW_WEBSITE
-
-        if payload.thank_you_page.button_type == ThankYouPageButtonType.VIEW_WEBSITE:
-            payload.thank_you_page.website_url = website_data.business_url
+    def _set_thank_you_page_config(
+        self, payload: LeadFormPayload, summary: str, business_url: str
+    ):
+        phone = payload.thank_you_page.business_phone_number
+        if phone:
+            phone = phone.strip()
+        normalized_phone = self._normalize_phone(phone)
 
         if payload.thank_you_page.button_type == ThankYouPageButtonType.CALL_BUSINESS:
-            payload.thank_you_page.button_text = "Call Now"
+            if normalized_phone:
+                payload.thank_you_page.business_phone_number = normalized_phone
+                payload.thank_you_page.country_code = DEFAULT_COUNTRY_CODE
+                payload.thank_you_page.website_url = None
+                payload.thank_you_page.button_text = (
+                    payload.thank_you_page.button_text or "Call Now"
+                )
+            else:
+                logger.warning(
+                    "LLM requested CALL_BUSINESS but phone is missing or invalid. Falling back to VIEW_WEBSITE."
+                )
+                payload.thank_you_page.button_type = ThankYouPageButtonType.VIEW_WEBSITE
+                payload.thank_you_page.website_url = business_url
+                payload.thank_you_page.button_text = "Visit Website"
+                payload.thank_you_page.business_phone_number = None
+                payload.thank_you_page.country_code = None
 
         elif payload.thank_you_page.button_type == ThankYouPageButtonType.VIEW_WEBSITE:
+            payload.thank_you_page.website_url = business_url
             payload.thank_you_page.button_text = "Visit Website"
+            payload.thank_you_page.business_phone_number = None
+            payload.thank_you_page.country_code = None
 
         return payload
 
@@ -176,7 +227,7 @@ class MetaLeadFormAgent:
         self,
         session_id: str,
         payload: LeadFormPayload,
-    ) -> dict:
+    ) -> LeadFormCreateResponse:
 
         if session_id not in sessions:
             raise SessionException(session_id=session_id)
@@ -187,36 +238,17 @@ class MetaLeadFormAgent:
 
         page_id = ad_plan.get("metaPageId") or session.get("metaPageId")
 
-        # TEMP: Hardcoded Meta page ID for development
+        # TODO: Transition from hardcoded fallback to robust error handling or dynamic retrieval.
+        # This ID (332515906622723) is a temporary placeholder for development/testing.
         if not page_id:
             page_id = "332515906622723"
 
-        logger.info("Final Lead Form Name", name=payload.name)
+        enable_otp = payload.enable_otp_verification
+        is_optimized = payload.is_optimized_for_quality
 
-        meta_payload = payload.model_dump(exclude_none=True)
+        is_phone_sms_verify_enabled = enable_otp and is_optimized
 
-        enable_otp = getattr(payload, "enable_otp_verification", False)
-
-        meta_payload["is_optimized_for_quality"] = payload.is_optimized_for_quality
-        meta_payload["is_phone_sms_verify_enabled"] = (
-            bool(enable_otp) and payload.is_optimized_for_quality
-        )
-
-        for field in [
-            "enable_otp_verification",
-            "intent",
-            "is_verification_required",
-            "block_display_for_review",
-        ]:
-            meta_payload.pop(field, None)
-
-        questions = meta_payload.get("questions", [])
-        has_phone = False
-        for q in questions:
-            if isinstance(q, dict) and q.get("type") == "PHONE":
-                has_phone = True
-                q.pop("is_required", None)
-                break
+        has_phone = any(q.type == QuestionType.PHONE for q in payload.questions)
 
         if enable_otp and not has_phone:
             logger.warning(
@@ -227,10 +259,17 @@ class MetaLeadFormAgent:
         logger.info(
             "Creating Meta lead form",
             name=payload.name,
-            is_optimized_for_quality=True,
-            is_phone_sms_verify_enabled=bool(enable_otp),
+            is_optimized_for_quality=is_optimized,
+            is_phone_sms_verify_enabled=is_phone_sms_verify_enabled,
             has_phone_field=has_phone,
+            client_code=auth_context.client_code,
         )
+
+        meta_payload = payload.model_dump(
+            exclude_none=True, exclude={"enable_otp_verification"}
+        )
+
+        meta_payload["is_phone_sms_verify_enabled"] = is_phone_sms_verify_enabled
 
         result = await self.lead_form_adapter.create(
             client_code=auth_context.client_code,
@@ -238,7 +277,7 @@ class MetaLeadFormAgent:
             payload=meta_payload,
         )
 
-        return {"leadFormId": result["id"]}
+        return LeadFormCreateResponse(leadFormId=result["id"])
 
     async def _fetch_site_links(self, storage_id: str):
 
@@ -299,28 +338,20 @@ class MetaLeadFormAgent:
 
         return None
 
-    def _extract_phone(self, text: str) -> str | None:
-        matches = re.findall(r"\+\d[\d\s\-\(\)]{7,15}", text)
-        if matches:
-            return matches[0]
-
-        matches = re.findall(r"\b(?:\d[\s\-\(\)]*){10,12}\b", text)
-        if matches:
-            return max(matches, key=len)
-
-        return None
-
     def _normalize_phone(self, phone: str | None) -> str | None:
         if not phone:
             return None
 
         phone = re.sub(r"[^\d+]", "", phone)
 
-        if phone.startswith("+"):
-            return phone
+        if phone.startswith("+91") and len(phone) == 13:
+            if phone[3] in "6789":
+                return phone
+            return None
 
-        if phone.isdigit() and len(phone[-10:]) == 10:
-            return DEFAULT_PHONE_PREFIX + phone[-10:]
+        digits = re.sub(r"\D", "", phone)
+        if len(digits) == 10 and digits[0] in "6789":
+            return "+91" + digits
 
         return None
 

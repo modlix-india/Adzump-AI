@@ -47,7 +47,7 @@ class LeadFormQuestion(BaseModel):
 
 class PrivacyPolicy(BaseModel):
     url: str = Field(..., min_length=1)
-    link_text: str = Field(..., min_length=1)
+    link_text: str = Field(..., min_length=1, max_length=70)
 
 
 class ThankYouPage(BaseModel):
@@ -69,3 +69,7 @@ class LeadFormPayload(BaseModel):
     privacy_policy: PrivacyPolicy
     thank_you_page: ThankYouPage
     enable_otp_verification: Optional[bool] = False
+
+
+class LeadFormCreateResponse(BaseModel):
+    leadFormId: str

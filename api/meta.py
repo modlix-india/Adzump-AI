@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Query, Request
-from core.infrastructure.context import auth_context
+from fastapi import APIRouter, Query
 from agents.meta import meta_campaign_agent
 from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
@@ -42,12 +41,8 @@ async def generate_creative_image(
 
 
 @router.post("/lead-form/generate")
-async def generate_lead_form(
-    request: Request, session_id: str = Query(..., alias="sessionId")
-):
-    timezone_str = request.headers.get("x-timezone", "UTC")
-    auth_context.timezone = timezone_str
-
+async def generate_lead_form(session_id: str = Query(..., alias="sessionId")):
+    """timezone`: Optional time zone string (e.g., 'Asia/Kolkata'). By default 'Asia/Kolkata' is used."""
     result = await meta_lead_form_agent.generate_payload(session_id)
     return success_response(data=result.model_dump(mode="json"))
 
@@ -57,4 +52,4 @@ async def create_lead_form(
     payload: LeadFormPayload, session_id: str = Query(..., alias="sessionId")
 ):
     result = await meta_lead_form_agent.create_lead_form(session_id, payload)
-    return success_response(data=result)
+    return success_response(data=result.model_dump(mode="json"))

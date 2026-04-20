@@ -26,16 +26,61 @@ FORM SETTINGS
 
 - is_optimized_for_quality
 
+
+INTENT DETECTION (STRICT)
+
+Analyze the summary and classify user intent based on signals.
+
+HIGH INTENT (MUST use CALL_BUSINESS and is_optimized_for_quality = true):
+- Explicit contact instructions (call, contact us, book now, schedule visit)
+- Phone number present AND used for inquiries
+- Actions like:
+  - site visit
+  - consultation
+  - admission inquiry
+  - booking/demo
+
+MEDIUM INTENT:
+- Phone present but not strongly emphasized
+- Some inquiry signals but also informational content
+
+LOW INTENT (MUST use VIEW_WEBSITE and is_optimized_for_quality = false):
+- Pure informational content
+- Branding or awareness
+- No strong call-to-action
+
 Rules:
-- true → HIGHER_INTENT (for consultation, booking, high-value services)
+- true → HIGHER_INTENT (for consultation, booking, high-value services, real estate, finance, hiring)
 - false → MORE_VOLUME (for general leads)
+
+
+DECISION PRIORITY (STRICT ORDER)
+
+Follow this order when making decisions:
+
+1. PHONE SIGNAL RULE (highest priority)
+2. INTENT DETECTION
+3. CTA DECISION RULES
+4. CONSISTENCY RULE
+
+If conflicts occur:
+→ Follow the higher priority rule
 
 
 NAME RULE:
 
 - name must be ONLY the business name
-- extract exact brand name from summary
-- keep it under 25 characters
+- Extract the business name EXACTLY as it appears in the summary
+- DO NOT modify, rephrase, or invent words
+- DO NOT add extra words like "Project", "Official", "Pvt Ltd" unless already present
+
+- If the name exceeds 25 characters:
+  → truncate safely without changing meaning
+  → DO NOT break words mid-way
+
+- If no clear business name is found:
+  → extract from website domain (if available)
+  → otherwise use a short meaningful fallback
 
 ---
 
@@ -63,6 +108,7 @@ IMPORTANT:
 - Prefer phrases over full sentences
 - DO NOT exceed 80 characters under any condition
 - If any bullet exceeds 80 characters, rewrite it to fit within limit
+- Do NOT invent features or benefits not mentioned in the summary
 
 ---
 
@@ -80,16 +126,7 @@ Types:
 
 Supported keys:
 
-email → EMAIL  
-phone_number → PHONE  
-full_name → FULL_NAME  
-first_name → FIRST_NAME  
-last_name → LAST_NAME  
-city → CITY  
-country → COUNTRY  
-company_name → COMPANY_NAME  
-job_title → JOB_TITLE  
-marital_status → MARITIAL_STATUS  
+{question_mapping}
 
 IMPORTANT:
 
@@ -123,13 +160,95 @@ Rules:
 - MULTIPLE_CHOICE must have 2–5 options
 - option keys must be lowercase, no special characters
 
+QUESTION GENERATION RULES (CRITICAL)
+
+Questions must be generated dynamically based on the business context.
+
+DO NOT copy templates.
+DO NOT generate generic questions.
+
+Instead, analyze:
+- What is the user trying to achieve?
+- What information helps qualify serious leads?
+- What helps the business take action?
+
+QUALITY RULES (STRICT)
+
+- Questions MUST be specific and meaningful
+- Questions MUST NOT be vague or generic
+
+Avoid:
+- "Any preferences?"
+- "Tell us more"
+- "Your requirement?"
+
+QUALIFICATION RULE
+
+- At least ONE question MUST identify:
+  - serious vs casual users
+  - intent level
+
+GUIDELINES (FLEXIBLE, NOT HARD CODED)
+
+For high-consideration businesses:
+- Ask about budget, timeline, or intent (visit, booking)
+
+For services:
+- Ask about requirement type or urgency
+
+For low-intent:
+- Ask about interest or category
+
+FINAL CHECK
+
+- Every question must have a purpose
+- Remove redundant or useless questions
+- Do NOT assume information not present in the summary
+
+EXAMPLES OF HIGH-QUALITY QUESTIONS (FOR GUIDANCE ONLY)
+
+- "What is your budget range?"
+- "When would you like to schedule a visit?"
+- "Which service are you interested in?"
+- "What is your preferred timeline?"
+
+IMPORTANT:
+- Do NOT copy these directly
+- Use them to understand specificity and intent
+
 ---
 
 QUESTION PAGE HEADLINE
 
-Always include:
+Generate a dynamic headline based on the business type and intent.
 
-"question_page_custom_headline": "Please enter the below Details."
+Rules:
+- Maximum 60 characters (HARD LIMIT)
+- Must feel like a natural next step after the context card
+- Must be relevant to the business and user intent
+- Should guide the user on what to do next
+- Avoid generic phrases like:
+  - "Please enter the below details"
+  - "Fill the form below"
+
+Guidelines by intent:
+
+HIGH INTENT (consultation, booking, real estate, education):
+- "Share your details to schedule a visit"
+- "Let our expert connect with you"
+- "Tell us your requirements to get started"
+
+MEDIUM INTENT:
+- "Help us understand your needs"
+- "Tell us a bit about your requirement"
+
+LOW INTENT (exploration, browsing):
+- "Get more details about this offer"
+- "Explore more with your details"
+
+IMPORTANT:
+- Do NOT copy examples
+- Generate a fresh, relevant headline every time
 
 ---
 
@@ -156,17 +275,127 @@ Fields required:
 
 button_type must be one of:
 
-VIEW_WEBSITE  
-CALL_BUSINESS  
+{button_types}
 
-Rules:
+---
+
+CTA DECISION RULES (STRICT)
+
+- If the business requires direct human interaction (consultation, booking, service, real estate, finance, hiring):
+  → MUST use CALL_BUSINESS
+
+- If the goal is to drive users to explore products, browse offerings, or visit a website:
+  → MUST use VIEW_WEBSITE
+
+- DO NOT randomly choose button_type
+- button_type MUST align with business intent from summary
+
+
+PHONE SIGNAL RULE (CRITICAL)
+
+- If a valid phone number is present AND strong contact intent is clearly indicated:
+  → MUST treat as HIGH INTENT
+  → MUST use CALL_BUSINESS
+
+- Do NOT ignore phone numbers
+- Do NOT default to VIEW_WEBSITE when contact intent exists
+
+
+FALLBACK RULE (IMPORTANT)
+
+- If CALL_BUSINESS is selected but no valid phone number exists:
+  → Switch to VIEW_WEBSITE
+  → DO NOT keep CALL_BUSINESS without a phone number
+
+
+MULTIPLE PHONE RULE
+
+- If multiple valid phone numbers exist:
+  → Select ONLY ONE number
+  → Prefer the first valid mobile number
+  → Do NOT return multiple numbers
+
+
+---
+
+OPTIMIZATION-CTA ALIGNMENT RULE
+
+- If is_optimized_for_quality = true:
+  → Must use CALL_BUSINESS
+
+- If is_optimized_for_quality = false:
+  → Must use VIEW_WEBSITE
+
+---
+
+PHONE NUMBER RULES (STRICT - INDIA FOCUS)
+
+- If button_type = CALL_BUSINESS:
+  → Populate "business_phone_number" using ONLY a valid mobile number from the summary
+
+- Accept ONLY:
+  - 10-digit Indian mobile numbers starting with 6, 7, 8, or 9
+  - OR +91 format with exactly 10 digits after +91
+
+- DO NOT use:
+  - landline numbers
+  - toll-free numbers (1800, 800, etc.)
+  - short codes or extensions
+
+- If no valid mobile number exists:
+  → leave "business_phone_number" empty
+
+PHONE NUMBER INTEGRITY RULE (CRITICAL)
+
+- NEVER generate or guess phone numbers
+- NEVER modify digits of a phone number
+- ONLY return phone numbers EXACTLY as present in the summary
+- You may remove spaces or formatting, but digits MUST remain identical
+- If no valid number exists → return null
+
+
+---
+
+THANK YOU PAGE CONTENT RULES
+
+- title: Must be action-oriented and relevant to the business
+- body: Must clearly explain next step in 1–2 short sentences
+- Avoid generic text like "Thank you for your interest"
+
+Examples:
+
+For CALL_BUSINESS:
+- "Our expert will contact you shortly"
+- "Connect with our team now"
+
+For VIEW_WEBSITE:
+- "Explore more on our website"
+- "Discover our latest offerings"
+
+---
+
+BUTTON TEXT RULES
+
+- CALL_BUSINESS → "Call Now", "Talk to Expert", "Speak with Us"
+- VIEW_WEBSITE → "Visit Website", "Explore Now", "Learn More"
+
+---
+
+CONSISTENCY RULE
+
+- button_text, title, and body MUST align with button_type
+- If button_type = CALL_BUSINESS → content must encourage calling
+- If button_type = VIEW_WEBSITE → content must encourage visiting website
+
+---
+
+FIELD RULES
 
 If VIEW_WEBSITE:
 - include "website_url"
 
 If CALL_BUSINESS:
-- set only button_type = CALL_BUSINESS
-- DO NOT generate business_phone_number
+- MUST include "business_phone_number" if a valid mobile number exists
 - DO NOT generate country_code
 
 IMPORTANT:
@@ -183,19 +412,46 @@ OTP VERIFICATION LOGIC
 - Add field: "enable_otp_verification"
 
 Rules:
-- Only applicable when is_optimized_for_quality = true
-- true → enable OTP
-- false → disable OTP
 
-Enable OTP ONLY for:
-- real estate
-- finance
-- hiring
-- consultation
-- bookings
+- Enable OTP ONLY when:
+  - is_optimized_for_quality = true AND
+  - the intent involves serious user commitment
 
-Otherwise:
-- set enable_otp_verification = false
+SERIOUS INTENT INCLUDES:
+- property inquiries (real estate)
+- consultations (legal, medical, financial)
+- bookings or appointments
+- admissions or enrollment inquiries
+- hiring or job applications
+- any scenario where direct contact or follow-up is expected
+
+- Disable OTP when:
+  - intent is informational or exploratory
+  - user is likely browsing or comparing options
+
+CRITICAL RULE:
+
+- OTP MUST NOT be enabled for low-intent or awareness flows
+- OTP MUST align with intent, NOT just industry
+
+FINAL OUTPUT:
+
+- If conditions match → "enable_otp_verification": true
+- Otherwise → "enable_otp_verification": false
+
+---
+
+
+FINAL OUTPUT VALIDATION (CRITICAL)
+
+Before returning JSON:
+
+- Ensure button_type and button_text match
+- Ensure no conflicting fields:
+  - CALL_BUSINESS → no website_url
+  - VIEW_WEBSITE → no phone number
+- Ensure all required fields are correct
+- Remove any conflicting values
 
 ---
 
@@ -223,7 +479,7 @@ Return ONLY valid JSON.
     "style": "",
     "title": ""
   }},
-  "question_page_custom_headline": "Please enter the below Details.",
+  "question_page_custom_headline": "",
   "questions": [],
   "privacy_policy": {{
     "url": "",
