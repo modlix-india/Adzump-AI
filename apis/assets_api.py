@@ -7,6 +7,7 @@ from services.assets.call_out_service import CalloutsService
 from services.assets.site_link_service import SitelinksService
 from services.assets.structured_snippet_service import StructuredSnippetsService
 from services.assets.whatsapp_asset_service import WhatsAppAssetsService
+from services.assets.price_asset_service import PriceAssetService
 
 
 router = APIRouter(prefix="/api/ds/ads/assets", tags=["Assets"])
@@ -17,6 +18,7 @@ ASSET_SERVICE_MAP = {
     "STRUCTURED_SNIPPETS": StructuredSnippetsService.generate,
     "CALL_ASSETS": CallAssetsService.generate,
     "WHATSAPP_ASSETS": WhatsAppAssetsService().generate,
+    "PRICE_ASSETS": PriceAssetService.generate,
 }
 
 
