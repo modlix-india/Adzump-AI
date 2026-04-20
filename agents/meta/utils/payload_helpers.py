@@ -1,25 +1,27 @@
-from datetime import datetime, timedelta
-from typing import Optional
-from agents.meta.payload_builders.constants import SCHEDULE_BUFFER_SECONDS
+from datetime import date, datetime, timedelta
+from core.models.meta_constants import SCHEDULE_BUFFER_SECONDS
 from core.models.meta import AdCreationStage
 
 
-def normalize_time(date_str: Optional[str]) -> Optional[str]:
+def normalize_time(value: str | date | datetime | None) -> str | None:
+    """Normalize a date to Meta's ISO-8601 format.
+ 
+    Handle 'Today' by adding a safety buffer, and 'Future' by defaulting 
+    to midnight local time.
     """
-    Normalizes a date-only string (YYYY-MM-DD) to Meta's accepted format.
-    Meta format: YYYY-MM-DDTHH:MM:SS±HHMM e.g. "2026-03-21T00:00:00+0530"
-
-    - Today  → now + buffer
-    - Future → midnight local time
-    """
-    if not date_str:
+    if not value:
         return None
 
     try:
-        parsed_date = datetime.fromisoformat(date_str).date()
+        if isinstance(value, (date, datetime)):
+            parsed_date = value if isinstance(value, date) else value.date()
+        else:
+            parsed_date = datetime.fromisoformat(value).date()
+
         today = datetime.now().date()
 
         if parsed_date == today:
+            # Add requirement buffer + 10s extra padding for network/processing latency
             dt = datetime.now().astimezone() + timedelta(
                 seconds=SCHEDULE_BUFFER_SECONDS + 10
             )
@@ -28,14 +30,15 @@ def normalize_time(date_str: Optional[str]) -> Optional[str]:
 
         return dt.strftime("%Y-%m-%dT%H:%M:%S%z")
 
-    except ValueError:
-        return date_str  # let validate_schedule raise 400
+    except (ValueError, TypeError):
+        raise ValueError(f"Invalid date format: '{value}'. Expected YYYY-MM-DD.")
 
 
-def build_name(name: str, entity_type: AdCreationStage, date: datetime = None) -> str:
-    """
-    Formatted string e.g., "name - entity_type dd/mm/yy"
-    """
+def build_name(
+    name: str, entity_type: AdCreationStage, target_date: datetime | None = None
+) -> str:
+    """Generate a standardized name for Meta entities."""
+    # Format: 'Project - Campaign 24/05/26'
     if not isinstance(entity_type, AdCreationStage):
         try:
             entity_type = AdCreationStage(entity_type.upper().strip())
@@ -44,10 +47,10 @@ def build_name(name: str, entity_type: AdCreationStage, date: datetime = None) -
                 f"Invalid entity_type '{entity_type}'. Must be a valid AdCreationStage."
             )
 
-    if date is None:
-        date = datetime.today()
+    if target_date is None:
+        target_date = datetime.today()
 
-    date_str = date.strftime("%d/%m/%y")
+    date_str = target_date.strftime("%d/%m/%y")
     label = entity_type.value.capitalize()
 
     return f"{name} - {label} {date_str}"

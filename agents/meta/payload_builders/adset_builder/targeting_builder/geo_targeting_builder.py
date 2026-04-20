@@ -1,127 +1,97 @@
-from fastapi import HTTPException
-from agents.meta.payload_builders.constants import MIN_RADIUS_KM
+from core.models.meta import Location
+from core.models.meta_constants import MIN_RADIUS_KM, DEFAULT_DISTANCE_UNIT
 
 
-# BUILDER
-
-
-def build_geo_locations(location_list: list):
-    """
-    Transforms incoming locations array into Meta compatible geo_locations format.
-    Supports: country, city, region, zip, custom location types.
-    Strips empty arrays before returning — Meta rejects empty arrays.
+def build_geo_locations(locations: list[Location]):
+    """Transform Location models into Meta compatible geo_locations format.
+ 
+    Use an internal set-based approach for automatic deduplication.
     """
 
-    if not location_list:
-        raise HTTPException(status_code=400, detail="Locations are required")
+    if not locations:
+        raise ValueError("Locations are required")
 
-    # Initialize all supported geo location buckets
-    geo_payload = {
-        "countries": set(),  # set — auto deduplicates country codes
-        "cities": [],
-        "regions": [],
-        "zips": [],  # set — auto deduplicates zip codes
-        "custom_locations": [],
-        "neighborhoods": [],
+    temp_storage = {
+        "countries": set(),
+        "cities": {},  # key -> Location
+        "regions": set(),
+        "zips": set(),
+        "neighborhoods": set(),
+        "custom": {},  # coords -> Location
     }
 
-    for location in location_list:
-        location_type = location.get("type")
+    for location in locations:
+        match location.type:
+            case "country":
+                temp_storage["countries"].add(location.key)
 
-        if not location_type:
-            raise HTTPException(status_code=400, detail="Location type is required")
+            case "city":
+                temp_storage["cities"][location.key] = location
 
-        # COUNTRY
-        # Meta expects a list of country codes e.g. ["IN", "US"]
-        if location_type == "country":
-            country_key = location.get("key")
-            if not country_key:
-                raise HTTPException(status_code=400, detail="Country key missing")
+            case "region":
+                temp_storage["regions"].add(location.key)
 
-            # str() cast — Meta always expects string keys
-            geo_payload["countries"].add(str(country_key))
+            case "zip":
+                temp_storage["zips"].add(location.key)
 
-        # CITY
-        # Meta expects city key with optional radius and distance_unit
-        # Defaults to 17km radius if not provided
-        elif location_type == "city":
-            city_key = location.get("key")
-            if not city_key:
-                raise HTTPException(status_code=400, detail="City key missing")
+            case "neighborhood":
+                temp_storage["neighborhoods"].add(location.key)
 
-            city_payload = {"key": str(city_key)}
+            case "custom":
+                if location.latitude is None or location.longitude is None:
+                    raise ValueError("Custom location requires latitude and longitude")
+                coords = (location.latitude, location.longitude)
+                temp_storage["custom"][coords] = location
 
-            radius = location.get("radius")
-            distance_unit = location.get("distance_unit")
-
-            if radius:
-                city_payload["radius"] = radius
-                city_payload["distance_unit"] = distance_unit
-            else:
-                # Default radius when not provided
-                city_payload["radius"] = MIN_RADIUS_KM
-                city_payload["distance_unit"] = "kilometer"
-
-            geo_payload["cities"].append(city_payload)
-
-        # REGION
-        # Meta expects region key e.g. state or province
-        elif location_type == "region":
-            region_key = location.get("key")
-            if not region_key:
-                raise HTTPException(status_code=400, detail="Region key missing")
-
-            geo_payload["regions"].append({"key": str(region_key)})
-
-        # ZIP
-        elif location_type == "zip":
-            zip_code = location.get("key")
-            if not zip_code:
-                raise HTTPException(status_code=400, detail="zip key missing")
-            zip = {"key": zip_code}
-            geo_payload["zips"].append(zip)
-
-        # NEIGHBORHOOD
-        elif location_type == "neighborhood":
-            neighborhood_key = location.get("key")
-            if not neighborhood_key:
-                raise HTTPException(status_code=400, detail="neighborhood key missing")
-
-            geo_payload["neighborhoods"].append({"key": str(neighborhood_key)})
-
-        # CUSTOM LOCATION
-        # Meta expects latitude, longitude with optional radius
-        # Useful for targeting a specific point on the map
-        elif location_type == "custom":
-            latitude = location.get("latitude")
-            longitude = location.get("longitude")
-
-            if latitude is None or longitude is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Custom location requires latitude and longitude",
+            case _:
+                raise ValueError(
+                    f"Unsupported location type: '{location.type}'. "
+                    "Supported: country, city, region, zip, custom, neighborhood"
                 )
 
-            custom_location = {"latitude": latitude, "longitude": longitude}
+    return _format_geo_payload(temp_storage)
 
-            radius = location.get("radius")
-            distance_unit = location.get("distance_unit")
 
-            if radius:
-                custom_location["radius"] = radius
-                custom_location["distance_unit"] = distance_unit
+def _format_geo_payload(temp_storage: dict) -> dict:
+    """Transform internal set-based storage into the final Meta-compatible JSON structure."""
+    geo_payload = {}
 
-            geo_payload["custom_locations"].append(custom_location)
+    if temp_storage["countries"]:
+        geo_payload["countries"] = list(temp_storage["countries"])
 
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unsupported location type: '{location_type}'. Supported: country, city, region, zip, custom",
-            )
+    if temp_storage["cities"]:
+        geo_payload["cities"] = []
+        for key, loc in temp_storage["cities"].items():
+            item = {"key": key}
+            _apply_radius_and_unit(item, loc)
+            geo_payload["cities"].append(item)
 
-    # Convert sets to lists — Meta expects arrays not sets
-    geo_payload["countries"] = list(geo_payload["countries"])
-    geo_payload["zips"] = list(geo_payload["zips"])
+    if temp_storage["regions"]:
+        geo_payload["regions"] = [{"key": k} for k in temp_storage["regions"]]
 
-    # Strip empty arrays — Meta rejects keys with empty arrays
-    return {key: value for key, value in geo_payload.items() if value}
+    if temp_storage["zips"]:
+        geo_payload["zips"] = [{"key": k} for k in temp_storage["zips"]]
+
+    if temp_storage["neighborhoods"]:
+        geo_payload["neighborhoods"] = [
+            {"key": k} for k in temp_storage["neighborhoods"]
+        ]
+
+    if temp_storage["custom"]:
+        geo_payload["custom_locations"] = []
+        for coords, loc in temp_storage["custom"].items():
+            item = {"latitude": coords[0], "longitude": coords[1]}
+            _apply_radius_and_unit(item, loc)
+            geo_payload["custom_locations"].append(item)
+
+    return geo_payload
+
+
+def _apply_radius_and_unit(payload: dict, location: Location):
+    """Apply radius and distance unit to a location payload, falling back to MIN_RADIUS_KM (17km)."""
+    if location.radius:
+        payload["radius"] = location.radius
+        payload["distance_unit"] = location.distance_unit or DEFAULT_DISTANCE_UNIT
+    else:
+        payload["radius"] = MIN_RADIUS_KM
+        payload["distance_unit"] = DEFAULT_DISTANCE_UNIT

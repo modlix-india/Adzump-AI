@@ -13,17 +13,18 @@ logger = get_logger(__name__)
 
 
 def setup_exception_handlers(app):
-
-    @app.exception_handler(HTTPException)
-    async def http_exception_handler(request: Request, exc: HTTPException):
-        logger.warning(f"HTTPException at {request.url.path}: {exc.detail}")
-        return error_response(exc.detail, status_code=exc.status_code)
+    # Handlers are ordered most-specific → least-specific for readability.
+    # FastAPI resolves by exact class match, but this mirrors Python's try/except convention.
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
     ):
-        logger.warning(f"Validation error at {request.url.path}: {exc.errors()}")
+        logger.error(
+            "Validation error",
+            path=request.url.path,
+            errors=exc.errors(),
+        )
         formatted_errors = [
             {
                 "loc": err.get("loc", []),
@@ -42,50 +43,74 @@ def setup_exception_handlers(app):
             status_code=422,
         )
 
-    @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
-        logger.error(f"Unhandled Exception at {request.url.path}: {exc}")
-        return error_response("Something went wrong on the server", status_code=500)
+    @app.exception_handler(MetaAdCreationError)
+    async def meta_ad_creation_error_handler(
+        request: Request, exc: MetaAdCreationError
+    ):
+        logger.error(
+            "MetaAdCreationError",
+            path=request.url.path,
+            message=exc.message,
+            failed_stage=exc.failed_stage,
+            meta_error=exc.meta_error,
+        )
+        return error_response(
+            message=exc.message,
+            status_code=exc.status_code,
+            details={
+                "failed_stage": exc.failed_stage,
+                "meta_error": exc.meta_error,
+                "ids": exc.existing_ids,
+            },
+        )
+
+    @app.exception_handler(MetaAPIError)
+    async def meta_api_error_handler(request: Request, exc: MetaAPIError):
+        logger.error(
+            "Meta API error",
+            path=request.url.path,
+            message=exc.message,
+        )
+        return error_response(exc.message, status_code=exc.status_code)
 
     @app.exception_handler(BaseAppException)
     async def app_exception_handler(request: Request, exc: BaseAppException):
         details = getattr(exc, "details", None)
-        logger.warning(
-            f"AppException at {request.url.path}: {exc.message}",
+        log_method = logger.error if exc.status_code >= 500 else logger.warning
+        log_method(
+            "Application error",
+            path=request.url.path,
+            message=exc.message,
             status_code=exc.status_code,
             details=details,
         )
         return error_response(exc.message, details=details, status_code=exc.status_code)
 
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        logger.warning(
+            "HTTP exception",
+            path=request.url.path,
+            detail=exc.detail,
+            status_code=exc.status_code,
+        )
+        return error_response(exc.detail, status_code=exc.status_code)
+
     @app.exception_handler(SQLAlchemyError)
     async def db_exception_handler(request: Request, exc: SQLAlchemyError):
-        logger.exception(f"Database Error at {request.url.path}: {exc}")
+        logger.exception(
+            "Database error",
+            path=request.url.path,
+            error=str(exc),
+        )
         return error_response("A database error occurred.", status_code=500)
 
-    @app.exception_handler(MetaAPIError)
-    async def meta_api_error_handler(request: Request, exc: MetaAPIError):
-        logger.warning(f"Meta API Error at {request.url.path}: {exc.message}")
-        return error_response(exc.message, status_code=exc.status_code)
-
-    @app.exception_handler(MetaAdCreationError)
-    async def meta_ad_creation_error_handler(
-        request: Request, exc: MetaAdCreationError
-    ):
-        status_code = getattr(exc.original_exc, "status_code", 400)
-        message = getattr(exc.original_exc, "message", str(exc.original_exc))
-        meta_error = getattr(exc.original_exc, "error_data", {}).get("error", {})
-
-        logger.warning(
-            f"MetaAdCreationError at {request.url.path}: {message}",
-            failed_stage=exc.failed_stage,
-            meta_error=meta_error,
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        logger.exception(
+            "Unhandled exception",
+            path=request.url.path,
+            error=str(exc),
+            error_type=type(exc).__name__,
         )
-        return error_response(
-            message=message,
-            status_code=status_code,
-            details={
-                "failed_stage": exc.failed_stage,
-                "meta_error": meta_error,
-                "ids": exc.existing_ids,
-            },
-        )
+        return error_response("Something went wrong on the server", status_code=500)

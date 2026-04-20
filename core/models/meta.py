@@ -1,10 +1,11 @@
+from __future__ import annotations
 from enum import Enum
-from typing import List, Literal, Optional, Dict, Any, Annotated, Set
+from typing import Literal, Any, Annotated
 from datetime import date, datetime
 import re
 
 from pydantic import BaseModel, Field, model_validator, field_validator
-from agents.meta.payload_builders import constants as meta_constants
+from core.models import meta_constants
 
 
 class CampaignObjective(str, Enum):
@@ -32,50 +33,9 @@ class AdCreationStage(str, Enum):
     AD = "AD"
 
 
-CountryCode = Annotated[
-    str, Field(pattern="^[A-Z]{2}$")  # exactly 2 uppercase letters
-]
-
-
 class Status(str, Enum):
     ACTIVE = "ACTIVE"
     PAUSED = "PAUSED"
-
-
-class CampaignPayload(BaseModel):
-    name: str
-    objective: CampaignObjective
-    status: Status
-    special_ad_categories: Optional[List[SpecialAdCategory]] = None
-    special_ad_category_country: Optional[List[CountryCode]] = None
-
-
-# it should be delete after campaign builder is merged
-class CreateCampaignRequest(BaseModel):
-    ad_account_id: str = Field(..., alias="adAccountId")
-    campaign_payload: CampaignPayload = Field(..., alias="campaignPayload")
-
-
-# it should be delete after adset builder is merged
-class AdSetPayload(BaseModel):
-    genders: List[Literal["MALE", "FEMALE"]]
-    age_min: int = Field(..., ge=18, le=65)
-    age_max: int = Field(..., ge=18, le=65)
-    languages: List[str]
-
-
-# it should be delete after adset builder is merged
-class CreateAdSetRequest(BaseModel):
-    ad_account_id: str = Field(..., alias="adAccountId", min_length=1)
-    campaign_id: str = Field(..., alias="campaignId", min_length=1)
-    adset_payload: AdSetPayload = Field(..., alias="adsetPayload")
-
-
-# it should be delete after creative builder is merged
-class DetailedTargeting(BaseModel):
-    interests: List[str] = []
-    behaviors: List[str] = []
-    demographics: List[str] = []
 
 
 class CallToAction(str, Enum):
@@ -99,50 +59,6 @@ class CallToAction(str, Enum):
     WATCH_MORE = "WATCH_MORE"
 
 
-class CreativeText(BaseModel):
-    primary_texts: List[str]
-    headlines: List[str]
-    descriptions: List[str]
-    cta: CallToAction
-
-    @field_validator("primary_texts", "headlines", "descriptions")
-    @classmethod
-    def validate_exactly_five(cls, value):
-        if len(value) != 5:
-            raise ValueError("Must contain exactly 5 items")
-        return value
-
-
-class CreativeImage(BaseModel):
-    image_url: Optional[str] = Field(
-        default=None, description="Base64 image (only for preview / upload step)"
-    )
-    image_hash: Optional[str] = Field(
-        default=None, description="Meta uploaded image hash"
-    )
-
-    @model_validator(mode="after")
-    def validate_image_source(self):
-        if not self.image_url and not self.image_hash:
-            raise ValueError("Either image_url or image_hash must be provided")
-        return self
-
-
-class CreativePayload(BaseModel):
-    text: CreativeText
-    image: Optional[CreativeImage] = None
-
-
-class CreateCreativeRequest(BaseModel):
-    adAccountId: str = Field(..., alias="adAccountId")
-    creativePayload: CreativePayload = Field(..., alias="creativePayload")
-
-
-class CreateCreativeResponse(BaseModel):
-    creativeId: str = Field(..., alias="creativeId")
-
-
-# AdSet
 class Gender(str, Enum):
     MALE = "MALE"
     FEMALE = "FEMALE"
@@ -189,9 +105,8 @@ class OptimizationGoal(str, Enum):
     MESSAGING_APPOINTMENT_CONVERSION = "MESSAGING_APPOINTMENT_CONVERSION"
 
 
-# billing_event — what you pay for
 class BillingEvent(str, Enum):
-    IMPRESSIONS = "IMPRESSIONS"  # pay per 1000 impressions
+    IMPRESSIONS = "IMPRESSIONS"
     CLICKS = "CLICKS"
     APP_INSTALLS = "APP_INSTALLS"
     LINK_CLICKS = "LINK_CLICKS"
@@ -205,11 +120,23 @@ class BillingEvent(str, Enum):
 
 
 class BidStrategy(str, Enum):
+    """
+    Meta Bid Strategies.
+    SOURCE_LINK = "https://developers.facebook.com/docs/marketing-api/bidding/overview/bid-strategy"
+    """
+
     LOWEST_COST_WITHOUT_CAP = "LOWEST_COST_WITHOUT_CAP"
     LOWEST_COST_WITH_BID_CAP = "LOWEST_COST_WITH_BID_CAP"
     LOWEST_COST_WITH_MIN_ROAS = "LOWEST_COST_WITH_MIN_ROAS"
     COST_CAP = "COST_CAP"
-    TARGET_COST = "TARGET_COST"
+
+    @property
+    def requires_bid_amount(self) -> bool:
+        """Return True if the strategy requires the 'bid_amount' field."""
+        return self in {
+            BidStrategy.LOWEST_COST_WITH_BID_CAP,
+            BidStrategy.COST_CAP,
+        }
 
 
 class DestinationType(str, Enum):
@@ -240,16 +167,10 @@ class DestinationType(str, Enum):
     MESSAGING_INSTAGRAM_DIRECT_WHATSAPP = "MESSAGING_INSTAGRAM_DIRECT_WHATSAPP"
 
 
-# Promoted Object
 class PromotedObjectType(str, Enum):
     PIXEL = "PIXEL"
     APP = "APP"
     PAGE = "PAGE"
-
-
-HeadlineStr = Annotated[str, Field(max_length=meta_constants.MAX_HEADLINE_CHARS)]
-PrimaryTextStr = Annotated[str, Field(max_length=meta_constants.MAX_PRIMARY_TEXT_CHARS)]
-DescriptionStr = Annotated[str, Field(max_length=meta_constants.MAX_DESCRIPTION_CHARS)]
 
 
 class ConversionEvent(str, Enum):
@@ -265,10 +186,10 @@ class ConversionEvent(str, Enum):
     CONTACT = "CONTACT"
 
 
-# Creative
 class CreativeType(str, Enum):
     IMAGE = "IMAGE"
     VIDEO = "VIDEO"
+    CAROUSEL = "CAROUSEL"
 
 
 class CreativeFormat(str, Enum):
@@ -287,48 +208,131 @@ class NonDemographicType(str, Enum):
     behaviors = "behaviors"
 
 
-# MODELS
+CountryCode = Annotated[str, Field(pattern="^[A-Z]{2}$")]
+HeadlineStr = Annotated[str, Field(max_length=meta_constants.MAX_HEADLINE_CHARS)]
+PrimaryTextStr = Annotated[str, Field(max_length=meta_constants.MAX_PRIMARY_TEXT_CHARS)]
+DescriptionStr = Annotated[str, Field(max_length=meta_constants.MAX_DESCRIPTION_CHARS)]
+
+# Discriminated Union for Creative types
+CreativePayload = Annotated[
+    "WebsiteCreative | LeadGenCreative", Field(discriminator="destination_type")
+]
 
 
-# Existing IDs
-class ExistingIdsPayload(BaseModel):
-    campaign_id: Optional[str] = None
-    adset_id: Optional[str] = None
-    creative_id: Optional[str] = None
-    ad_id: Optional[str] = None
-
-
-# Ad
-class AdPayload(BaseModel):
-    name: str
+class CampaignPayload(BaseModel):
+    name: str = Field(..., min_length=1)
+    objective: CampaignObjective
     status: Status
-    adset_id: Optional[str] = None
-    creative: Optional[Dict[str, Annotated[str, Field(min_length=1)]]] = (
+    special_ad_categories: list[SpecialAdCategory] | None = None
+    special_ad_category_country: list[CountryCode] | None = None
+
+
+class CreateCampaignRequest(BaseModel):
+    ad_account_id: str = Field(..., alias="adAccountId")
+    campaign_payload: CampaignPayload = Field(..., alias="campaignPayload")
+
+
+class LLMAdSetTargeting(BaseModel):
+    genders: list[Literal["MALE", "FEMALE"]]
+    age_min: int = Field(..., ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE)
+    age_max: int = Field(..., ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE)
+    languages: list[str]
+
+
+class CreateAdSetRequest(BaseModel):
+    ad_account_id: str = Field(..., alias="adAccountId", min_length=1)
+    campaign_id: str = Field(..., alias="campaignId", min_length=1)
+    adset_payload: LLMAdSetTargeting = Field(..., alias="adsetPayload")
+
+
+class DetailedTargeting(BaseModel):
+    interests: list[str] = []
+    behaviors: list[str] = []
+    demographics: list[str] = []
+
+
+class CreativeText(BaseModel):
+    primary_texts: list[PrimaryTextStr] = Field(
+        ..., min_length=1, max_length=meta_constants.MAX_PRIMARY_TEXTS
+    )
+    headlines: list[HeadlineStr] = Field(
+        ..., min_length=1, max_length=meta_constants.MAX_HEADLINES
+    )
+    descriptions: list[DescriptionStr] = Field(
+        ..., min_length=1, max_length=meta_constants.MAX_DESCRIPTIONS
+    )
+    cta: CallToAction
+
+
+class CreativeImage(BaseModel):
+    image_url: str | None = Field(
+        default=None, description="Base64 image (only for preview / upload step)"
+    )
+    image_hash: str | None = Field(default=None, description="Meta uploaded image hash")
+
+    @model_validator(mode="after")
+    def validate_image_source(self):
+        if not self.image_url and not self.image_hash:
+            raise ValueError("Either image_url or image_hash must be provided")
+        return self
+
+
+class LLMCreativeTextPayload(BaseModel):
+    text: CreativeText
+    image: CreativeImage | None = None
+
+
+class CreateCreativeRequest(BaseModel):
+    adAccountId: str = Field(..., alias="adAccountId")
+    creativePayload: LLMCreativeTextPayload = Field(..., alias="creativePayload")
+
+
+class CreateCreativeResponse(BaseModel):
+    creativeId: str = Field(..., alias="creativeId")
+
+
+class ExistingIdsPayload(BaseModel):
+    campaign_id: str | None = None
+    adset_id: str | None = None
+    creative_id: str | None = None
+    ad_id: str | None = None
+
+
+class AdPayload(BaseModel):
+    name: str = Field(..., min_length=1)
+    status: Status
+    adset_id: str | None = None
+    creative: dict[str, Annotated[str, Field(min_length=1)]] | None = (
         None  # creative_id: str
     )
 
 
-# Schedule
 class Schedule(BaseModel):
     start_time: date
-    end_time: Optional[date] = None
+    end_time: date | None = None
 
     @field_validator("start_time", "end_time", mode="before")
     @classmethod
     def parse_date(cls, value):
+        """Parse date string (dd/mm/yyyy or ISO) into a standard date object."""
         if not value:
             return value
         if isinstance(value, str):
+            # Try dd/mm/yyyy first (common UI format)
             try:
-                parsed = datetime.strptime(value, "%d/%m/%Y").date()
-                return parsed.isoformat()
+                return datetime.strptime(value, "%d/%m/%Y").date()
             except Exception:
-                raise ValueError("Date must be in format dd/mm/yyyy")
-
+                # Fallback to ISO format (YYYY-MM-DD)
+                try:
+                    return datetime.fromisoformat(value).date()
+                except Exception:
+                    raise ValueError("Date must be in format dd/mm/yyyy or YYYY-MM-DD")
+ 
         return value
 
     @model_validator(mode="after")
     def validate_dates(self):
+        """Validate that start_time is not in the past and end_time follows start_time."""
         current_date = datetime.now().date()
         if self.start_time < current_date:
             raise ValueError("start_time cannot be in the past")
@@ -340,35 +344,50 @@ class Schedule(BaseModel):
 
 class Locale(BaseModel):
     key: int
-    name: str
+    name: str = Field(..., min_length=1)
 
 
 class Location(BaseModel):
-    key: str
-    name: str
-    type: str
-    radius: Optional[int] = None
-    distance_unit: Optional[str] = None
+    key: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1)
+    type: str = Field(..., min_length=1)
+    radius: int | None = None
+    distance_unit: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+    @field_validator("distance_unit")
+    @classmethod
+    def validate_distance_unit(cls, v):
+        """Validate that the distance unit is supported by Meta constants."""
+        if v and v not in meta_constants.VALID_DISTANCE_UNITS:
+            raise ValueError(
+                f"Invalid distance_unit: '{v}'. "
+                f"Must be one of: {meta_constants.VALID_DISTANCE_UNITS}"
+            )
+        return v
 
 
 class TargetingEntity(BaseModel):
-    id: str
-    name: str
-    type: str
+    id: str = Field(..., min_length=1)
+    name: str = Field(..., min_length=1)
+    type: str = Field(..., min_length=1)
 
 
-# Targeting (Flexible)
 class Targeting(BaseModel):
     locations: list[Location]
+    locales: list[Locale] | None = None
+    behaviors: list[TargetingEntity] | None = None
+    interests: list[TargetingEntity] | None = None
+    demographics: list[TargetingEntity] | None = None
 
-    locales: Optional[list[Locale]] = None
-    behaviors: Optional[list[TargetingEntity]] = None
-    interests: Optional[list[TargetingEntity]] = None
-    demographics: Optional[list[TargetingEntity]] = None
-
-    age_min: Optional[int] = Field(None, ge=18, le=65)
-    age_max: Optional[int] = Field(None, ge=18, le=65)
-    genders: Optional[list[Gender]] = None
+    age_min: int | None = Field(
+        None, ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE
+    )
+    age_max: int | None = Field(
+        None, ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE
+    )
+    genders: list[Gender] | None = None
 
     @field_validator("locations")
     @classmethod
@@ -384,7 +403,6 @@ class Targeting(BaseModel):
         behaviors = getattr(values, "behaviors", []) or []
         demographics = getattr(values, "demographics", []) or []
 
-        # Validate type of interests and behaviors
         for i in interests:
             if i.type != NonDemographicType.interests:
                 raise ValueError(f"Invalid type '{i.type}' in interests")
@@ -393,13 +411,11 @@ class Targeting(BaseModel):
             if b.type != NonDemographicType.behaviors:
                 raise ValueError(f"Invalid type '{b.type}' in behaviors")
 
-        # Validate demographics do not contain interests/behaviors
         for d in demographics:
             if d.type in NonDemographicType.__members__:
                 raise ValueError(f"Invalid type '{d.type}' in demographics")
 
-        # Deduplicate IDs across all groups
-        seen_ids: Set[str] = set()
+        seen_ids: set[str] = set()
         for group in [interests, behaviors, demographics]:
             for e in group:
                 if e.id in seen_ids:
@@ -411,49 +427,44 @@ class Targeting(BaseModel):
         return values
 
 
-# Budget
 class Budget(BaseModel):
-    amount: int = Field(..., gt=100)
+    amount: int = Field(..., gt=meta_constants.MIN_DAILY_BUDGET_INR)
     type: BudgetType
 
     def to_meta_payload(self) -> dict:
+        """Transform the budget model into a Meta-compatible minor-unit payload."""
         minor_units = int(self.amount * meta_constants.INR_TO_MINOR_UNIT)
         key = "daily_budget" if self.type == BudgetType.DAILY else "lifetime_budget"
         return {key: minor_units}
 
 
-# Bidding
 class Bidding(BaseModel):
     optimization_goal: OptimizationGoal
     billing_event: BillingEvent
     bid_strategy: BidStrategy
-    bid_amount: Optional[int] = None
+    bid_amount: int | None = None
 
     @model_validator(mode="after")
     def validate_bid_amount(self):
-        if (
-            self.bid_strategy.value
-            in meta_constants.BID_STRATEGIES_REQUIRING_BID_AMOUNT
-            and self.bid_amount is None
-        ):
+        """Validate that bid_amount is provided if the strategy requires it."""
+        if self.bid_strategy.requires_bid_amount and self.bid_amount is None:
             raise ValueError(
                 f"bid_amount is required for bid_strategy '{self.bid_strategy.value}'"
             )
         return self
 
 
-# Promoted Object
 class PromotedObject(BaseModel):
     type: PromotedObjectType
-
-    pixel_id: Optional[str] = Field(default=None, min_length=1)
-    event: Optional[ConversionEvent] = None
-    application_id: Optional[str] = Field(default=None, min_length=1)
-    object_store_url: Optional[str] = Field(default=None, min_length=1)
-    page_id: Optional[str] = Field(default=None, min_length=1)
+    pixel_id: str | None = Field(default=None, min_length=1)
+    event: ConversionEvent | None = None
+    application_id: str | None = Field(default=None, min_length=1)
+    object_store_url: str | None = Field(default=None, min_length=1)
+    page_id: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_required_fields(self):
+        """Ensure all required fields for the specific promoted object type are present."""
         if self.type == PromotedObjectType.PIXEL:
             if not self.pixel_id:
                 raise ValueError("pixel_id is required for PIXEL type")
@@ -473,6 +484,7 @@ class PromotedObject(BaseModel):
         return self
 
     def to_meta_payload(self) -> dict:
+        """Transform the promoted object into a specific Meta API structure."""
         if self.type == PromotedObjectType.PAGE:
             return {"page_id": str(self.page_id)}
 
@@ -491,23 +503,20 @@ class PromotedObject(BaseModel):
         return {}
 
 
-# AdSet
 class AdSetPayload(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1)
     status: Status
-
-    schedule: Optional[Schedule] = None
+    schedule: Schedule | None = None
     targeting: Targeting
-
     destination_type: DestinationType
-
     budget: Budget
     bidding: Bidding
     promoted_object: PromotedObject
-    campaign_id: Optional[str] = Field(default=None, min_length=1)
+    campaign_id: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def validate_lifetime_budget_requires_schedule(self):
+        """Ensure a complete schedule is provided if using a LIFETIME budget."""
         if self.budget.type == BudgetType.LIFETIME:
             if self.schedule is None:
                 raise ValueError("schedule is required when using a LIFETIME budget")
@@ -518,11 +527,10 @@ class AdSetPayload(BaseModel):
         return self
 
 
-# Creative models
 class WebsiteCTA(BaseModel):
     type: CallToAction
     url: str
-    lead_gen_form_id: None = None  # not allowed
+    lead_gen_form_id: None = None
 
 
 class LeadGenCTA(BaseModel):
@@ -531,26 +539,22 @@ class LeadGenCTA(BaseModel):
     url: str = Field(..., min_length=1)
 
 
-# BASE CREATIVE
 class BaseCreative(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1)
     type: CreativeType
     page_id: str = Field(..., min_length=1)
-    instagram_user_id: Optional[str] = Field(default=None, min_length=1)
+    instagram_user_id: str | None = Field(default=None, min_length=1)
     destination_type: DestinationType
-    image_hashes: List[str] = Field(
+    image_hashes: list[str] = Field(
         ..., min_length=1, max_length=meta_constants.MAX_IMAGES
     )
-
-    headlines: List[HeadlineStr] = Field(
+    headlines: list[HeadlineStr] = Field(
         ..., min_length=1, max_length=meta_constants.MAX_HEADLINES
     )
-
-    primary_texts: List[PrimaryTextStr] = Field(
+    primary_texts: list[PrimaryTextStr] = Field(
         ..., min_length=1, max_length=meta_constants.MAX_PRIMARY_TEXTS
     )
-
-    descriptions: Optional[List[DescriptionStr]] = Field(
+    descriptions: list[DescriptionStr] | None = Field(
         default=None, min_length=1, max_length=meta_constants.MAX_DESCRIPTIONS
     )
 
@@ -558,11 +562,12 @@ class BaseCreative(BaseModel):
 class WebsiteCreative(BaseCreative):
     destination_type: Literal[DestinationType.WEBSITE]
     call_to_action: WebsiteCTA
-    url_tags: Optional[str] = None
+    url_tags: str | None = None
 
     @field_validator("url_tags", mode="before")
     @classmethod
-    def validate_url_tags(cls, value: Optional[str]) -> Optional[str]:
+    def validate_url_tags(cls, value: str | None) -> str | None:
+        """Validate and sanitize Meta URL tags and macros."""
         if not value:
             return value
 
@@ -577,9 +582,9 @@ class WebsiteCreative(BaseCreative):
                 raise ValueError(
                     f"Invalid url_tags format: '{pair}' is not a key=value pair"
                 )
+
             key, val = pair.split("=", 1)
-            key = key.strip()
-            val = val.strip()
+            key, val = key.strip(), val.strip()
 
             if key not in valid_keys:
                 raise ValueError(
@@ -588,7 +593,6 @@ class WebsiteCreative(BaseCreative):
             if not val:
                 raise ValueError(f"url_tag key '{key}' has an empty value")
 
-            # Validate any {{macro}} tokens found in the value
             macros_in_val = re.findall(r"\{\{[^}]+\}\}", val)
             for macro in macros_in_val:
                 if macro not in valid_macros:
@@ -596,7 +600,6 @@ class WebsiteCreative(BaseCreative):
                         f"Unknown Meta macro '{macro}' in url_tag '{key}'. "
                         f"Allowed macros: {sorted(valid_macros)}"
                     )
-
         return value
 
 
@@ -605,29 +608,23 @@ class LeadGenCreative(BaseCreative):
     call_to_action: LeadGenCTA
 
 
-# FINAL CREATIVE PAYLOAD (UNION)
-
-CreativePayload = Annotated[
-    WebsiteCreative | LeadGenCreative,
-    Field(discriminator="destination_type"),
-]
-
-
 class AssembledMetaPayloads(BaseModel):
-    campaign_payload: Dict[str, Any]
-    adset_payload: Dict[str, Any]
-    creative_payload: Dict[str, Any]
-    ad_payload: Dict[str, Any]
+    campaign_payload: dict[str, Any]
+    adset_payload: dict[str, Any]
+    creative_payload: dict[str, Any]
+    ad_payload: dict[str, Any]
 
 
-# Root Request
-class CreateMetaAdRequest(BaseModel):
+class MetaAdCreationRequest(BaseModel):
+    """Unified request model for creating a full Meta Ad structure."""
     ad_account_id: str = Field(..., min_length=1)
-
     campaign: CampaignPayload
     adset: AdSetPayload
     creative: CreativePayload
-
     ad: AdPayload
-
-    existing_ids: ExistingIdsPayload
+    existing_ids: ExistingIdsPayload | None = None
+ 
+ 
+class MetaAdCreationResponse(BaseModel):
+    """Unified response model containing the final state of all created/recovered IDs."""
+    ids: ExistingIdsPayload

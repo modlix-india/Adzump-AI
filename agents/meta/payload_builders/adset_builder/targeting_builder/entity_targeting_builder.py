@@ -1,77 +1,35 @@
-from fastapi import HTTPException
-
-from agents.meta.payload_builders.constants import (
-    FIXED_CATEGORIES,
-    NON_DEMOGRAPHIC_TYPES,
-)
+from core.models.meta import Targeting
 
 
-def build_entity_targeting(targeting_payload: dict) -> dict:
-    """
-    Validates, expands and transforms interests, behaviors, demographics
-    into Meta compatible flexible_spec format in a single pass.
-    Returns empty dict if no entity targeting is provided.
-    """
+def build_entity_targeting(targeting: Targeting) -> dict:
+    """Transforms interests, behaviors, and demographics into Meta's flexible_spec format."""
 
     meta_targeting = {}
 
-    for category_name in FIXED_CATEGORIES:
-        category_entities = targeting_payload.get(category_name)
+    # Define the groups we want to map into flexible_spec
+    groups = {
+        "interests": targeting.interests,
+        "behaviors": targeting.behaviors,
+        "demographics": targeting.demographics,
+    }
 
-        if not category_entities:
+    for entities in groups.values():
+        if not entities:
             continue
 
-        for entity in category_entities:
-            entity_type = entity.get("type")
-            entity_name = entity.get("name")
+        for entity in entities:
+            entity_type = entity.type
+            entity_id = entity.id
+            entity_name = entity.name
 
-            raw_id = entity.get("id")
-            if not raw_id:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Entity '{entity_name or '<unknown>'}' in '{category_name}' is missing a required 'id'",
-                )
-            entity_id = str(raw_id)
-
-            # Validate interests and behaviors type matches category name
-            if category_name in NON_DEMOGRAPHIC_TYPES and entity_type != category_name:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid type '{entity_type}' found in '{category_name}'. Expected type '{category_name}'",
-                )
-
-            # Validate demographics doesn't contain interests or behaviors
-            if category_name == "demographics" and entity_type in NON_DEMOGRAPHIC_TYPES:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid type '{entity_type}' found in 'demographics'. '{entity_type}' must be in its own array",
-                )
-
-            # Dynamically initialize targeting group if not present
             if entity_type not in meta_targeting:
-                meta_targeting[entity_type] = {
-                    "processed_ids": set(),
-                    "targeting_entities": [],
-                }
+                meta_targeting[entity_type] = []
 
-            targeting_group = meta_targeting[entity_type]
+            # Targeting model validator already deduplicated IDs across all groups,
+            # so we can append directly without additional set-checks here.
+            meta_targeting[entity_type].append({"id": entity_id, "name": entity_name})
 
-            # Deduplicate and append in same step
-            if entity_id not in targeting_group["processed_ids"]:
-                targeting_group["processed_ids"].add(entity_id)
-                targeting_group["targeting_entities"].append(
-                    {"id": entity_id, "name": entity_name}
-                )
-
-    # No entity targeting provided — return empty dict
-    # flexible_spec will not be added to the payload
     if not meta_targeting:
         return {}
 
-    # Build single flexible_spec object with all entity types
-    flexible_spec_object = {
-        entity_type: targeting_group["targeting_entities"]
-        for entity_type, targeting_group in meta_targeting.items()
-    }
-
-    return {"flexible_spec": [flexible_spec_object]}
+    return {"flexible_spec": [meta_targeting]}

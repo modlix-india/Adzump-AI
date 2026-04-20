@@ -1,5 +1,6 @@
+import asyncio
 from structlog import get_logger
-from core.models.meta import CreateMetaAdRequest, CreativePayload, AssembledMetaPayloads
+from core.models.meta import MetaAdCreationRequest, CreativePayload, AssembledMetaPayloads
 from agents.meta.payload_builders.basic_entity_builders import (
     build_campaign_payload,
     build_ad_payload,
@@ -11,54 +12,50 @@ logger = get_logger(__name__)
 
 
 class MetaPayloadAssemblyService:
-    """
-    Assembles Meta Ads payloads from the unified input contract.
-    - Detects dynamic creative automatically
-    """
+    """Orchestrate parallel assembly of Meta API payloads from a unified request."""
 
     @staticmethod
-    def assemble_meta_payloads(
-        meta_request: CreateMetaAdRequest,
+    async def assemble_meta_payloads(
+        meta_request: MetaAdCreationRequest,
     ) -> AssembledMetaPayloads:
-        campaign_input = meta_request.campaign
-        adset_input = meta_request.adset
+        """Assemble Campaign, AdSet, Creative, and Ad payloads concurrently."""
         creative_input = meta_request.creative
 
-        # Detect dynamic creative
         is_dynamic_creative = MetaPayloadAssemblyService._is_dynamic_creative(
             creative_input
         )
 
-        # Build campaign
-        campaign_payload = build_campaign_payload(campaign_input)
+        async def _run_task(name: str, func, *args) -> dict:
+            try:
+                return await asyncio.to_thread(func, *args)
+            except Exception as e:
+                logger.error("Meta payload assembly failed", component=name, error=str(e))
+                raise
 
-        logger.info("Campaign payload built", campaign_payload=campaign_payload)
-
-        # Build adset
-        adset_payload = build_adset_payload(adset_input, is_dynamic_creative)
-
-        logger.info(
-            "Adset payload built",
-            adset_payload=adset_payload,
-            is_dynamic=is_dynamic_creative,
+        # Build payloads in parallel
+        (
+            campaign_payload,
+            adset_payload,
+            creative_payload,
+            ad_payload,
+        ) = await asyncio.gather(
+            _run_task("campaign", build_campaign_payload, meta_request.campaign),
+            _run_task(
+                "adset", build_adset_payload, meta_request.adset, is_dynamic_creative
+            ),
+            _run_task(
+                "creative",
+                build_creative_payload,
+                creative_input,
+                is_dynamic_creative,
+            ),
+            _run_task("ad", build_ad_payload, meta_request.ad),
         )
 
-        # Build creative (pass dynamic flag)
-        creative_payload = build_creative_payload(
-            creative_input,
-            is_dynamic=is_dynamic_creative,
-        )
         logger.info(
-            "Creative payload built",
-            creative_payload=creative_payload,
+            "Meta payloads assembled successfully",
             is_dynamic=is_dynamic_creative,
-        )
-
-        # Build ad
-
-        ad_payload = build_ad_payload(meta_request.ad)
-        logger.info(
-            "Ad payload built", ad_payload=ad_payload, is_dynamic=is_dynamic_creative
+            components=["campaign", "adset", "creative", "ad"],
         )
 
         return AssembledMetaPayloads(
@@ -70,11 +67,7 @@ class MetaPayloadAssemblyService:
 
     @staticmethod
     def _is_dynamic_creative(creative: CreativePayload) -> bool:
-        """
-        Detects whether creative should be dynamic.
-        Rule:
-        - If any variation array has more than 1 element → dynamic
-        """
+        """Return True if any asset (text/headline/image) has multiple variations."""
 
         return (
             len(creative.primary_texts) > 1
