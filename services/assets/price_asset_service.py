@@ -7,7 +7,7 @@ from structlog import get_logger
 logger = get_logger(__name__)
 
 MAX_HEADER_LENGTH = 25
-MAX_DESCRIPTION_LENGTH = 35
+MAX_DESCRIPTION_LENGTH = 25
 
 
 class PriceAssetService(BaseAssetService):

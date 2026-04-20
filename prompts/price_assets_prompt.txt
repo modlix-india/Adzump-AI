@@ -90,9 +90,9 @@ Your response MUST be a valid JSON **array containing a single price asset objec
      3. "2 BHK Apartment" (80L)
    - This grouping strategy is a standard Google Ads practice and is **NOT** considered a hallucination.
 3. **Language Detection**: Use the correct BCP 47 tag. Default to 'en' if ambiguous.
-4. **Header**: Max 25 characters. Highlight the specific product or service.
+4. **Header**: Max 20 characters. Highlight the specific product or service.
 5. **Description (CRITICAL)**: 
-   - Max 35 characters. Highlight a USP.
+   - Max 20 characters. Highlight a USP.
    - **STRICT RULE**: DO NOT repeat the price or use "Starting from X".
 6. **Price & Unit (CRITICAL)**: 
    - Extract the **actual numerical price** found in the summary (e.g., 500, 1000, 2500000).
