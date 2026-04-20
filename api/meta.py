@@ -7,7 +7,8 @@ from core.models.meta import CreateCreativeRequest
 from core.models.lead_form import LeadFormPayload
 from agents.meta.creative_agent import meta_creative_agent
 from agents.meta.lead_form_agent import meta_lead_form_agent
-
+from core.models.meta import PlacementRequest
+from agents.meta.ads_placement_agent import meta_ads_placement_agent
 
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
@@ -37,10 +38,10 @@ async def generate_creative(session_id: str = Query(..., alias="sessionId")):
 @router.post("/creative/image/generate")
 async def generate_creative_image(
     session_id: str = Query(..., alias="sessionId"),
-    ad_account_id: str = Query(..., alias="adAccountId")
+    ad_account_id: str = Query(..., alias="adAccountId"),
 ):
     result = await meta_creative_agent.generate_image(session_id, ad_account_id)
-    return success_response(data=result.model_dump(mode="json"))    
+    return success_response(data=result.model_dump(mode="json"))
 
 
 @router.post("/lead-form/generate")
@@ -51,8 +52,23 @@ async def generate_lead_form(session_id: str = Query(..., alias="sessionId")):
 
 @router.post("/lead-form/create")
 async def create_lead_form(
-    payload: LeadFormPayload,
-    session_id: str = Query(..., alias="sessionId")
+    payload: LeadFormPayload, session_id: str = Query(..., alias="sessionId")
 ):
     result = await meta_lead_form_agent.create_lead_form(session_id, payload)
+    return success_response(data=result)
+
+
+@router.post("/placement/generate")
+async def generate_placements(
+    body: PlacementRequest,
+    session_id: str = Query(..., alias="sessionId"),
+    ad_account_id: str = Query(..., alias="adAccountId"),
+):
+    result = await meta_ads_placement_agent.generate_placements(
+        session_id=session_id,
+        ad_account_id=ad_account_id,
+        objective=body.objective,
+        creative_type=body.creative_type,
+    )
+
     return success_response(data=result)

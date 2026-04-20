@@ -46,7 +46,7 @@ class CreateAdSetRequest(BaseModel):
 class DetailedTargeting(BaseModel):
     interests: List[str] = []
     behaviors: List[str] = []
-    demographics: List[str] = []    
+    demographics: List[str] = []
 
 
 class CallToAction(str, Enum):
@@ -86,12 +86,10 @@ class CreativeText(BaseModel):
 
 class CreativeImage(BaseModel):
     image_url: Optional[str] = Field(
-        default=None,
-        description="Base64 image (only for preview / upload step)"
+        default=None, description="Base64 image (only for preview / upload step)"
     )
     image_hash: Optional[str] = Field(
-        default=None,
-        description="Meta uploaded image hash"
+        default=None, description="Meta uploaded image hash"
     )
 
     @model_validator(mode="after")
@@ -114,3 +112,12 @@ class CreateCreativeRequest(BaseModel):
 class CreateCreativeResponse(BaseModel):
     creativeId: str = Field(..., alias="creativeId")
 
+
+class PlacementRequest(BaseModel):
+    objective: str
+    creative_type: str
+
+
+class PlacementItem(BaseModel):
+    placement: str
+    reason: str
