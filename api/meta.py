@@ -2,12 +2,10 @@ from fastapi import APIRouter, Query
 from agents.meta import meta_campaign_agent
 from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
+from core.models.lead_form import LeadFormPayload
 from agents.meta.creative_agent import meta_creative_agent
 from core.models.meta import MetaAdCreationRequest
-
-from core.models.lead_form import LeadFormPayload
 from agents.meta.lead_form_agent import meta_lead_form_agent
-
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
 
 
@@ -61,6 +59,7 @@ async def create_meta_ads(
 
 @router.post("/lead-form/generate")
 async def generate_lead_form(session_id: str = Query(..., alias="sessionId")):
+    """timezone`: Optional time zone string (e.g., 'Asia/Kolkata'). By default 'Asia/Kolkata' is used."""
     result = await meta_lead_form_agent.generate_payload(session_id)
     return success_response(data=result.model_dump(mode="json"))
 

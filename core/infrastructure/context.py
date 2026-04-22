@@ -20,6 +20,7 @@ class AuthContext:
     client_code: str = ""
     x_forwarded_host: str = ""
     x_forwarded_port: str = ""
+    timezone: str = "Asia/Kolkata"
 
 
 _auth_context: ContextVar[AuthContext] = ContextVar(
@@ -32,6 +33,7 @@ def set_auth_context(
     client_code: str = "",
     x_forwarded_host: str = "",
     x_forwarded_port: str = "",
+    timezone: str = "Asia/Kolkata",
 ) -> None:
     """Set auth context for current request. Called by middleware."""
     _auth_context.set(
@@ -40,6 +42,7 @@ def set_auth_context(
             client_code=client_code,
             x_forwarded_host=x_forwarded_host,
             x_forwarded_port=x_forwarded_port,
+            timezone=timezone,
         )
     )
 
@@ -68,6 +71,10 @@ class _AuthContextAccessor:
     @property
     def x_forwarded_port(self) -> str:
         return _auth_context.get().x_forwarded_port
+
+    @property
+    def timezone(self) -> str:
+        return _auth_context.get().timezone
 
 
 auth_context = _AuthContextAccessor()
