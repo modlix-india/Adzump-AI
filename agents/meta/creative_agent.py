@@ -1,7 +1,4 @@
-# from datetime import datetime
-from typing import Any
 import json
-import os
 import base64
 
 import structlog
@@ -9,7 +6,7 @@ from pydantic import ValidationError
 
 from adapters.meta.creatives import MetaCreativeAdapter
 from core.models.meta import (
-    CreativePayload,
+    LLMCreativeTextPayload,
     CreateCreativeRequest,
     CreateCreativeResponse,
     CallToAction,
@@ -40,7 +37,7 @@ def _extract_json(text: str) -> str:
     start = text.find("{")
     end = text.rfind("}")
     if start != -1 and end != -1:
-        return text[start:end + 1]
+        return text[start : end + 1]
     return text
 
 
@@ -57,38 +54,45 @@ class MetaCreativeAgent:
         self.business_service = BusinessService()
         self.creative_adapter = MetaCreativeAdapter()
 
-    async def generate_payload(self, session_id: str) -> CreativePayload:
+    async def generate_payload(self, session_id: str) -> LLMCreativeTextPayload:
 
         if session_id not in sessions:
             raise BusinessValidationException("Session not found")
 
         website_data = await self.business_service.fetch_website_data(session_id)
 
-        summary = website_data.final_summary or website_data.summary   
+        summary = website_data.final_summary or website_data.summary
 
         if not summary:
             raise BusinessValidationException(
                 "Missing summary in product data. Please complete website analysis."
-            )    
+            )
 
         strategy_raw = await chat_completion(
             [{"role": "user", "content": STRATEGY_PROMPT.format(summary=summary)}]
         )
         strategy_json = _extract_json(strategy_raw.choices[0].message.content)
-        
+
         # Cache summary and strategy for image generation
         sessions[session_id].setdefault("campaign_data", {})
         sessions[session_id]["campaign_data"]["business_summary"] = summary
         sessions[session_id]["campaign_data"]["visual_strategy"] = strategy_json
 
         text_raw = await chat_completion(
-            [{"role": "user", "content": TEXT_PROMPT.format(summary=summary, strategy=strategy_json)}]
+            [
+                {
+                    "role": "user",
+                    "content": TEXT_PROMPT.format(
+                        summary=summary, strategy=strategy_json
+                    ),
+                }
+            ]
         )
         text_json = json.loads(_extract_json(text_raw.choices[0].message.content))
         text_json["cta"] = normalize_cta(text_json.get("cta"))
 
         try:
-            creative_payload = CreativePayload(text=text_json)
+            creative_payload = LLMCreativeTextPayload(text=text_json)
         except ValidationError as e:
             logger.error(
                 "Creative payload validation failed",
@@ -100,7 +104,7 @@ class MetaCreativeAgent:
         return creative_payload
 
     async def generate_image(
-        self, 
+        self,
         session_id: str,
         ad_account_id: str,
     ) -> CreativeImage:
@@ -114,21 +118,30 @@ class MetaCreativeAgent:
         strategy_json = campaign_data.get("visual_strategy")
 
         if not summary or not strategy_json:
-            raise BusinessValidationException("Creative text must be generated before image")
+            raise BusinessValidationException(
+                "Creative text must be generated before image"
+            )
 
         if not ad_account_id:
-            raise BusinessValidationException("adAccountId is required to generate image")    
+            raise BusinessValidationException(
+                "adAccountId is required to generate image"
+            )
 
         logger.info(
-            "Generating image generation intent", 
+            "Generating image generation intent",
             summary=summary,
-            visual_directive=strategy_json
+            visual_directive=strategy_json,
         )
         image_intent_raw = await chat_completion(
-            [{"role": "user", "content": IMAGE_INTENT_PROMPT.format(
-                summary=summary,
-                visual_directive=strategy_json,
-            )}]
+            [
+                {
+                    "role": "user",
+                    "content": IMAGE_INTENT_PROMPT.format(
+                        summary=summary,
+                        visual_directive=strategy_json,
+                    ),
+                }
+            ]
         )
         image_intent_json = _extract_json(image_intent_raw.choices[0].message.content)
 
@@ -136,7 +149,7 @@ class MetaCreativeAgent:
             images = await generate_images(image_intent_json, n=1)
             if not images:
                 raise AIProcessingException("Image generation returned empty results")
-            
+
             image_base64 = base64.b64encode(images[0]).decode("utf-8")
             image_adapter = MetaAdImageAdapter()
 
@@ -158,13 +171,12 @@ class MetaCreativeAgent:
             logger.error(
                 "Image generation or upload failed",
                 error=str(e),
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
             )
             raise AIProcessingException(f"Image generation failed: {str(e)}") from e
 
     async def create_creative(
-        self, 
-        request: CreateCreativeRequest
+        self, request: CreateCreativeRequest
     ) -> CreateCreativeResponse:
 
         session = sessions.get(request.session_id)
@@ -180,15 +192,12 @@ class MetaCreativeAgent:
             page_id = "332515906622723"
 
         if not request.creativePayload.image:
-            raise BusinessValidationException(
-                "Image required before creating creative"
-            )
+            raise BusinessValidationException("Image required before creating creative")
 
         if not request.creativePayload.image.image_hash:
             raise BusinessValidationException(
                 "image_hash is required to create Meta creative"
             )
-   
 
         result = await self.creative_adapter.create(
             ad_account_id=request.adAccountId,

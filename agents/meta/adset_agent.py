@@ -2,7 +2,7 @@ import asyncio
 import structlog
 
 from adapters.meta.adsets import MetaAdSetAdapter
-from core.models.meta import AdSetPayload, CreateAdSetRequest, DetailedTargeting
+from core.models.meta import LLMAdSetTargeting, CreateAdSetRequest, DetailedTargeting
 from agents.shared.llm import chat_completion
 from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import (
@@ -130,7 +130,7 @@ class MetaAdSetAgent:
         self,
         summary: str,
         business_type: str,
-    ) -> AdSetPayload:
+    ) -> LLMAdSetTargeting:
         template = load_prompt("meta/adset.txt")
         prompt = template.format(
             summary=summary,
@@ -150,7 +150,7 @@ class MetaAdSetAgent:
         if not raw_output:
             raise AIProcessingException("LLM returned empty response")
         try:
-            return AdSetPayload.model_validate_json(raw_output)
+            return LLMAdSetTargeting.model_validate_json(raw_output)
         except ValidationError as e:
             logger.error(
                 "Failed to parse AdSet LLM output",
