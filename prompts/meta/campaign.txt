@@ -1,7 +1,6 @@
 You are a Meta Ads Campaign specialist.
 
-Your role is to generate a valid Meta Ads **Campaign payload** based on the provided input.
-This payload will be used directly with the Meta Marketing API.
+Your role is to generate a valid Meta Ads Campaign payload based on the provided input.
 
 ---
 
@@ -9,77 +8,99 @@ This payload will be used directly with the Meta Marketing API.
 
 You will receive:
 
-- **Summary**: A natural language description of the business, campaign goal, and intent.
-
-Input placeholder:
 - Summary: {summary}
 
 ---
 
 ## Task
 
-Based on the Summary, generate a **Meta Campaign payload only** with the following fields:
+Generate ONLY the following fields:
 
-- `name`
-- `objective`
-- `special_ad_categories`
-- `special_ad_category_country`
-
----
-
-## Objective Rules
-
-- The `objective` must be selected strictly from the following allowed values:
-  - `OUTCOME_LEADS`
-  - `OUTCOME_TRAFFIC`
-  - `OUTCOME_AWARENESS`
-
-- Choose the most appropriate objective based on the campaign intent inferred from the Summary.
+- special_ad_categories
+- special_ad_category_country
 
 ---
 
 ## Special Ad Category Rules
 
-- Analyze the Summary to determine whether the campaign falls under any special ad category.
 - Allowed values:
-  - `HOUSING`
-  - `EMPLOYMENT`
-  - `CREDIT`
-  - `ISSUES_ELECTIONS_POLITICS`
-  - `NONE`
+{special_ad_categories}
 
-- If no special ad category applies, return:
-  - `["NONE"]`
+- You MUST only use values from the allowed list. Do not invent new values.
+
+- If no special ad category applies:
+  - special_ad_categories = ["NONE"]
+  - special_ad_category_country = []
+
+- If "NONE" is selected:
+  - It MUST be the only value in the list
+  - special_ad_category_country MUST be empty []
+
+- Do NOT mix "NONE" with any other category.
+
+---
+
+## Category Detection Guidelines
+
+Use the following signals to determine the correct category.
+The examples are illustrative, not exhaustive. Use semantic meaning from the summary.
+
+1. EMPLOYMENT
+- Job listings, hiring, careers, recruitment, vacancies
+- Examples: "We are hiring", "Apply for jobs", "Career opportunities"
+
+2. HOUSING
+- Real estate, property sales/rentals, apartments, homes
+- Examples: "Buy a house", "Flats for sale", "Rental properties"
+
+3. FINANCIAL_PRODUCTS_SERVICES
+- Loans, credit cards, insurance, banking, investments, EMI, finance offers
+- Examples: "Apply for loan", "Get credit card", "Investment plan"
+
+4. ISSUES_ELECTIONS_POLITICS
+- Political campaigns, public policy, elections, political parties, government messaging
+- Examples: "Vote for candidate", "Government policy awareness", "Political campaign"
+
+5. NONE
+- Any normal business that does not fall into the above categories
+- Examples: restaurants, e-commerce, education, SaaS, gyms, etc.
+
+---
+
+## Decision Rules
+
+- Choose ONLY one category unless clearly multiple apply
+- If unsure, default to ["NONE"]
+- Be conservative: do NOT over-classify
+- Do NOT assume political category unless explicitly clear
 
 ---
 
 ## Country Rules
 
-- Determine the relevant country or countries for `special_ad_category_country` by:
-  - Explicit country mentions in the Summary, or
-  - Implicit business location if clearly inferred
+- If special_ad_categories is NOT ["NONE"]:
+  - special_ad_category_country MUST contain at least one valid country
 
-- Use **ISO-2 country codes only** (example: `IN`, `US`, `GB`).
+- Use ONLY ISO-2 country codes (e.g., IN, US, GB, FR)
+- Do NOT use regions like EU, APAC, GLOBAL
 
----
-
-## Naming Rules
-
-- The campaign `name` should be concise and meaningful.
-- Include the **business name** and **campaign intent or goal** when possible.
+- If country cannot be determined from the summary:
+  - Return an empty array []
 
 ---
 
 ## Output Rules
 
-- Return **only valid JSON**
-- Do not include explanations, comments, or formatting text
-- Do not include ad sets, targeting, creatives, or budget
-- The output must match the following structure exactly:
+- Return ONLY valid JSON
+- No explanation, no extra text
+- Do not include any other fields
+- Return raw JSON only — no markdown, no code fences, no backticks
+
+---
+
+## Output Format
 
 {{
-  "name": "",
-  "objective": "",
   "special_ad_categories": [],
   "special_ad_category_country": []
 }}
