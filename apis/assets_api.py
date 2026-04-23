@@ -1,5 +1,6 @@
 import asyncio
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Header
+from exceptions.custom_exceptions import BusinessValidationException
 from models.assets_models.assets_request_model import AssetRequest
 from models.assets_models.assets_response_model import AssetResponse
 from services.assets.call_assets_service import CallAssetsService
@@ -33,8 +34,8 @@ async def generate_asset(
     results = {}
     invalid_assets = [a for a in request.asset_type if a not in ASSET_SERVICE_MAP]
     if invalid_assets:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid asset types: {', '.join(invalid_assets)}"
+        raise BusinessValidationException(
+            message=f"Invalid asset types: {', '.join(invalid_assets)}"
         )
     try:
         tasks = [

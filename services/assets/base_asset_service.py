@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from exceptions.custom_exceptions import AIProcessingException
 import json
 import re
 from services.openai_client import chat_completion
@@ -33,8 +33,8 @@ class BaseAssetService:
             if match:
                 data = json.loads(match.group(0))
             else:
-                raise HTTPException(
-                    status_code=500, detail=f"Invalid JSON from LLM: {content}"
+                raise AIProcessingException(
+                    message=f"Invalid JSON from LLM: {content}"
                 )
 
         return data

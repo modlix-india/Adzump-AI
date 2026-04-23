@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from exceptions.custom_exceptions import BusinessValidationException
 from services.assets.base_asset_service import BaseAssetService
 from services.business_service import BusinessService
 from utils.text_utils import is_valid_length
@@ -8,6 +8,9 @@ logger = get_logger(__name__)
 
 MAX_HEADER_LENGTH = 25
 MAX_DESCRIPTION_LENGTH = 25
+DEFAULT_LANGUAGE = "en"
+DEFAULT_CURRENCY = "INR"
+MIN_PRICE_OFFERINGS = 3
 
 
 class PriceAssetService(BaseAssetService):
@@ -31,9 +34,8 @@ class PriceAssetService(BaseAssetService):
         base_url = product_data.get("businessUrl", "")
 
         if not base_url or not summary:
-            raise HTTPException(
-                status_code=400,
-                detail="Missing 'summary' or 'businessUrl' for price asset generation",
+            raise BusinessValidationException(
+                message="Missing 'summary' or 'businessUrl' for price asset generation",
             )
 
         # Generate price assets using LLM (expects an array)
@@ -48,7 +50,7 @@ class PriceAssetService(BaseAssetService):
 
         for asset_data in results:
             valid_offerings = []
-            currency_code = asset_data.get("currency_code", "INR")
+            currency_code = asset_data.get("currency_code", DEFAULT_CURRENCY)
 
             # Validate and clean up offerings
             for offer in asset_data.get("price_offerings", []):
@@ -61,9 +63,9 @@ class PriceAssetService(BaseAssetService):
                 if not is_valid_length(description, MAX_DESCRIPTION_LENGTH):
                     continue
 
-                # Ensure price exists (actual amount)
+                # Ensure price exists and is valid (positive number)
                 price = offer.get("price")
-                if price is None:
+                if price is None or not isinstance(price, (int, float)) or price <= 0:
                     continue
 
                 # Ensure final_url is a single valid URL string
@@ -84,12 +86,9 @@ class PriceAssetService(BaseAssetService):
             if not valid_offerings:
                 continue
 
-            # Detect language fallback
-            lang = asset_data.get("language_code", "en")
-            if not lang:
-                lang = "en"
+            lang = asset_data.get("language_code") or DEFAULT_LANGUAGE
 
-            if len(valid_offerings) < 3:
+            if len(valid_offerings) < MIN_PRICE_OFFERINGS:
                 logger.warning(
                     "Generated fewer than 3 price offerings. This asset may be rejected by Google Ads.",
                     count=len(valid_offerings),
