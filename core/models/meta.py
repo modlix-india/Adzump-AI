@@ -327,7 +327,7 @@ class Schedule(BaseModel):
                     return datetime.fromisoformat(value).date()
                 except Exception:
                     raise ValueError("Date must be in format dd/mm/yyyy or YYYY-MM-DD")
- 
+
         return value
 
     @model_validator(mode="after")
@@ -617,14 +617,27 @@ class AssembledMetaPayloads(BaseModel):
 
 class MetaAdCreationRequest(BaseModel):
     """Unified request model for creating a full Meta Ad structure."""
+
     ad_account_id: str = Field(..., min_length=1)
     campaign: CampaignPayload
     adset: AdSetPayload
     creative: CreativePayload
     ad: AdPayload
     existing_ids: ExistingIdsPayload | None = None
- 
- 
+
+
 class MetaAdCreationResponse(BaseModel):
     """Unified response model containing the final state of all created/recovered IDs."""
+
     ids: ExistingIdsPayload
+
+
+class PlacementItem(BaseModel):
+    placement: str
+    reason: str
+
+
+class PlacementRecommendation(BaseModel):
+    primary: list[PlacementItem]
+    secondary: list[PlacementItem]
+    avoid: list[PlacementItem]
