@@ -1,5 +1,6 @@
 import asyncio
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, Header
+from exceptions.custom_exceptions import BusinessValidationException
 from models.assets_models.assets_request_model import AssetRequest
 from models.assets_models.assets_response_model import AssetResponse
 from services.assets.call_assets_service import CallAssetsService
@@ -7,6 +8,7 @@ from services.assets.call_out_service import CalloutsService
 from services.assets.site_link_service import SitelinksService
 from services.assets.structured_snippet_service import StructuredSnippetsService
 from services.assets.whatsapp_asset_service import WhatsAppAssetsService
+from services.assets.price_asset_service import PriceAssetService
 
 
 router = APIRouter(prefix="/api/ds/ads/assets", tags=["Assets"])
@@ -17,6 +19,7 @@ ASSET_SERVICE_MAP = {
     "STRUCTURED_SNIPPETS": StructuredSnippetsService.generate,
     "CALL_ASSETS": CallAssetsService.generate,
     "WHATSAPP_ASSETS": WhatsAppAssetsService().generate,
+    "PRICE_ASSETS": PriceAssetService.generate,
 }
 
 
@@ -31,8 +34,8 @@ async def generate_asset(
     results = {}
     invalid_assets = [a for a in request.asset_type if a not in ASSET_SERVICE_MAP]
     if invalid_assets:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid asset types: {', '.join(invalid_assets)}"
+        raise BusinessValidationException(
+            message=f"Invalid asset types: {', '.join(invalid_assets)}"
         )
     try:
         tasks = [
