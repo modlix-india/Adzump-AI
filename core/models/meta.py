@@ -20,7 +20,7 @@ class CampaignObjective(str, Enum):
 class SpecialAdCategory(str, Enum):
     HOUSING = "HOUSING"
     EMPLOYMENT = "EMPLOYMENT"
-    CREDIT = "CREDIT"
+    FINANCIAL_PRODUCTS_SERVICES = "FINANCIAL_PRODUCTS_SERVICES"
     ISSUES_ELECTIONS_POLITICS = "ISSUES_ELECTIONS_POLITICS"
     NONE = "NONE"
 
@@ -220,11 +220,21 @@ CreativePayload = Annotated[
 
 
 class CampaignPayload(BaseModel):
-    name: str = Field(..., min_length=1)
-    objective: CampaignObjective
-    status: Status
-    special_ad_categories: list[SpecialAdCategory] | None = None
-    special_ad_category_country: list[CountryCode] | None = None
+    name: str = Field(default="campaign")
+    objective: CampaignObjective = Field(default=CampaignObjective.OUTCOME_LEADS)
+    status: Status = Field(default=Status.PAUSED)
+    special_ad_categories: list[SpecialAdCategory] | None = Field(default=None)
+    special_ad_category_country: list[CountryCode] | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate_special_ad_category_country(self):
+        if (
+            self.special_ad_categories
+            and SpecialAdCategory.NONE in self.special_ad_categories
+        ):
+            self.special_ad_categories = [SpecialAdCategory.NONE]
+            self.special_ad_category_country = []
+        return self
 
 
 class CreateCampaignRequest(BaseModel):
@@ -300,7 +310,7 @@ class ExistingIdsPayload(BaseModel):
 
 class AdPayload(BaseModel):
     name: str = Field(..., min_length=1)
-    status: Status
+    status: Status = Status.PAUSED
     adset_id: str | None = None
     creative: dict[str, Annotated[str, Field(min_length=1)]] | None = (
         None  # creative_id: str
@@ -505,7 +515,7 @@ class PromotedObject(BaseModel):
 
 class AdSetPayload(BaseModel):
     name: str = Field(..., min_length=1)
-    status: Status
+    status: Status = Status.PAUSED
     schedule: Schedule | None = None
     targeting: Targeting
     destination_type: DestinationType
@@ -667,3 +677,14 @@ class MetaTargetingSuggestionResult(BaseModel):
     interests: List[TargetingEntity] = []
     demographics: List[TargetingEntity] = []
     behaviours: List[TargetingEntity] = []
+
+
+class LLMAdSetGenerationResponse(BaseModel):
+    """Result model for the adset generation agent."""
+
+    genders: list[Gender]
+    age_min: int = Field(..., ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE)
+    age_max: int = Field(..., ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE)
+    locales: list[dict]
+    flexible_spec: list[dict]
+    locations: dict | None = None

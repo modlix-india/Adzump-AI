@@ -1,9 +1,8 @@
-from datetime import datetime
 import structlog
 from pydantic import ValidationError
 
 from adapters.meta import MetaCampaignAdapter
-from core.models.meta import CampaignPayload, CreateCampaignRequest
+from core.models.meta import CampaignPayload, CreateCampaignRequest, SpecialAdCategory
 from agents.shared.llm import chat_completion
 from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import AIProcessingException
@@ -36,8 +35,15 @@ class MetaCampaignAgent:
 
     async def _generate_payload_from_llm(self, summary: str) -> CampaignPayload:
         """Generate campaign payload using LLM."""
+
+        special_ad_categories_str = "\n".join(
+            f"  - `{c.value}`" for c in SpecialAdCategory
+        )
+
         template = load_prompt("meta/campaign.txt")
-        prompt = template.format(summary=summary)
+        prompt = template.format(
+            summary=summary, special_ad_categories=special_ad_categories_str
+        )
 
         messages = [
             {"role": "system", "content": "Respond only with valid JSON"},
@@ -52,7 +58,6 @@ class MetaCampaignAgent:
 
         try:
             payload = CampaignPayload.model_validate_json(content)
-            payload.name = f"{payload.name} - {datetime.now().strftime('%Y-%m-%d')}"
             return payload
         except ValidationError as e:
             logger.error("Failed to parse LLM output", error=str(e), raw=content)
