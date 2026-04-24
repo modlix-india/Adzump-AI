@@ -9,8 +9,8 @@ GOOGLE_ADS_API = "https://googleads.googleapis.com/v20"
 
 def _get_auth_headers(client_code: str) -> Dict[str, str]:
     """Build Google Ads API auth headers."""
-    access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
-    # access_token = connection.fetch_google_api_token_simple(client_code)
+    # access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+    access_token = connection.fetch_google_api_token_simple(client_code)
     developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
 
     if not access_token or not developer_token:

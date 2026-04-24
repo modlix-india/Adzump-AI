@@ -17,8 +17,8 @@ async def post_mutate_operations(
     Post the provided mutate payload to Google Ads API and return JSON response.
     """
     developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-    # access_token =  connection.fetch_google_api_token_simple(client_code)
-    access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
+    access_token = connection.fetch_google_api_token_simple(client_code)
+    # access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN")
     if not developer_token or not access_token:
         raise Exception("Missing Google Ads credentials or tokens.")
 
