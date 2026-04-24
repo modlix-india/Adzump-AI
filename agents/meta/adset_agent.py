@@ -2,7 +2,12 @@ import asyncio
 import structlog
 
 from adapters.meta.adsets import MetaAdSetAdapter
-from core.models.meta import LLMAdSetTargeting, CreateAdSetRequest, DetailedTargeting
+from core.models.meta import (
+    LLMAdSetTargeting,
+    CreateAdSetRequest,
+    DetailedTargeting,
+    LLMAdSetGenerationResponse,
+)
 from agents.shared.llm import chat_completion
 from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import (
@@ -30,7 +35,9 @@ class MetaAdSetAgent:
         self.targeting_adapter = MetaDetailedTargetingAdapter()
         self.geo_targeting_adapter = MetaGeoTargetingAdapter()
 
-    async def generate_payload(self, session_id: str, ad_account_id: str) -> dict:
+    async def generate_payload(
+        self, session_id: str, ad_account_id: str
+    ) -> LLMAdSetGenerationResponse:
         website_data = await self.business_service.fetch_website_data(session_id)
 
         logger.info(
@@ -104,14 +111,14 @@ class MetaAdSetAgent:
             allowed_countries=allowed_countries,
         )
 
-        return {
-            "genders": targeting.genders,
-            "age_min": targeting.age_min,
-            "age_max": targeting.age_max,
-            "locales": locales,
-            "flexible_spec": flexible_spec,
-            "locations": locations,
-        }
+        return LLMAdSetGenerationResponse(
+            genders=targeting.genders,
+            age_min=targeting.age_min,
+            age_max=targeting.age_max,
+            locales=locales,
+            flexible_spec=flexible_spec,
+            locations=locations,
+        )
 
     # TODO: wire to API route when adset creation endpoint is added
     async def create_adset(

@@ -149,7 +149,7 @@ POST /api/ds/ads/meta/campaign/create
 ### Special Ad Categories
 - `HOUSING`
 - `EMPLOYMENT`
-- `CREDIT`
+- `FINANCIAL_PRODUCTS_SERVICES`
 - `ISSUES_ELECTIONS_POLITICS`
 - `NONE`
 
