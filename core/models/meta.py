@@ -4,7 +4,7 @@ from typing import Literal, Any, Annotated
 from datetime import date, datetime
 import re
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, model_validator, field_validator, computed_field
 from core.models import meta_constants
 
 
@@ -651,3 +651,39 @@ class LLMAdSetGenerationResponse(BaseModel):
     locales: list[dict]
     flexible_spec: list[dict]
     locations: dict | None = None
+
+
+class PlacementItem(BaseModel):
+    placement: str
+    reason: str
+
+
+class PlacementRecommendation(BaseModel):
+    primary: list[PlacementItem]
+    secondary: list[PlacementItem]
+    avoid: list[PlacementItem]
+
+
+class MetaPositions(BaseModel):
+    effective_facebook_positions: list[str] = []
+    effective_instagram_positions: list[str] = []
+
+    @computed_field
+    @property
+    def effective_publisher_platforms(self) -> list[str]:
+        platforms = []
+        if self.effective_facebook_positions:
+            platforms.append("facebook")
+        if self.effective_instagram_positions:
+            platforms.append("instagram")
+        return platforms
+
+
+class MetaAdsPlacementResponse(BaseModel):
+    meta_positions: MetaPositions
+    recommendation: PlacementRecommendation
+
+
+class PlacementRequest(BaseModel):
+    objective: CampaignObjective
+    creative_type: CreativeType

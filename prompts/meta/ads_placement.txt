@@ -1,0 +1,190 @@
+# Meta Ads Placement Recommendation Prompt
+# NOTE: This file is loaded via Python str.format(). 
+# Use {{ and }} for literal braces in JSON examples.
+
+
+## Inputs
+- Objective: {objective}
+- Creative Type: {creative_type}
+
+## Business Context
+Use the provided business summary to understand the specific niche, target audience, and service/product nature. Use this context to refine the placement recommendations beyond the generic industry rules.
+
+Summary: {summary}
+
+---
+
+## Business Type Extraction (Mandatory)
+
+You must first infer the business type from the summary.
+
+### Guidelines
+
+Look for:
+- Direct statements: "We are a...", "...company", "...services"
+- Service/product descriptions indicating category
+- Industry-specific terminology
+
+Rules:
+- Be specific: "Dental Clinic" not "Healthcare"
+- "Real Estate Developer" not "Real Estate"
+- Return "Unknown" if unclear
+
+Examples:
+- Real Estate Development
+- Digital Marketing Agency
+- Plumbing Services
+- Restaurant
+- E-commerce Store
+- Dental Clinic
+
+Use this inferred business type to map against the closest matching industry rules below.
+
+---
+
+## Important Rules (Strict)
+
+1. Return ONLY valid JSON
+2. Do NOT add explanations outside JSON
+3. Use ONLY placements from allowed list
+4. Do NOT rename placements
+5. DO NOT return a separate reasoning object
+6. Each placement MUST include a short reason
+7. Output must strictly follow the required format
+
+---
+
+## Allowed Placements
+
+{allowed_placements}
+
+---
+
+## Industry → Placement Priority Logic
+
+Interpret priorities as:
+
+- HIGH → primary
+- MEDIUM → secondary
+- LOW → secondary (lower tier) OR simply omit
+- NOT RECOMMENDED → avoid
+- AVOID → avoid
+
+---
+
+## Conflict Resolution
+
+- GLOBAL RULES always override INDUSTRY RULES.
+- If a global rule forces a placement into primary, remove it from secondary/avoid regardless of industry rule.
+
+---
+
+## Industry Rules
+
+Fitness:
+- HIGH: facebook_feed, instagram_feed, instagram_stories, facebook_stories
+- MEDIUM: facebook_profile_feed, instagram_explore, instagram_explore_home
+- LOW: facebook_marketplace, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Education:
+- HIGH: facebook_feed, facebook_stories
+- MEDIUM: instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, facebook_profile_feed
+- LOW: facebook_marketplace, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Real Estate:
+- HIGH: facebook_feed, facebook_marketplace, facebook_stories
+- MEDIUM: instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, facebook_profile_feed
+- LOW: instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+B2B Services:
+- HIGH: facebook_feed
+- MEDIUM: facebook_stories, facebook_profile_feed
+- AVOID: facebook_reels, facebook_instream_reels, instagram_reels, instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, instagram_profile_feed, facebook_marketplace
+
+Finance:
+- HIGH: facebook_feed
+- MEDIUM: facebook_stories, instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, facebook_profile_feed
+- LOW: facebook_marketplace, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Healthcare:
+- HIGH: facebook_feed
+- MEDIUM: facebook_stories, instagram_feed, instagram_stories, facebook_profile_feed
+- LOW: instagram_explore, instagram_explore_home, facebook_marketplace, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Food & Beverage:
+- HIGH: facebook_feed, instagram_feed, instagram_stories
+- MEDIUM: facebook_stories, facebook_marketplace, instagram_explore, instagram_explore_home, facebook_profile_feed, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Retail / Apparel:
+- HIGH: facebook_feed, instagram_feed, instagram_stories
+- MEDIUM: facebook_stories, facebook_marketplace, instagram_explore, instagram_explore_home, facebook_profile_feed, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Technology:
+- HIGH: facebook_feed
+- MEDIUM: instagram_feed
+- LOW: facebook_stories, instagram_stories, instagram_explore, instagram_explore_home
+- AVOID: facebook_marketplace, facebook_profile_feed, instagram_profile_feed, instagram_reels, facebook_reels, facebook_instream_reels
+
+Automotive / Hardware:
+- HIGH: facebook_marketplace
+- MEDIUM: facebook_feed
+- LOW: facebook_stories, instagram_feed, instagram_stories, instagram_explore, instagram_explore_home
+- AVOID: facebook_profile_feed, instagram_profile_feed, instagram_reels, facebook_reels, facebook_instream_reels
+
+Unknown / Other Industry:
+- HIGH: facebook_feed, instagram_feed
+- MEDIUM: facebook_stories, instagram_stories, instagram_explore, instagram_explore_home
+- AVOID: facebook_reels, facebook_instream_reels, instagram_reels, facebook_marketplace, facebook_profile_feed, instagram_profile_feed
+
+---
+
+## Global Rules
+
+1. If objective = OUTCOME_LEADS AND creative_type = IMAGE:
+   - ALWAYS include facebook_feed in primary
+   - ALWAYS put reels (instagram_reels, facebook_reels, facebook_instream_reels) in avoid
+
+2. If objective = OUTCOME_AWARENESS AND creative_type = VIDEO:
+   - Move facebook_reels and instagram_reels to secondary (even if industry rules say avoid)
+
+3. If creative_type = CAROUSEL:
+   - ALWAYS put stories (facebook_stories, instagram_stories) in avoid (not supported for Carousels)
+   - ALWAYS put reels (facebook_reels, instagram_reels) in avoid (not supported for Carousels)
+
+4. Profile feeds are LOW priority → mostly secondary or avoid
+
+5. Explore is MEDIUM → always secondary
+
+---
+
+## Output Format (Strict)
+
+```json
+{{
+  "primary": [
+    {{
+      "placement": "facebook_feed",
+      "reason": "Short reason"
+    }}
+  ],
+  "secondary": [
+    {{
+      "placement": "instagram_feed",
+      "reason": "Short reason"
+    }}
+  ],
+  "avoid": [
+    {{
+      "placement": "instagram_reels",
+      "reason": "Short reason"
+    }}
+  ]
+}}
+```

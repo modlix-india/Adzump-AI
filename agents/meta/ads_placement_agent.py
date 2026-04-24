@@ -1,28 +1,39 @@
 import structlog
-import json
-import re
-
 from agents.shared.llm import chat_completion
 from utils.prompt_loader import load_prompt
 from exceptions.custom_exceptions import (
     AIProcessingException,
     BusinessValidationException,
+    SessionException,
 )
-
-from core.models.meta import PlacementRecommendation
+from services.session_manager import sessions
+from core.models.meta import (
+    PlacementRecommendation,
+    CampaignObjective,
+    CreativeType,
+)
 from services.business_service import BusinessService
+from types import MappingProxyType
+from core.models.meta import MetaAdsPlacementResponse
+from pydantic import ValidationError
+from core.models.meta import MetaPositions
 
-logger = structlog.get_logger()
-
+logger = structlog.get_logger(__name__)
+LLM_MODEL = "gpt-4o-mini"
 
 # MAPPING (BUSINESS → META API)
-PLACEMENT_MAPPING = {
+
+
+_PLACEMENT_MAPPING = {
     "facebook_feed": {"platform": "facebook", "position": "feed"},
     "facebook_profile_feed": {"platform": "facebook", "position": "profile_feed"},
     "facebook_marketplace": {"platform": "facebook", "position": "marketplace"},
     "facebook_stories": {"platform": "facebook", "position": "story"},
     "facebook_reels": {"platform": "facebook", "position": "facebook_reels"},
-    "facebook_instream_reels": {"platform": "facebook", "position": "instream_video"},
+    "facebook_instream_reels": {
+        "platform": "facebook",
+        "position": "facebook_reels_overlay",
+    },
     "instagram_feed": {"platform": "instagram", "position": "stream"},
     "instagram_profile_feed": {"platform": "instagram", "position": "profile_feed"},
     "instagram_explore": {"platform": "instagram", "position": "explore"},
@@ -31,22 +42,32 @@ PLACEMENT_MAPPING = {
     "instagram_reels": {"platform": "instagram", "position": "reels"},
 }
 
+PLACEMENT_MAPPING = MappingProxyType(_PLACEMENT_MAPPING)
+VALID_PLACEMENTS = set(PLACEMENT_MAPPING.keys())
 
 # AGENT
 
 
 class MetaAdsPlacementAgent:
     def __init__(self):
-        self.business_service = BusinessService()
-        logger.info("ads_placement.agent_initialized")
+        self._business_service: BusinessService | None = None
+
+    @property
+    def business_service(self) -> BusinessService:
+        if self._business_service is None:
+            self._business_service = BusinessService()
+        return self._business_service
 
     async def generate_placements(
         self,
         session_id: str,
-        ad_account_id: str,
         objective: str,
         creative_type: str,
-    ) -> dict:
+    ) -> MetaAdsPlacementResponse:
+
+        if session_id not in sessions:
+            logger.warning("ads_placement.invalid_session", session_id=session_id)
+            raise SessionException("Session not found")
 
         # FETCH WEBSITE DATA
         website_data = await self.business_service.fetch_website_data(session_id)
@@ -57,22 +78,39 @@ class MetaAdsPlacementAgent:
                 "Missing summary in product data. Please complete website analysis."
             )
 
-        business_type = website_data.business_type or ""
-        industry = business_type.strip()
+        # VALIDATION
+        try:
+            # Ensure objective is valid
+            if objective not in [o.value for o in CampaignObjective]:
+                valid_objectives = [o.value for o in CampaignObjective]
+                raise BusinessValidationException(
+                    f"Invalid objective: '{objective}'. Allowed values: {valid_objectives}"
+                )
+
+            # Ensure creative_type is valid
+            if creative_type not in [c.value for c in CreativeType]:
+                valid_creatives = [c.value for c in CreativeType]
+                raise BusinessValidationException(
+                    f"Invalid creative_type: '{creative_type}'. Allowed values: {valid_creatives}"
+                )
+        except Exception as e:
+            if isinstance(e, BusinessValidationException):
+                raise e
+            logger.error("ads_placement.validation_error", error=str(e))
+            raise BusinessValidationException(f"Validation failed: {str(e)}")
 
         logger.info(
-            "ads_placement.generate_started",
+            "ads_placement.post_validation_started",
             objective=objective,
             creative_type=creative_type,
-            industry=industry,
-            ad_account_id=ad_account_id,
+            summary=summary,
         )
 
         # STEP 1: LLM CALL
         placements = await self._generate_placements_from_llm(
             objective=objective,
             creative_type=creative_type,
-            industry=industry,
+            summary=summary,
         )
 
         logger.info(
@@ -86,17 +124,16 @@ class MetaAdsPlacementAgent:
         meta_payload = self._map_to_meta_positions(placements)
 
         # STEP 3: FINAL RESPONSE
-        return {
-            "meta_positions": meta_payload,
-            "recommendation": self._build_recommendation_output(placements),
-        }
+        return MetaAdsPlacementResponse(
+            meta_positions=meta_payload, recommendation=placements
+        )
 
     # LLM CALL
     async def _generate_placements_from_llm(
         self,
         objective: str,
         creative_type: str,
-        industry: str,
+        summary: str,
     ) -> PlacementRecommendation:
 
         template = load_prompt("meta/ads_placement.txt")
@@ -104,85 +141,86 @@ class MetaAdsPlacementAgent:
         prompt = template.format(
             objective=objective,
             creative_type=creative_type,
-            industry=industry,
+            summary=summary,
+            allowed_placements="\n".join(sorted(VALID_PLACEMENTS)),
         )
 
         messages = [
             {
                 "role": "system",
-                "content": "Return ONLY valid JSON.",
+                "content": ("You are an expert Meta Ads Placement analyst."),
             },
             {"role": "user", "content": prompt},
         ]
 
-        response = await chat_completion(messages, model="gpt-4.1-mini")
+        response = await chat_completion(
+            messages, model=LLM_MODEL, response_format={"type": "json_object"}
+        )
+
+        if (
+            not response
+            or not response.choices
+            or len(response.choices) == 0
+            or not response.choices[0].message
+        ):
+            raise AIProcessingException("Invalid LLM response structure")
 
         raw_output = response.choices[0].message.content
-
-        logger.info("ads_placement.llm_raw_output", raw_output=raw_output)
 
         if not raw_output:
             raise AIProcessingException("Ads placement LLM returned empty response")
 
         try:
-            # CLEAN OUTPUT (important)
-            cleaned = raw_output.strip()
-            cleaned = re.sub(r"^```json", "", cleaned)
-            cleaned = re.sub(r"```$", "", cleaned).strip()
+            # Pydantic validation
+            validated = PlacementRecommendation.model_validate_json(raw_output)
 
-            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-            if match:
-                cleaned = match.group(0)
+            # SINGLE SUCCESS LOG (after validation only)
+            logger.info(
+                "ads_placement.llm_validated_success",
+                primary=[p.placement for p in validated.primary],
+                secondary=[p.placement for p in validated.secondary],
+                avoid=[p.placement for p in validated.avoid],
+            )
 
-            parsed_dict = json.loads(cleaned)
-
-            return PlacementRecommendation.model_validate(parsed_dict)
+            return validated
+        except ValidationError as ve:
+            logger.error(
+                "ads_placement.schema_validation_failed",
+                error=str(ve),
+                raw=raw_output,
+            )
+            raise AIProcessingException(
+                "LLM returned invalid schema for placement response"
+            )
 
         except Exception as e:
             logger.error(
-                "ads_placement.parse_failed",
+                "ads_placement.unexpected_parse_error",
                 error=str(e),
                 raw=raw_output,
             )
-            raise AIProcessingException("Ads placement output is not valid JSON")
-
-    # BUILD RECOMMENDATION OUTPUT
-    def _build_recommendation_output(self, placements: PlacementRecommendation):
-        return {
-            "primary": [item.model_dump() for item in placements.primary],
-            "secondary": [item.model_dump() for item in placements.secondary],
-            "avoid": [item.model_dump() for item in placements.avoid],
-        }
+            raise AIProcessingException("Unexpected error while parsing LLM response")
 
     # TRANSFORMATION LAYER
 
-    def _map_to_meta_positions(self, placements: PlacementRecommendation) -> dict:
-
-        VALID_PLACEMENTS = set(PLACEMENT_MAPPING.keys())
+    def _map_to_meta_positions(
+        self, placements: PlacementRecommendation
+    ) -> MetaPositions:
 
         # EXTRACT placement strings
-        primary = [
-            p.placement for p in placements.primary if p.placement in VALID_PLACEMENTS
-        ]
-        secondary = [
-            p.placement for p in placements.secondary if p.placement in VALID_PLACEMENTS
-        ]
-        avoid = {p.placement for p in placements.avoid}
+        selected = (
+            {p.placement for p in placements.primary if p.placement in VALID_PLACEMENTS}
+            | {
+                p.placement
+                for p in placements.secondary
+                if p.placement in VALID_PLACEMENTS
+            }
+        ) - {p.placement for p in placements.avoid if p.placement in VALID_PLACEMENTS}
 
-        # REMOVE avoid conflicts
-        primary = [p for p in primary if p not in avoid]
-        secondary = [p for p in secondary if p not in avoid]
+        selected_placements = list(selected)
 
-        # MERGE priority
-        selected_placements = []
-        selected_placements.extend(primary)
-
-        for p in secondary:
-            if p not in selected_placements:
-                selected_placements.append(p)
-
-        facebook_positions = set()
-        instagram_positions = set()
+        effective_facebook_positions = set()
+        effective_instagram_positions = set()
 
         for placement in selected_placements:
             mapping = PLACEMENT_MAPPING.get(placement)
@@ -190,38 +228,27 @@ class MetaAdsPlacementAgent:
             if not mapping:
                 continue
 
-            if mapping["platform"] == "facebook":
-                facebook_positions.add(mapping["position"])
+            platform = mapping["platform"]
+            position = mapping["position"]
 
-            elif mapping["platform"] == "instagram":
-                instagram_positions.add(mapping["position"])
+            if platform == "facebook":
+                effective_facebook_positions.add(position)
+            elif platform == "instagram":
+                effective_instagram_positions.add(position)
 
         # FALLBACK
-        if not facebook_positions and not instagram_positions:
-            facebook_positions.add("feed")
+        if not effective_facebook_positions and not effective_instagram_positions:
+            logger.warning(
+                "ads_placement.fallback_triggered",
+                reason="all placements filtered out after validation",
+                fallback="facebook_feed:feed",
+            )
+            effective_facebook_positions.add("feed")
 
-        return {
-            "facebook_positions": list(facebook_positions),
-            "instagram_positions": list(instagram_positions),
-            "publisher_platforms": self._get_publisher_platforms(
-                facebook_positions,
-                instagram_positions,
-            ),
-        }
-
-    # PLATFORM BUILDER
-    def _get_publisher_platforms(
-        self, fb_positions: set, ig_positions: set
-    ) -> list[str]:
-        platforms = []
-
-        if fb_positions:
-            platforms.append("facebook")
-
-        if ig_positions:
-            platforms.append("instagram")
-
-        return platforms
+        return MetaPositions(
+            effective_facebook_positions=list(effective_facebook_positions),
+            effective_instagram_positions=list(effective_instagram_positions),
+        )
 
 
 # INSTANCE
