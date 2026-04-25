@@ -1,62 +1,9 @@
-# Meta Ads Placement Recommendation Prompt
-# NOTE: This file is loaded via Python str.format(). 
-# Use {{ and }} for literal braces in JSON examples.
-
-
-## Inputs
-- Objective: {objective}
-- Creative Type: {creative_type}
-
-## Business Context
-Use the provided business summary to understand the specific niche, target audience, and service/product nature. Use this context to refine the placement recommendations beyond the generic industry rules.
-
-Summary: {summary}
-
----
-
-## Business Type Extraction (Mandatory)
-
-You must first infer the business type from the summary.
-
-### Guidelines
-
-Look for:
-- Direct statements: "We are a...", "...company", "...services"
-- Service/product descriptions indicating category
-- Industry-specific terminology
-
-Rules:
-- Be specific: "Dental Clinic" not "Healthcare"
-- "Real Estate Developer" not "Real Estate"
-- Return "Unknown" if unclear
-
-Examples:
-- Real Estate Development
-- Digital Marketing Agency
-- Plumbing Services
-- Restaurant
-- E-commerce Store
-- Dental Clinic
-
-Use this inferred business type to map against the closest matching industry rules below.
-
----
-
 ## Important Rules (Strict)
 
-1. Return ONLY valid JSON
-2. Do NOT add explanations outside JSON
-3. Use ONLY placements from allowed list
-4. Do NOT rename placements
-5. DO NOT return a separate reasoning object
-6. Each placement MUST include a short reason
-7. Output must strictly follow the required format
-
----
-
-## Allowed Placements
-
-{allowed_placements}
+1. Use ONLY placements from the allowed list
+2. Do NOT rename placements
+3. Each placement MUST include a short reason
+4. Output must strictly follow the required format
 
 ---
 
@@ -81,67 +28,115 @@ Interpret priorities as:
 
 ## Industry Rules
 
-Fitness:
+Fitness / Gym / Sports:
 - HIGH: facebook_feed, instagram_feed, instagram_stories, facebook_stories
-- MEDIUM: facebook_profile_feed, instagram_explore, instagram_explore_home
+- MEDIUM: instagram_explore, instagram_explore_home, facebook_profile_feed
 - LOW: facebook_marketplace, instagram_profile_feed
 - AVOID: instagram_reels, facebook_reels, facebook_instream_reels
 
-Education:
+Education / E-Learning / Coaching:
 - HIGH: facebook_feed, facebook_stories
 - MEDIUM: instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, facebook_profile_feed
 - LOW: facebook_marketplace, instagram_profile_feed
 - AVOID: instagram_reels, facebook_reels, facebook_instream_reels
 
-Real Estate:
+Real Estate / Property:
 - HIGH: facebook_feed, facebook_marketplace, facebook_stories
 - MEDIUM: instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, facebook_profile_feed
 - LOW: instagram_profile_feed
 - AVOID: instagram_reels, facebook_reels, facebook_instream_reels
 
-B2B Services:
+B2B Services / SaaS / Agencies:
 - HIGH: facebook_feed
 - MEDIUM: facebook_stories, facebook_profile_feed
-- AVOID: facebook_reels, facebook_instream_reels, instagram_reels, instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, instagram_profile_feed, facebook_marketplace
+- LOW: instagram_feed
+- AVOID: facebook_reels, facebook_instream_reels, instagram_reels, instagram_stories, instagram_explore, instagram_explore_home, instagram_profile_feed, facebook_marketplace
 
-Finance:
+Finance / Insurance / Accounting:
 - HIGH: facebook_feed
 - MEDIUM: facebook_stories, instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, facebook_profile_feed
 - LOW: facebook_marketplace, instagram_profile_feed
 - AVOID: instagram_reels, facebook_reels, facebook_instream_reels
 
-Healthcare:
+Healthcare / Medical / Wellness:
 - HIGH: facebook_feed
 - MEDIUM: facebook_stories, instagram_feed, instagram_stories, facebook_profile_feed
 - LOW: instagram_explore, instagram_explore_home, facebook_marketplace, instagram_profile_feed
 - AVOID: instagram_reels, facebook_reels, facebook_instream_reels
 
-Food & Beverage:
+Food & Beverage / Restaurants / Cafes:
 - HIGH: facebook_feed, instagram_feed, instagram_stories
 - MEDIUM: facebook_stories, facebook_marketplace, instagram_explore, instagram_explore_home, facebook_profile_feed, instagram_profile_feed
 - AVOID: instagram_reels, facebook_reels, facebook_instream_reels
 
-Retail / Apparel:
+Retail / Apparel / Fashion / Beauty:
 - HIGH: facebook_feed, instagram_feed, instagram_stories
 - MEDIUM: facebook_stories, facebook_marketplace, instagram_explore, instagram_explore_home, facebook_profile_feed, instagram_profile_feed
 - AVOID: instagram_reels, facebook_reels, facebook_instream_reels
 
-Technology:
+Technology / Software / Apps:
 - HIGH: facebook_feed
 - MEDIUM: instagram_feed
 - LOW: facebook_stories, instagram_stories, instagram_explore, instagram_explore_home
 - AVOID: facebook_marketplace, facebook_profile_feed, instagram_profile_feed, instagram_reels, facebook_reels, facebook_instream_reels
 
-Automotive / Hardware:
+Automotive / Hardware / Manufacturing:
 - HIGH: facebook_marketplace
 - MEDIUM: facebook_feed
 - LOW: facebook_stories, instagram_feed, instagram_stories, instagram_explore, instagram_explore_home
 - AVOID: facebook_profile_feed, instagram_profile_feed, instagram_reels, facebook_reels, facebook_instream_reels
 
+Legal / Law Firms / Consulting:
+- HIGH: facebook_feed
+- MEDIUM: facebook_stories, facebook_profile_feed, instagram_feed
+- LOW: instagram_stories, instagram_explore, instagram_explore_home, instagram_profile_feed
+- AVOID: facebook_marketplace, instagram_reels, facebook_reels, facebook_instream_reels
+
+Home Services / Renovation / Construction:
+- HIGH: facebook_feed, facebook_marketplace
+- MEDIUM: facebook_stories, facebook_profile_feed, instagram_feed
+- LOW: instagram_stories, instagram_explore, instagram_explore_home, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Travel / Hospitality / Tourism:
+- HIGH: facebook_feed, instagram_feed, instagram_stories
+- MEDIUM: facebook_stories, instagram_explore, instagram_explore_home, facebook_profile_feed, instagram_profile_feed
+- LOW: facebook_marketplace
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Events / Entertainment / Media:
+- HIGH: facebook_feed, instagram_feed, instagram_stories
+- MEDIUM: facebook_stories, instagram_explore, instagram_explore_home, facebook_marketplace, facebook_profile_feed, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Non-Profit / NGO / Charity:
+- HIGH: facebook_feed, facebook_stories
+- MEDIUM: instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, facebook_profile_feed
+- LOW: facebook_marketplace, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+E-commerce / Online Store / D2C:
+- HIGH: facebook_feed, instagram_feed, instagram_stories
+- MEDIUM: facebook_stories, facebook_marketplace, instagram_explore, instagram_explore_home, facebook_profile_feed, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Logistics / Supply Chain / Delivery:
+- HIGH: facebook_feed
+- MEDIUM: facebook_stories, facebook_marketplace, facebook_profile_feed
+- LOW: instagram_feed, instagram_stories, instagram_explore, instagram_explore_home, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
+Recruitment / HR / Staffing:
+- HIGH: facebook_feed
+- MEDIUM: facebook_stories, instagram_feed, instagram_stories, facebook_profile_feed
+- LOW: instagram_explore, instagram_explore_home, facebook_marketplace, instagram_profile_feed
+- AVOID: instagram_reels, facebook_reels, facebook_instream_reels
+
 Unknown / Other Industry:
 - HIGH: facebook_feed, instagram_feed
 - MEDIUM: facebook_stories, instagram_stories, instagram_explore, instagram_explore_home
-- AVOID: facebook_reels, facebook_instream_reels, instagram_reels, facebook_marketplace, facebook_profile_feed, instagram_profile_feed
+- LOW: facebook_marketplace, facebook_profile_feed, instagram_profile_feed
+- AVOID: facebook_reels, facebook_instream_reels, instagram_reels
 
 ---
 
@@ -152,39 +147,69 @@ Unknown / Other Industry:
    - ALWAYS put reels (instagram_reels, facebook_reels, facebook_instream_reels) in avoid
 
 2. If objective = OUTCOME_AWARENESS AND creative_type = VIDEO:
-   - Move facebook_reels and instagram_reels to secondary (even if industry rules say avoid)
+   - Move facebook_reels, facebook_instream_reels, and instagram_reels to secondary
+     (even if industry rules say avoid)
 
 3. If creative_type = CAROUSEL:
-   - ALWAYS put stories (facebook_stories, instagram_stories) in avoid (not supported for Carousels)
-   - ALWAYS put reels (facebook_reels, instagram_reels) in avoid (not supported for Carousels)
+   - ALWAYS put stories (facebook_stories, instagram_stories) in avoid
+     (Carousel format is not supported in Stories placements)
+   - ALWAYS put reels (facebook_reels, facebook_instream_reels, instagram_reels) in avoid
+     (Carousel format is not supported in Reels placements)
 
-4. Profile feeds are LOW priority → mostly secondary or avoid
+4. Profile feeds (facebook_profile_feed, instagram_profile_feed) should be placed
+   in secondary or avoid — never primary.
 
-5. Explore is MEDIUM → always secondary
+5. Explore (instagram_explore, instagram_explore_home) is MEDIUM priority (secondary).
+   However, if an Industry Rule explicitly classifies Explore as LOW or AVOID,
+   the Industry Rule takes precedence over this global rule.
 
 ---
 
-## Output Format (Strict)
+Return a JSON object with four keys: "inferred_business_type", "primary", "secondary", and "avoid".
+- "inferred_business_type": (string) The specific industry category you mapped this business to
+  (e.g., "Dental Clinic", "SaaS Startup", "D2C Skincare Brand").
+  Be specific — use the business summary to go beyond the generic industry label.
+- "primary", "secondary", "avoid": Each must contain a list of objects,
+  where each object has exactly two fields: "placement" (string) and "reason" (string).
+- Every placement from the allowed list must appear in exactly one of: primary, secondary, or avoid.
+- No placement should be left unclassified.
 
-```json
+Example:
 {{
+  "inferred_business_type": "Dental Clinic",
   "primary": [
     {{
       "placement": "facebook_feed",
-      "reason": "Short reason"
+      "reason": "Highest converting placement for local service businesses targeting adults"
     }}
   ],
   "secondary": [
     {{
-      "placement": "instagram_feed",
-      "reason": "Short reason"
+      "placement": "instagram_explore",
+      "reason": "Good for awareness but lower purchase intent than feed"
     }}
   ],
   "avoid": [
     {{
-      "placement": "instagram_reels",
-      "reason": "Short reason"
+      "placement": "facebook_instream_reels",
+      "reason": "Not supported for carousel creatives and poor fit for healthcare services"
     }}
   ]
 }}
-```
+
+---
+
+## Request
+
+## Business Context
+Use the provided business summary to infer the specific industry niche, target audience, and service/product nature.
+Use this inferred business type to map against the closest matching Industry Rules above.
+
+Summary: {summary}
+
+## Inputs
+- Objective: {objective}
+- Creative Type: {creative_type}
+
+## Allowed Placements
+{allowed_placements}

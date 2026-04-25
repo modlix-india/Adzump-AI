@@ -654,19 +654,31 @@ class LLMAdSetGenerationResponse(BaseModel):
 
 
 class PlacementItem(BaseModel):
-    placement: str
-    reason: str
+    placement: str = Field(..., min_length=1)
+    reason: str = Field(..., min_length=1)
 
 
 class PlacementRecommendation(BaseModel):
+    inferred_business_type: str = Field(
+        ..., description="The industry category the LLM mapped this business to"
+    )
     primary: list[PlacementItem]
     secondary: list[PlacementItem]
     avoid: list[PlacementItem]
 
 
 class MetaPositions(BaseModel):
-    effective_facebook_positions: list[str] = []
-    effective_instagram_positions: list[str] = []
+    effective_facebook_positions: list[str]
+    effective_instagram_positions: list[str]
+
+    @model_validator(mode="after")
+    def validate_positions(self):
+        if (
+            not self.effective_facebook_positions
+            and not self.effective_instagram_positions
+        ):
+            raise ValueError("At least one placement position must be provided.")
+        return self
 
     @computed_field
     @property
