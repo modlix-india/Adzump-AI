@@ -1,107 +1,131 @@
 import asyncio
-from structlog import get_logger
+import structlog
 
 from agents.meta.detailed_targeting_executer import MetaTargetingExecutor
 from core.models.meta import (
     MetaTargetingSuggestionResult,
     TargetingCategory,
 )
-from exceptions.custom_exceptions import BusinessValidationException
-from oserver.models.storage_request_model import StorageFilter, StorageReadRequest
-from oserver.services.storage_service import StorageService
-from services.session_manager import get_website_url
-from utils.helpers import normalize_url
+from exceptions.custom_exceptions import (
+    InternalServerException,
+    BaseAppException,
+    SessionException,
+    BusinessValidationException,
+)
+from services.business_service import BusinessService
+from services.session_manager import sessions
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
-TARGETING_CATEGORIES = [
-    TargetingCategory.INTERESTS,
-    TargetingCategory.DEMOGRAPHICS,
-    TargetingCategory.BEHAVIORS,
-]
+# Iterate over Enum members directly to ensure all categories are included
+TARGETING_CATEGORIES = list(TargetingCategory)
 
 
 class DetailedTargetingAgent:
     """
     Entry point for the Meta targeting suggestion agent.
 
-    Resolves the business URL from the session, reads the stored summary
-    directly from StorageService, then runs the targeting pipeline for
-    all three categories in parallel and aggregates the results.
+    Resolves business data via BusinessService, then runs the targeting pipeline
+    for all three categories in parallel and aggregates the results.
     """
 
     def __init__(self) -> None:
-        self.storage_service = StorageService()
+        """Initialize the detailed targeting agent with business & meta-targeting services."""
+        self.business_service = BusinessService()
+        self.executor = MetaTargetingExecutor()
 
     async def generate_detailed_targeting_suggestions(
         self,
         session_id: str,
         ad_account_id: str,
     ) -> MetaTargetingSuggestionResult:
-
-        business_summary = await self._fetch_business_summary(session_id)
-
-        executor = MetaTargetingExecutor(ad_account_id=ad_account_id)
-
-        logger.info(
-            "meta_targeting.orchestrator_started",
+        """
+        Generate Meta targeting suggestions by orchestrating LLM analysis
+        and Marketing API searches across all targeting categories.
+        """
+        # Bind context variables for uniform logging across the request lifecycle
+        structlog.contextvars.bind_contextvars(
             session_id=session_id,
             ad_account_id=ad_account_id,
-            categories=TARGETING_CATEGORIES,
         )
 
-        category_results = await asyncio.gather(
-            *[
-                executor.run_targeting_pipeline(
-                    category=category,
-                    business_summary=business_summary,
+        logger.info("meta_detailed_targeting.orchestrator.started")
+
+        try:
+            # 1. Session Validation
+            if session_id not in sessions:
+                raise SessionException("Invalid or expired session.")
+
+            # 2. Business data retrieval
+            business_data = await self.business_service.fetch_website_data(session_id)
+            business_summary = business_data.final_summary or business_data.summary
+
+            if not business_summary:
+                raise BusinessValidationException(
+                    "Business summary is missing. Please complete website analysis first."
                 )
-                for category in TARGETING_CATEGORIES
-            ],
-            return_exceptions=False,
-        )
 
-        interests, demographics, behaviours = category_results
+            # 3. Run targeting pipeline for all categories in parallel
+            # We use return_exceptions=True to allow partial success if one category fails
+            category_results = await asyncio.gather(
+                *[
+                    self.executor.run_targeting_pipeline(
+                        ad_account_id=ad_account_id,
+                        category=category,
+                        business_summary=business_summary,
+                    )
+                    for category in TARGETING_CATEGORIES
+                ],
+                return_exceptions=True,
+            )
 
-        logger.info(
-            "meta_targeting.orchestrator_complete",
-            session_id=session_id,
-            interests_count=len(interests),
-            demographics_count=len(demographics),
-            behaviours_count=len(behaviours),
-        )
+            # 4. Results Mapping (Robust to category list changes)
+            results_map = {}
+            for category, result in zip(TARGETING_CATEGORIES, category_results):
+                if isinstance(result, Exception):
+                    logger.error(
+                        "meta_detailed_targeting.category.failed",
+                        category=category.value,
+                        error=str(result),
+                    )
+                    results_map[category.value] = []
+                else:
+                    results_map[category.value] = result
 
-        return MetaTargetingSuggestionResult(
-            interests=interests,
-            demographics=demographics,
-            behaviours=behaviours,
-        )
+            # 5. Final Result Construction (Type-safe Enum Mapping)
+            final_result = MetaTargetingSuggestionResult(
+                interests=results_map.get(TargetingCategory.INTERESTS.value, []),
+                demographics=results_map.get(TargetingCategory.DEMOGRAPHICS.value, []),
+                behaviors=results_map.get(TargetingCategory.BEHAVIORS.value, []),
+            )
 
-    # Internal helpers
+            # 6. Global Result Logging & Failure Check
+            total_categories = len(TARGETING_CATEGORIES)
+            failed_count = sum(1 for r in category_results if isinstance(r, Exception))
 
-    async def _fetch_business_summary(self, session_id: str) -> str:
+            logger.info(
+                "meta_detailed_targeting.orchestrator.complete",
+                interests_count=len(final_result.interests),
+                demographics_count=len(final_result.demographics),
+                behaviors_count=len(final_result.behaviors),
+                failed_categories=failed_count,
+                total_categories=total_categories,
+            )
 
-        website_url = normalize_url(get_website_url(session_id))
+            return final_result
 
-        read_request = StorageReadRequest(
-            storageName="AISuggestedData",
-            appCode="marketingai",
-            clientCode=self.storage_service.client_code,
-            filter=StorageFilter(field="businessUrl", value=website_url),
-        )
-
-        response = await self.storage_service.read_page_storage(read_request)
-
-        if response.success and response.content:
-            record = response.content[-1]
-            summary = record.get("finalSummary") or record.get("summary")
-            if summary:
-                logger.info("meta_targeting.business_summary_found")
-                return summary
-
-        raise BusinessValidationException(
-            "Missing business summary for session. Please complete website analysis first."
-        )
+        except BaseAppException:
+            # Let our custom exceptions propagate to the global handler
+            raise
+        except Exception:
+            logger.exception("meta_detailed_targeting.orchestrator.error")
+            raise InternalServerException(
+                "An unexpected error occurred during targeting suggestion generation."
+            )
+        finally:
+            # Clear context variables to prevent leakage to subsequent requests
+            structlog.contextvars.clear_contextvars()
 
 
-meta_detailed_targeting_agent = DetailedTargetingAgent()
+# Singleton instance for shared use
+detailed_targeting_agent = DetailedTargetingAgent()

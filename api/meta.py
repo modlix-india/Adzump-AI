@@ -7,7 +7,7 @@ from agents.meta.creative_agent import meta_creative_agent
 from core.models.meta import MetaAdCreationRequest
 from agents.meta.lead_form_agent import meta_lead_form_agent
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
-from agents.meta.detailed_targeting_agent import meta_detailed_targeting_agent
+from agents.meta.detailed_targeting_agent import detailed_targeting_agent
 
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
@@ -75,11 +75,21 @@ async def create_lead_form(
 
 @router.post("/targeting-suggestions")
 async def generate_meta_targeting_suggestions(
-    session_id: str = Query(..., alias="sessionId"),
-    ad_account_id: str = Query(..., alias="adAccountId"),
+    session_id: str = Query(
+        ..., alias="sessionId", min_length=1, description="The session ID"
+    ),
+    ad_account_id: str = Query(
+        ...,
+        alias="adAccountId",
+        min_length=1,
+        description="The Meta Ad Account ID (with or without 'act_' prefix)",
+    ),
 ):
+    """
+    Generate Meta targeting suggestions for interests, demographics, and behaviors.
+    """
     result = (
-        await meta_detailed_targeting_agent.generate_detailed_targeting_suggestions(
+        await detailed_targeting_agent.generate_detailed_targeting_suggestions(
             session_id=session_id,
             ad_account_id=ad_account_id,
         )

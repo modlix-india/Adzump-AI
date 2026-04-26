@@ -379,6 +379,8 @@ class Location(BaseModel):
 
 
 class TargetingEntity(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     id: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1)
     type: str = Field(..., min_length=1)
@@ -653,30 +655,22 @@ class TargetingCategory(str, Enum):
 class TargetingSeedsResponse(BaseModel):
     """Parsed LLM response for seed generation."""
 
-    seeds: List[str]
+    seeds: list[str]
 
 
 class TargetingFilterResponse(BaseModel):
     """Parsed LLM response for candidate filtering."""
 
-    selected_ids: List[str]
-
-
-# Per-category output
-class CategoryTargetingResult(BaseModel):
-    """Filtered targeting results for a single category."""
-
-    category: str
-    items: List[TargetingEntity]
+    selected_ids: list[str]
 
 
 # Final agent output
 class MetaTargetingSuggestionResult(BaseModel):
     """Complete output returned by the orchestrator."""
 
-    interests: List[TargetingEntity] = []
-    demographics: List[TargetingEntity] = []
-    behaviours: List[TargetingEntity] = []
+    interests: list[TargetingEntity] = []
+    demographics: list[TargetingEntity] = []
+    behaviors: list[TargetingEntity] = []
 
 
 class LLMAdSetGenerationResponse(BaseModel):

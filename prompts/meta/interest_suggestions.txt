@@ -1,69 +1,37 @@
-You are a senior Meta (Facebook & Instagram) Ads strategist with deep expertise in **interest-based audience targeting**.
+Your task is to generate interest targeting seed keywords for Meta Ads based on the business summary below.
 
-Your task is to generate high-quality **interest targeting seed keywords** based on the business summary provided.
+These seeds will be used as search queries against Meta's targeting API to surface real interest segments.
+Your goal is to generate seeds that are specific and targeted enough to return high-quality, relevant Meta interest segments.
 
-OBJECTIVE:
-Identify interests that a skilled marketing manager would use to reach the **most relevant and conversion-ready audience segments** on Meta Ads.
+WHAT MAKES A GOOD SEED
+- Specific enough to surface niche, relevant Meta interest segments
+- Directly tied to what the business sells or who buys it
+- Covers the buyer's hobbies, passions, brand affinities, and content consumption habits
+- A mix of core niche interests AND adjacent interests for audience expansion
 
-STRICT RULES:
-- Generate ONLY 10 to 15 seeds
-- Output MUST contain ONLY interest-based targeting (NO behaviors, demographics, or job titles)
-- Each seed must represent a **realistic, targetable Meta interest**
-- Avoid vague, generic, or overly broad terms
+WHAT TO AVOID
+- Generic terms that return overly broad segments (e.g. "shopping", "business", "internet")
+- Demographic descriptors (e.g. "parents", "men aged 25-34")
+- Behaviors or transactional signals (e.g. "online shoppers", "frequent buyers")
+- Job titles or professional roles
+- Terms unlikely to exist as actual Meta interest segments
 
-INTEREST SOURCES TO CONSIDER:
-Focus on identifying interests from these high-signal categories:
+OUTPUT RULES
+- Generate between 10 and 15 seeds
+- Include a smart mix of: core niche interests, adjacent lifestyle interests, and recognisable brands or media relevant to this business.
+- Each seed must target a distinctly different audience angle — do not generate variations of the same concept.
+- Each seed must be distinct — no duplicates or near-duplicates
+- Keep seeds concise: 1 to 5 words preferred
+- Return strict JSON only, no extra text
 
-1. Hobbies & Lifestyle Activities  
-   (e.g., "home workouts", "vegan cooking", "photography")
-
-2. Consumer Passions & Habits  
-   (e.g., "organic food", "luxury travel", "personal finance")
-
-3. Brands & Influencers  
-   (e.g., well-known companies, creators, or personalities relevant to the niche)
-
-4. Media & Content Consumption  
-   (e.g., magazines, blogs, YouTube channels, online communities)
-
-5. Industry-Specific Interests  
-   (e.g., "digital marketing", "real estate investing", "fitness training")
-
-6. Product/Service Adjacent Interests  
-   (e.g., complementary or substitute products/services your audience engages with)
-
-STRICTLY EXCLUDE:
-- Demographics (e.g., "men aged 25-34", "parents")
-- Behaviors (e.g., "frequent travelers", "online shoppers")
-- Job titles (e.g., "software engineers", "CEOs")
-- Extremely broad or generic terms (e.g., "shopping", "internet", "business")
-- Interests that are unlikely to exist as Meta targeting options
-
-QUALITY CONSTRAINTS:
-- Each seed must be DISTINCT (no duplicates or slight variations)
-- Keep seeds concise (1–4 words preferred, max 5 words)
-- Ensure strong alignment with the business summary
-- Prioritize **high-intent and niche-relevant interests**
-- Include a smart mix of:
-  - Core niche interests (high relevance)
-  - Adjacent interests (audience expansion)
-  - Recognizable brands/media (targetability boost)
-
-MARKETING THINKING (CRITICAL):
-Before selecting each interest, validate:
-- Would this audience realistically be interested in the product/service?
-- Does this interest indicate **intent, affinity, or buying potential**?
-- Would targeting this improve campaign performance?
-
-
-OUTPUT FORMAT (STRICT JSON ONLY — NO EXTRA TEXT):
+OUTPUT FORMAT
 {{
   "seeds": [
     "seed_1",
     "seed_2",
-    "seed_3"
+    "..."
   ]
 }}
 
-Business Summary:
+BUSINESS SUMMARY
 {summary}

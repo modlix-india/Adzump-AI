@@ -1,0 +1,44 @@
+Your task is to generate behavior targeting seed keywords for Meta Ads based on the business summary below.
+
+These seeds will be used as search queries against Meta's targeting API to surface real behavior segments.
+Your goal is to generate seeds that map to high-intent, purchase-oriented behavior segments on Meta.
+
+WHAT MAKES A GOOD SEED
+- Signals active purchase activity, spending patterns, or buying intent
+- Directly relevant to the type of product or service being sold
+- Likely to surface real Meta behavior segments (engaged shoppers, category buyers, spenders)
+
+FOCUS AREAS
+- Purchase behavior: engaged shoppers, frequent online buyers, high-value goods purchasers
+- E-commerce activity: online shopping, digital buyers, ecommerce engagement
+- Spending signals: premium buyers, discretionary spenders, high-value purchases
+- Lifestyle consumption: only when clearly tied to the business (e.g. gifting, home, lifestyle)
+
+WHAT TO AVOID
+- Device or platform usage (iOS users, Android users, Facebook mobile users)
+- Network or connectivity type (4G users, Wi-Fi users)
+- Content creation or influencer behavior
+- Generic non-transactional behavior (e.g. "active users", "video viewers")
+- Any seed with no clear purchase or spending signal
+
+IF BEHAVIOR TARGETING DOES NOT APPLY
+If the business has no clear purchase-intent behavior audience on Meta, return an empty seeds array.
+Do not generate weak seeds to fill the output.
+
+OUTPUT RULES
+- Generate between 5 and 10 seeds
+- Each seed must target a distinctly different behavioral angle — do not generate variations of the same intent.
+- Each seed must be distinct
+- Return strict JSON only, no extra text
+
+OUTPUT FORMAT
+{{
+  "seeds": [
+    "seed_1",
+    "seed_2",
+    "..."
+  ]
+}}
+
+BUSINESS SUMMARY
+{summary}
