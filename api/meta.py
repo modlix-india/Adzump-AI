@@ -4,10 +4,11 @@ from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
 from core.models.lead_form import LeadFormPayload
 from agents.meta.creative_agent import meta_creative_agent
-from core.models.meta import MetaAdCreationRequest
+from core.models.meta import MetaAdCreationRequest, PlacementRequest
 from agents.meta.lead_form_agent import meta_lead_form_agent
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
 from agents.meta.detailed_targeting_agent import detailed_targeting_agent
+from agents.meta.ads_placement_agent import meta_ads_placement_agent
 
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
@@ -93,5 +94,18 @@ async def generate_meta_targeting_suggestions(
             session_id=session_id,
             ad_account_id=ad_account_id,
         )
+    )
+    return success_response(data=result.model_dump(mode="json"))
+
+
+@router.post("/placement/generate")
+async def generate_placements(
+    body: PlacementRequest,
+    session_id: str = Query(..., alias="sessionId"),
+):
+    result = await meta_ads_placement_agent.generate_placements(
+        session_id=session_id,
+        objective=body.objective,
+        creative_type=body.creative_type,
     )
     return success_response(data=result.model_dump(mode="json"))
