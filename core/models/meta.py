@@ -4,7 +4,7 @@ from typing import Literal, Any, Annotated
 from datetime import date, datetime
 import re
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, model_validator, field_validator, computed_field
 from core.models import meta_constants
 
 
@@ -651,3 +651,51 @@ class LLMAdSetGenerationResponse(BaseModel):
     locales: list[dict]
     flexible_spec: list[dict]
     locations: dict | None = None
+
+
+class PlacementItem(BaseModel):
+    placement: str = Field(..., min_length=1)
+    reason: str = Field(..., min_length=1)
+
+
+class PlacementRecommendation(BaseModel):
+    inferred_business_type: str = Field(
+        ..., description="The industry category the LLM mapped this business to"
+    )
+    primary: list[PlacementItem]
+    secondary: list[PlacementItem]
+    avoid: list[PlacementItem]
+
+
+class MetaPositions(BaseModel):
+    effective_facebook_positions: list[str]
+    effective_instagram_positions: list[str]
+
+    @model_validator(mode="after")
+    def validate_positions(self):
+        if (
+            not self.effective_facebook_positions
+            and not self.effective_instagram_positions
+        ):
+            raise ValueError("At least one placement position must be provided.")
+        return self
+
+    @computed_field
+    @property
+    def effective_publisher_platforms(self) -> list[str]:
+        platforms = []
+        if self.effective_facebook_positions:
+            platforms.append("facebook")
+        if self.effective_instagram_positions:
+            platforms.append("instagram")
+        return platforms
+
+
+class MetaAdsPlacementResponse(BaseModel):
+    meta_positions: MetaPositions
+    recommendation: PlacementRecommendation
+
+
+class PlacementRequest(BaseModel):
+    objective: CampaignObjective
+    creative_type: CreativeType
