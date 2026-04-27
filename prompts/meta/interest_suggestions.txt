@@ -1,35 +1,70 @@
 Your task is to generate interest targeting seed keywords for Meta Ads based on the business summary below.
 
-These seeds will be used as search queries against Meta's targeting API to surface real interest segments.
-Your goal is to generate seeds that are specific and targeted enough to return high-quality, relevant Meta interest segments.
+These seeds will be used as search queries against Meta's targeting API to surface real, targetable interest segments.
 
-WHAT MAKES A GOOD SEED
-- Specific enough to surface niche, relevant Meta interest segments
-- Directly tied to what the business sells or who buys it
-- Covers the buyer's hobbies, passions, brand affinities, and content consumption habits
-- A mix of core niche interests AND adjacent interests for audience expansion
+CRITICAL — HOW META INTEREST TARGETING WORKS
+Meta indexes interests based on what people follow, engage with, and identify with on Facebook and Instagram.
+Meta does NOT index product descriptions, unknown or local business names, local place names, or feature-level terminology.
+Meta DOES index well-known brands, platforms, and publications — use these where relevant.
+
+A seed only has value if it maps to something Meta actually has in its interest index.
+Your job is to think about the buyer, not the product.
+
+HOW META NAMES AND ORGANISES INTERESTS
+Meta's interest index is built around five types of signals. Use these patterns to derive seeds:
+
+1. BRANDS AND PLATFORMS THE BUYER USES
+   Think: what are the 2-3 dominant apps, marketplaces, tools, or platforms buyers in this space already use?
+   Use the actual brand or platform name — Meta indexes these directly (e.g. "Salesforce", "Nike", "Zillow").
+   Do not copy-paste from examples. Derive the right brands from the business summary.
+
+2. MEDIA AND PUBLICATIONS THE BUYER READS
+   Think: what is the industry-equivalent of a trade magazine, news outlet, or content platform this buyer follows?
+   Use the publication or media brand name — not a description of the content type.
+
+3. LIFESTYLE AND HOBBY CATEGORIES THE BUYER IDENTIFIES WITH
+   Think: what broader lifestyle, hobby, or identity category does this buyer belong to?
+   Meta indexes these as broad category labels — use recognisable category names, not descriptions.
+
+4. ADJACENT COMMUNITIES WITH HIGH BUYER OVERLAP
+   Think: what other interest communities attract the same type of buyer, even if not directly about this product?
+   These are interests that strongly correlate with the target buyer profile.
+
+5. BROAD CATEGORY TERMS META IS KNOWN TO INDEX
+   Think: what is the top-level category label for this space?
+   These are short, clean category names — not product features or business descriptions.
+
+CRITICAL — DO NOT COPY THE PATTERN LABELS ABOVE AS SEEDS
+The five types above are thinking frameworks, not output templates.
+Every seed must be derived from the business summary — not from the pattern descriptions themselves.
 
 WHAT TO AVOID
-- Generic terms that return overly broad segments (e.g. "shopping", "business", "internet")
-- Demographic descriptors (e.g. "parents", "men aged 25-34")
-- Behaviors or transactional signals (e.g. "online shoppers", "frequent buyers")
-- Job titles or professional roles
-- Terms unlikely to exist as actual Meta interest segments
+- Hyper-local terms (e.g. city names, neighbourhood names) — Meta does not index these as interests
+- Product feature descriptions — these are not interest segments
+- Generic terms too broad to be actionable (e.g. "shopping", "business", "online")
+- Demographic descriptors (e.g. "high income families", "affluent buyers")
+- Behaviors or purchase signals — these belong in behavior targeting, not interests
+- Job titles or professional roles — these belong in demographic targeting
+- Invented terms — only generate seeds that plausibly exist in Meta's index
+
+INDUSTRY-AGNOSTIC RULE
+This prompt must produce accurate, useful seeds for any business — SaaS, skincare, food, finance, fitness, real estate, education, or anything else.
+Do not rely on any assumed industry. Read the business summary carefully and derive everything from it.
+If you find yourself generating seeds that would work for a different business, stop and re-derive.
 
 OUTPUT RULES
 - Generate between 10 and 15 seeds
-- Include a smart mix of: core niche interests, adjacent lifestyle interests, and recognisable brands or media relevant to this business.
-- Each seed must target a distinctly different audience angle — do not generate variations of the same concept.
-- Each seed must be distinct — no duplicates or near-duplicates
+- Each seed must cover a different angle — do not generate variations of the same concept
+- No duplicates or near-duplicates
 - Keep seeds concise: 1 to 5 words preferred
-- Return strict JSON only, no extra text
+- Return strict JSON only — no explanation, no preamble, no markdown
 
 OUTPUT FORMAT
 {{
   "seeds": [
     "seed_1",
     "seed_2",
-    "..."
+    "seed_3"
   ]
 }}
 

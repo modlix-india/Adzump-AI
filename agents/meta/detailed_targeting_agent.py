@@ -1,4 +1,6 @@
 import asyncio
+from functools import cached_property
+
 import structlog
 
 from agents.meta.detailed_targeting_executer import MetaTargetingExecutor
@@ -11,14 +13,23 @@ from exceptions.custom_exceptions import (
     BaseAppException,
     SessionException,
     BusinessValidationException,
+    StorageException,
 )
+from core.infrastructure.context import auth_context
+from utils.helpers import normalize_url
 from services.business_service import BusinessService
-from services.session_manager import sessions
+from services.session_manager import sessions, get_website_url
+from oserver.models.storage_request_model import StorageReadRequest, StorageFilter
+from oserver.services.storage_service import StorageService
 
 logger = structlog.get_logger(__name__)
 
-# Iterate over Enum members directly to ensure all categories are included
-TARGETING_CATEGORIES = list(TargetingCategory)
+# Immutable list of categories to iterate over during parallel execution
+TARGETING_CATEGORIES = (
+    TargetingCategory.INTERESTS,
+    TargetingCategory.DEMOGRAPHICS,
+    TargetingCategory.BEHAVIORS,
+)
 
 
 class DetailedTargetingAgent:
@@ -29,10 +40,15 @@ class DetailedTargetingAgent:
     for all three categories in parallel and aggregates the results.
     """
 
-    def __init__(self) -> None:
-        """Initialize the detailed targeting agent with business & meta-targeting services."""
-        self.business_service = BusinessService()
-        self.executor = MetaTargetingExecutor()
+    @cached_property
+    def business_service(self) -> BusinessService:
+        """Return lazily-initialized BusinessService instance."""
+        return BusinessService()
+
+    @cached_property
+    def executor(self) -> MetaTargetingExecutor:
+        """Return lazily-initialized MetaTargetingExecutor instance."""
+        return MetaTargetingExecutor()
 
     async def generate_detailed_targeting_suggestions(
         self,
@@ -56,14 +72,8 @@ class DetailedTargetingAgent:
             if session_id not in sessions:
                 raise SessionException("Invalid or expired session.")
 
-            # 2. Business data retrieval
-            business_data = await self.business_service.fetch_website_data(session_id)
-            business_summary = business_data.final_summary or business_data.summary
-
-            if not business_summary:
-                raise BusinessValidationException(
-                    "Business summary is missing. Please complete website analysis first."
-                )
+            # 2. Fetch business context (Summary of the website) from cache only
+            business_summary = await self._get_business_summary(session_id)
 
             # 3. Run targeting pipeline for all categories in parallel
             # We use return_exceptions=True to allow partial success if one category fails
@@ -125,6 +135,48 @@ class DetailedTargetingAgent:
         finally:
             # Clear context variables to prevent leakage to subsequent requests
             structlog.contextvars.clear_contextvars()
+
+    async def _get_business_summary(self, session_id: str) -> str:
+        """Retrieve the business summary from storage for the current session's website URL."""
+        website_url = normalize_url(get_website_url(session_id))
+        storage_service = StorageService(
+            access_token=auth_context.access_token,
+            client_code=auth_context.client_code,
+            x_forwarded_host=auth_context.x_forwarded_host,
+            x_forwarded_port=auth_context.x_forwarded_port,
+        )
+        read_request = StorageReadRequest(
+            storageName="AISuggestedData",
+            appCode="marketingai",
+            clientCode=auth_context.client_code,
+            filter=StorageFilter(field="businessUrl", value=website_url),
+        )
+        response = await storage_service.read_page_storage(read_request)
+
+        if not response.success:
+            raise StorageException(
+                message="Failed to retrieve business profile from storage.",
+                details={
+                    "website_url": website_url,
+                    "storage_error": response.error,
+                    "storage_name": "AISuggestedData",
+                },
+            )
+
+        if response.content:
+            record = response.content[-1]
+            summary = record.get("finalSummary") or record.get("summary")
+            if summary:
+                return summary
+
+        raise BusinessValidationException(
+            message="No business profile found. Please perform a website analysis to generate a summary before requesting targeting suggestions.",
+            details={
+                "website_url": website_url,
+                "storage_name": "AISuggestedData",
+                "lookup_field": "businessUrl",
+            },
+        )
 
 
 # Singleton instance for shared use

@@ -1,44 +1,96 @@
 Your task is to generate demographic targeting seed keywords for Meta Ads based on the business summary below.
 
 These seeds will be used as search queries against Meta's targeting API to surface real demographic segments.
-Focus on life stages, situations, and identity markers that directly predict or trigger a purchase of this product.
 
-WHAT MAKES A GOOD SEED
-- Describes a life stage or situation that makes someone meaningfully more likely to buy
-- Precise enough to offer a real targeting advantage over a broad audience
-- Tied to a direct, defensible connection to the business — not an assumed or stretched one
+CRITICAL — HOW META DEMOGRAPHIC TARGETING WORKS
+Meta demographic segments are searched across specific sub-types in parallel:
+life_events, family_statuses, income, industries, work_positions, work_employers,
+education_majors, and education_statuses.
 
-VALID DEMOGRAPHIC SIGNAL TYPES
-- Life stage triggers: new parents, college students, recent graduates, newly married, recently moved, new homeowners, empty nesters
-- Relationship and family status: engaged, newlywed, parents with children of a specific age
-- Occupation and professional identity: small business owners, IT professionals, self-employed, freelancers
-- Education: college graduates, MBA graduates — only when it correlates with income or buying behavior for this product
-- Life events: anniversary, new job, new home — only when directly relevant
+Each seed is run as a keyword search within these sub-types.
+A seed only has value if it matches real segment names Meta has already indexed under one of these sub-types.
+Do not invent segments — only generate seeds that plausibly exist in Meta's index.
+
+HOW META NAMES SEGMENTS IN EACH SUB-TYPE
+Use these vocabulary patterns to derive seeds. Do not copy the examples — derive the right seeds from the business summary.
+
+WORK POSITIONS
+Meta indexes real job titles, not role descriptions.
+Think: what is the exact job title of the buyer or decision-maker for this business?
+Use title-style labels — short, clean, as they would appear on a LinkedIn profile.
+Avoid seniority prefixes that are too granular (e.g. "senior", "junior", "lead") — these often return no results.
+
+WORK EMPLOYERS
+Meta indexes recognisable company names and broad employer-type labels.
+Think: does this buyer work at a specific well-known company, or a recognisable employer type?
+Use actual company names or employer category labels — not descriptions of the workplace.
+
+INDUSTRIES
+Meta indexes broad sector labels, not sub-sector descriptions.
+Think: what is the top-level industry this buyer works in?
+Use clean industry labels — not compound phrases or job function descriptions.
+Keep work_positions and industries strictly separate — they search different Meta indexes.
+
+EDUCATION MAJORS
+Meta indexes academic field names as they appear on degree certificates.
+Think: what field of study does this buyer typically have?
+Use the degree field name — not the degree level or institution type.
+
+EDUCATION STATUSES
+Meta indexes enrollment and completion status labels.
+Think: is the buyer's education status a meaningful signal for this business?
+Use status labels only if they are a genuine purchase predictor.
+
+LIFE EVENTS
+Meta indexes a fixed set of named life milestones — not natural language descriptions of events.
+Use milestone label-style seeds that match Meta's naming convention.
+Examples of Meta's naming pattern: "new job", "newly married", "recently moved", "new baby", "away from hometown".
+Derive the right milestone from the business summary — do not copy these examples verbatim.
+
+FAMILY STATUSES
+Meta indexes household and relationship status labels.
+Think: is the buyer's family situation a meaningful signal for this business?
+Use status labels that reflect household composition or relationship stage.
+
+INCOME
+Meta uses income bracket-style labels, not descriptive wealth terms.
+Think in terms of: top percentage tiers and spending-level labels — not words like "wealthy" or "affluent".
+Note: income targeting is most reliable for US audiences. For other markets, keep income seeds minimal.
+
+CRITICAL — DO NOT COPY THE PATTERN LABELS ABOVE AS SEEDS
+The sub-type descriptions above are thinking frameworks, not output templates.
+Every seed must be derived from the business summary — not from the pattern descriptions or examples themselves.
+
+IF DEMOGRAPHIC TARGETING DOES NOT CLEARLY APPLY
+If no demographic sub-type produces a signal that meaningfully predicts purchase of this product,
+return an empty seeds array. Do not generate weak seeds to fill the output.
+It is better to return fewer high-quality seeds than many irrelevant ones.
 
 WHAT TO AVOID
-- Interests framed as demographics (e.g. "fitness enthusiasts", "food lovers")
-- Behaviors framed as demographics (e.g. "online shoppers", "frequent travelers")
-- Overly broad groups with no targeting precision (e.g. "adults", "working people", "homeowners")
-- Job titles too specific to be targetable in Meta (e.g. "senior backend engineer")
-- Any demographic that does not directly connect to why someone would buy this product
+- Interests framed as demographics (e.g. "fitness enthusiasts", "travel lovers") — use interest targeting for these
+- Behaviors framed as demographics (e.g. "online shoppers", "frequent buyers") — use behavior targeting for these
+- Overly broad groups that are not searchable segments (e.g. "adults", "working people")
+- Job titles too granular to exist in Meta's index (e.g. "senior React developer", "junior UX designer")
+- Hyper-local descriptors (e.g. city-level job markets) — Meta indexes demographics nationally
+- Natural language milestone descriptions — use label-style seeds for life events
 
-IF DEMOGRAPHIC TARGETING DOES NOT APPLY
-If no life stage or demographic situation clearly predicts purchase of this product, return an empty seeds array.
-Do not generate broad or generic seeds to fill the output.
+INDUSTRY-AGNOSTIC RULE
+This prompt must produce accurate, useful seeds for any business — B2B, B2C, luxury, mass market, education, or anything else.
+Do not rely on any assumed industry. Read the business summary carefully and derive everything from it.
+Ask: who is the buyer, and which demographic sub-type in Meta's index best identifies them?
 
 OUTPUT RULES
 - Generate between 5 and 12 seeds
-- Each seed must target a distinctly different life-stage or situational angle.
-- Each seed must be distinct — no near-duplicates (e.g. pick one of "new parents" vs "parents with newborns")
+- Each seed must be distinct — no near-duplicates
 - Keep seeds concise: 2 to 5 words preferred
-- Return strict JSON only, no extra text
+- Return strict JSON only — no explanation, no preamble, no markdown
 
 OUTPUT FORMAT
 {{
   "seeds": [
     "seed_1",
     "seed_2",
-    "..."
+    "seed_3"
   ]
 }}
 

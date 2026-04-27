@@ -1,34 +1,62 @@
 Your task is to generate behavior targeting seed keywords for Meta Ads based on the business summary below.
 
 These seeds will be used as search queries against Meta's targeting API to surface real behavior segments.
-Your goal is to generate seeds that map to high-intent, purchase-oriented behavior segments on Meta.
 
-WHAT MAKES A GOOD SEED
-- Signals active purchase activity, spending patterns, or buying intent
-- Directly relevant to the type of product or service being sold
-- Likely to surface real Meta behavior segments (engaged shoppers, category buyers, spenders)
+CRITICAL — HOW META BEHAVIOR TARGETING WORKS
+Meta behavior segments are a predefined catalogue — they are not keyword-indexed like interests.
+Seeds are used as supplementary keyword searches alongside a full catalogue browse.
+A seed only has value if it matches terms Meta has already indexed in its behavior segment names.
 
-FOCUS AREAS
-- Purchase behavior: engaged shoppers, frequent online buyers, high-value goods purchasers
-- E-commerce activity: online shopping, digital buyers, ecommerce engagement
-- Spending signals: premium buyers, discretionary spenders, high-value purchases
-- Lifestyle consumption: only when clearly tied to the business (e.g. gifting, home, lifestyle)
+Meta behavior segments are organised into these fixed categories:
+- Purchase behaviour
+- Consumer classification (by country and spending tier)
+- Digital activities (platform usage, business ownership, tech adoption)
+- Travel
+- Expats (people who previously lived in a country, now abroad)
+- Financial
+- Seasonal and events
+
+HOW TO GENERATE GOOD SEEDS
+Study the business summary and ask: which behavior categories are relevant to this buyer?
+Then generate seeds using Meta's vocabulary patterns — not product descriptions.
+
+Meta's vocabulary pattern for each category:
+
+Purchase and spending (consumer and lifestyle businesses):
+Meta uses terms like "engaged shoppers", "high-value goods", "mid and high-value goods",
+"consumer classification". Generate seeds that fit this pattern for the business.
+
+Digital activity (B2B, SaaS, tech, small business products):
+Meta uses terms like "small business owners", "page admins", "early technology adopters",
+"marketing API developers", "new active business". Generate seeds that fit this pattern.
+
+Expats (India-based businesses with diaspora relevance):
+Meta uses terms like "lived in India", "expats". Use only if diaspora buyers are relevant.
+
+Travel (only if travel is directly relevant to the buyer):
+Meta uses terms like "frequent travellers", "business travellers". Use only if relevant.
+
+IMPORTANT — DO NOT copy the examples above verbatim for every business.
+Use them to understand Meta's vocabulary style, then generate seeds appropriate
+to this specific business and buyer.
 
 WHAT TO AVOID
-- Device or platform usage (iOS users, Android users, Facebook mobile users)
-- Network or connectivity type (4G users, Wi-Fi users)
-- Content creation or influencer behavior
-- Generic non-transactional behavior (e.g. "active users", "video viewers")
-- Any seed with no clear purchase or spending signal
+- Any term containing a product name (e.g. "real estate buyers", "skincare users",
+  "property seekers") — these do not exist as Meta behavior segments
+- Invented spending tiers not in Meta's vocabulary (e.g. "premium buyers",
+  "luxury spenders") — use "high-value goods" or "engaged shoppers" instead
+- Hyper-local or city-level terms
+- Device or network types (e.g. "iOS users", "4G users")
+- Content engagement terms (e.g. "video viewers", "page likers")
 
-IF BEHAVIOR TARGETING DOES NOT APPLY
-If the business has no clear purchase-intent behavior audience on Meta, return an empty seeds array.
+IF BEHAVIOR TARGETING DOES NOT CLEARLY APPLY
+If no purchase-intent or spending behavior clearly maps to this business, return an empty seeds array.
 Do not generate weak seeds to fill the output.
 
 OUTPUT RULES
 - Generate between 5 and 10 seeds
-- Each seed must target a distinctly different behavioral angle — do not generate variations of the same intent.
-- Each seed must be distinct
+- Each seed must be distinct — no near-duplicates
+- Keep seeds concise: 1 to 5 words preferred
 - Return strict JSON only, no extra text
 
 OUTPUT FORMAT
@@ -36,7 +64,7 @@ OUTPUT FORMAT
   "seeds": [
     "seed_1",
     "seed_2",
-    "..."
+    "seed_3"
   ]
 }}
 
