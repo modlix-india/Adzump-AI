@@ -47,7 +47,7 @@ LOGIC RULES:
    → overall.match = false  
    → overall.match_level = "Weak Match" or "Moderate Match" depending on location strength  
    → intent_stage = "Needs Optimization"  
-   → suggestion_type = "neutral"  
+   → suggestion_type = "no_action"  
    → reason: Only the location matches but brand is generic or missing; user intent unclear.
 
 5. **No matches across brand, configuration, or location**  
@@ -74,7 +74,7 @@ Return strictly valid JSON (no markdown, no code blocks):
       "match": true/false,
       "match_level": "Strong Match" | "Moderate Match" | "Weak Match" | "No Match",
       "intent_stage": "Positive Intent" | "Competitor Intent" | "Irrelevant" | "Needs Optimization",
-      "suggestion_type": "positive" | "negative" | "neutral",
+      "suggestion_type": "positive" | "negative" | "no_action",
       "reason": "Short, human-readable justification combining brand, configuration, and location outcomes."
     
   }

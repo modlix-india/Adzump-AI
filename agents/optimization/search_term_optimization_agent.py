@@ -107,24 +107,45 @@ class SearchTermOptimizationAgent:
     async def _analyze_terms(
         self, terms: list, summary: str
     ) -> tuple[list[KeywordRecommendation], list[KeywordRecommendation]]:
+        valid_terms = []
+        skipped_long_terms = 0
+        for t in terms:
+            text = t["search_term"]
+
+            if len(text) > KEYWORD_MAX_LENGTH:
+                skipped_long_terms += 1
+                continue
+
+            valid_terms.append(t)
+
+        if skipped_long_terms > 0:
+            logger.info(
+                "Skipped long search terms",
+                count=skipped_long_terms,
+                total_terms=len(terms),
+                reason="exceeds max keyword length",
+            )
+
+        if not valid_terms:
+            return [], []
+
         results = await asyncio.gather(
             *[
                 self.analyzer.analyze_term(summary, t["search_term"], t["metrics"])
-                for t in terms
+                for t in valid_terms
             ]
         )
 
         keywords, negative_keywords = [], []
-        for t, r in zip(terms, results):
-            text = r["text"]
-            if len(text) > KEYWORD_MAX_LENGTH:
-                logger.info(
-                    "Skipping long search term", text=text[:50], length=len(text)
-                )
+        for t, r in zip(valid_terms, results):
+            if not r or r.get("recommendation_type") in [
+                "no_action",
+                "neutral",
+            ]:  # Skip if no-action
                 continue
             match_type = _normalize_match_type(t["match_type"])
             rec = KeywordRecommendation(
-                text=text,
+                text=t["search_term"],
                 match_type=match_type,
                 reason=r["reason"],
                 metrics=r["metrics"],
