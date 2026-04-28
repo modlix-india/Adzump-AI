@@ -4,7 +4,14 @@ from typing import Literal, Any, Annotated
 from datetime import date, datetime
 import re
 
-from pydantic import BaseModel, Field, model_validator, field_validator, computed_field
+from pydantic import (
+    BaseModel,
+    Field,
+    model_validator,
+    field_validator,
+    ConfigDict,
+    computed_field,
+)
 from core.models import meta_constants
 
 
@@ -378,10 +385,18 @@ class Location(BaseModel):
         return v
 
 
+class TargetingCategory(str, Enum):
+    INTERESTS = "interests"
+    DEMOGRAPHICS = "demographics"
+    BEHAVIORS = "behaviors"
+
+
 class TargetingEntity(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     id: str = Field(..., min_length=1)
-    name: str = Field(..., min_length=1)
-    type: str = Field(..., min_length=1)
+    name: str | None = None
+    type: str | None = None
 
 
 class Targeting(BaseModel):
@@ -413,16 +428,18 @@ class Targeting(BaseModel):
         behaviors = getattr(values, "behaviors", []) or []
         demographics = getattr(values, "demographics", []) or []
 
+        non_demographic_values = {m.value for m in NonDemographicType}
+
         for i in interests:
-            if i.type != NonDemographicType.interests:
+            if i.type and i.type.lower() != NonDemographicType.interests.value:
                 raise ValueError(f"Invalid type '{i.type}' in interests")
 
         for b in behaviors:
-            if b.type != NonDemographicType.behaviors:
+            if b.type and b.type.lower() != NonDemographicType.behaviors.value:
                 raise ValueError(f"Invalid type '{b.type}' in behaviors")
 
         for d in demographics:
-            if d.type in NonDemographicType.__members__:
+            if d.type and d.type.lower() in non_demographic_values:
                 raise ValueError(f"Invalid type '{d.type}' in demographics")
 
         seen_ids: set[str] = set()
@@ -640,6 +657,27 @@ class MetaAdCreationResponse(BaseModel):
     """Unified response model containing the final state of all created/recovered IDs."""
 
     ids: ExistingIdsPayload
+
+
+# LLM response models
+class TargetingSeedsResponse(BaseModel):
+    """Parsed LLM response for seed generation."""
+
+    seeds: list[str]
+
+
+class TargetingFilterResponse(BaseModel):
+    """Parsed LLM response for candidate filtering."""
+
+    selected_ids: list[str]
+
+
+class MetaTargetingSuggestionResult(BaseModel):
+    """Complete output returned by the orchestrator."""
+
+    interests: list[TargetingEntity] = []
+    demographics: list[TargetingEntity] = []
+    behaviors: list[TargetingEntity] = []
 
 
 class LLMAdSetGenerationResponse(BaseModel):
