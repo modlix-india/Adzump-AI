@@ -52,6 +52,12 @@ from agents.chatv2.nodes import (
     select_parent_account_node,
     fetch_account_options,
     select_account_node,
+    fetch_fb_pages_options,
+    select_fb_page_node,
+    fetch_ig_pages_options,
+    select_ig_page_node,
+    fetch_pixel_options,
+    select_pixel_node,
 )
 from agents.chatv2.state import ChatState
 from core.chatv2.models import ChatStatus
@@ -65,6 +71,12 @@ FETCH_PARENT_ACCOUNT = "fetch_parent_account"
 SELECT_PARENT_ACCOUNT = "select_parent_account"
 FETCH_ACCOUNT = "fetch_account"
 SELECT_ACCOUNT = "select_account"
+FETCH_FB_PAGE = "fetch_fb_page"
+SELECT_FB_PAGE = "select_fb_page"
+FETCH_IG_PAGE = "fetch_ig_page"
+SELECT_IG_PAGE = "select_ig_page"
+FETCH_PIXEL = "fetch_pixel"
+SELECT_PIXEL = "select_pixel"
 SHOW_SUMMARY = "show_summary"
 CONFIRM = "confirm"
 
@@ -72,7 +84,10 @@ STATUS_TO_NODE = {
     ChatStatus.COMPLETED: END,
     ChatStatus.CONFIRMING_LOCATION: CONFIRM_LOCATION,
     ChatStatus.SELECTING_PARENT_ACCOUNT: SELECT_PARENT_ACCOUNT,
+    ChatStatus.SELECTING_FB_PAGE: SELECT_FB_PAGE,
+    ChatStatus.SELECTING_IG_PAGE: SELECT_IG_PAGE,
     ChatStatus.SELECTING_ACCOUNT: SELECT_ACCOUNT,
+    ChatStatus.SELECTING_PIXEL: SELECT_PIXEL,
     ChatStatus.AWAITING_CONFIRMATION: CONFIRM,
 }
 
@@ -98,6 +113,12 @@ def _build_graph() -> CompiledStateGraph:
     graph.add_node(SELECT_PARENT_ACCOUNT, select_parent_account_node)
     graph.add_node(FETCH_ACCOUNT, fetch_account_options)
     graph.add_node(SELECT_ACCOUNT, select_account_node)
+    graph.add_node(FETCH_FB_PAGE, fetch_fb_pages_options)
+    graph.add_node(SELECT_FB_PAGE, select_fb_page_node)
+    graph.add_node(FETCH_IG_PAGE, fetch_ig_pages_options)
+    graph.add_node(SELECT_IG_PAGE, select_ig_page_node)
+    graph.add_node(FETCH_PIXEL, fetch_pixel_options)
+    graph.add_node(SELECT_PIXEL, select_pixel_node)
     graph.add_node(SHOW_SUMMARY, show_summary_node)
     graph.add_node(CONFIRM, confirm_node)
 
@@ -107,7 +128,10 @@ def _build_graph() -> CompiledStateGraph:
             COLLECT_DATA: COLLECT_DATA,
             CONFIRM_LOCATION: CONFIRM_LOCATION,
             SELECT_PARENT_ACCOUNT: SELECT_PARENT_ACCOUNT,
+            SELECT_FB_PAGE: SELECT_FB_PAGE,
+            SELECT_IG_PAGE: SELECT_IG_PAGE,
             SELECT_ACCOUNT: SELECT_ACCOUNT,
+            SELECT_PIXEL: SELECT_PIXEL,
             CONFIRM: CONFIRM,
             END: END,
         },
@@ -131,19 +155,81 @@ def _build_graph() -> CompiledStateGraph:
     graph.add_conditional_edges(
         FETCH_PARENT_ACCOUNT,
         _route_after_parent,
-        {FETCH_ACCOUNT: FETCH_ACCOUNT, END: END},
+        {
+            FETCH_ACCOUNT: FETCH_ACCOUNT,
+            FETCH_FB_PAGE: FETCH_FB_PAGE,
+            END: END,
+        },
     )
     graph.add_conditional_edges(
         SELECT_PARENT_ACCOUNT,
         _route_after_parent,
-        {FETCH_ACCOUNT: FETCH_ACCOUNT, END: END},
+        {
+            FETCH_ACCOUNT: FETCH_ACCOUNT,
+            FETCH_FB_PAGE: FETCH_FB_PAGE,
+            END: END,
+        },
+    )
+    graph.add_conditional_edges(
+        FETCH_FB_PAGE,
+        _route_after_fb_page,
+        {FETCH_IG_PAGE: FETCH_IG_PAGE, END: END},
+    )
+    graph.add_conditional_edges(
+        SELECT_FB_PAGE,
+        _route_after_fb_page,
+        {FETCH_IG_PAGE: FETCH_IG_PAGE, END: END},
+    )
+    graph.add_conditional_edges(
+        FETCH_IG_PAGE,
+        _route_after_ig_page,
+        {
+            FETCH_ACCOUNT: FETCH_ACCOUNT,
+            FETCH_PIXEL: FETCH_PIXEL,
+            SHOW_SUMMARY: SHOW_SUMMARY,
+            END: END,
+        },
+    )
+    graph.add_conditional_edges(
+        SELECT_IG_PAGE,
+        _route_after_ig_page,
+        {
+            FETCH_ACCOUNT: FETCH_ACCOUNT,
+            FETCH_PIXEL: FETCH_PIXEL,
+            SHOW_SUMMARY: SHOW_SUMMARY,
+            END: END,
+        },
     )
     graph.add_conditional_edges(
         FETCH_ACCOUNT,
         _route_after_fetch_account,
+        {
+            FETCH_PIXEL: FETCH_PIXEL,
+            SHOW_SUMMARY: SHOW_SUMMARY,
+            FETCH_FB_PAGE: FETCH_FB_PAGE,
+            END: END,
+        },
+    )
+    graph.add_conditional_edges(
+        SELECT_ACCOUNT,
+        _route_after_fetch_account,
+        {
+            FETCH_PIXEL: FETCH_PIXEL,
+            SHOW_SUMMARY: SHOW_SUMMARY,
+            FETCH_FB_PAGE: FETCH_FB_PAGE,
+            END: END,
+        },
+    )
+    graph.add_conditional_edges(
+        FETCH_PIXEL,
+        _route_after_pixel,
         {SHOW_SUMMARY: SHOW_SUMMARY, END: END},
     )
-    graph.add_edge(SELECT_ACCOUNT, SHOW_SUMMARY)
+    graph.add_conditional_edges(
+        SELECT_PIXEL,
+        _route_after_pixel,
+        {SHOW_SUMMARY: SHOW_SUMMARY, END: END},
+    )
     graph.add_edge(SHOW_SUMMARY, END)
     graph.add_edge(CONFIRM, END)
 
@@ -177,14 +263,49 @@ def _route_after_predict(state: ChatState) -> str:
 
 
 def _route_after_parent(state: ChatState) -> str:
-    """After parent fetch/selection: fetch children if parent selected, else pause."""
-    if _get_status(state) == ChatStatus.SELECTING_ACCOUNT:
+    """After parent fetch/selection: fetch FB pages (Meta) or accounts (Google or manual)."""
+    status = _get_status(state)
+
+    if status == ChatStatus.SELECTING_FB_PAGE:
+        return FETCH_FB_PAGE
+    if status == ChatStatus.SELECTING_ACCOUNT:
         return FETCH_ACCOUNT
     return END
 
 
+def _route_after_fb_page(state: ChatState) -> str:
+    """After FB page: fetch IG accounts if selected, else pause."""
+    if _get_status(state) == ChatStatus.SELECTING_IG_PAGE:
+        return FETCH_IG_PAGE
+    return END
+
+
+def _route_after_ig_page(state: ChatState) -> str:
+    """After IG page: fetch ad accounts if selected, or fetch pixels if Meta, else summary."""
+    status = _get_status(state)
+    if status == ChatStatus.SELECTING_ACCOUNT:
+        return FETCH_ACCOUNT
+    if status == ChatStatus.SELECTING_PIXEL:
+        return FETCH_PIXEL
+    if status == ChatStatus.AWAITING_CONFIRMATION:
+        return SHOW_SUMMARY
+    return END
+
+
 def _route_after_fetch_account(state: ChatState) -> str:
-    """After child fetch: show summary if auto-selected, else pause."""
+    """After child fetch: show/fetch pixel (Meta) or show summary (others)."""
+    status = _get_status(state)
+    if status == ChatStatus.SELECTING_PIXEL:
+        return FETCH_PIXEL
+    if status == ChatStatus.AWAITING_CONFIRMATION:
+        return SHOW_SUMMARY
+    if status == ChatStatus.SELECTING_FB_PAGE:
+        return FETCH_FB_PAGE
+    return END
+
+
+def _route_after_pixel(state: ChatState) -> str:
+    """After pixel fetch/selection: proceed to summary."""
     if _get_status(state) == ChatStatus.AWAITING_CONFIRMATION:
         return SHOW_SUMMARY
     return END

@@ -92,11 +92,17 @@ async def fetch_account_options(state: ChatState) -> dict[str, Any]:
         new_ad_plan = dict(state["ad_plan"])
         new_ad_plan[config["account_id_field"]] = children[0].get("id")
         child_name = children[0].get("name", children[0].get("id"))
-        status = (
-            ChatStatus.AWAITING_CONFIRMATION
-            if all_fields_collected(new_ad_plan, config)
-            else ChatStatus.IN_PROGRESS
-        )
+        platform = _get_platform(state)
+
+        if platform == "meta":
+            status = ChatStatus.SELECTING_FB_PAGE
+        else:
+            status = (
+                ChatStatus.AWAITING_CONFIRMATION
+                if all_fields_collected(new_ad_plan, config)
+                else ChatStatus.IN_PROGRESS
+            )
+
         writer(
             {
                 "type": "progress",
@@ -105,12 +111,25 @@ async def fetch_account_options(state: ChatState) -> dict[str, Any]:
                 "label": f"Auto-selected {config['account_label']}: {child_name}",
             }
         )
+        # Record auto-selection if not already recorded
+        auto_selected = list(state.get("auto_selected_assets", []))
+        child_id = str(children[0].get("id"))
+        if not any(a["id"] == child_id for a in auto_selected):
+            auto_selected.append(
+                {"label": config["account_label"], "name": child_name, "id": child_id}
+            )
+
+        prev_msg = state.get("response_message", "")
+        new_msg = f"Auto-selected {config['account_label']}: {child_name}"
+        full_msg = f"{prev_msg}\n{new_msg}".strip() if prev_msg else new_msg
+
         return {
             "ad_plan": new_ad_plan,
             "account_options": children,
             "status": status,
-            "response_message": f"Auto-selected {config['account_label']}: {child_name}",
+            "response_message": full_msg,
             "account_selection": None,
+            "auto_selected_assets": auto_selected,
         }
 
     writer(
@@ -193,11 +212,36 @@ async def select_account_node(state: ChatState) -> dict[str, Any]:
         ),
         None,
     )
+    
+    # Record selection for summary
+    auto_selected = list(state.get("auto_selected_assets", []))
+    if not any(a["id"] == str(selected_id) for a in auto_selected):
+        auto_selected.append(
+            {"label": config["account_label"], "name": selected_name or selected_id, "id": str(selected_id)}
+        )
+
     end_label = (
         f"Selected: {selected_name}"
         if selected_name
         else f"{config['account_label'].capitalize()} selected"
     )
+
+    platform = _get_platform(state)
+    if platform == "meta":
+        writer(
+            {
+                "type": "progress",
+                "node": "select_account",
+                "phase": "end",
+                "label": end_label,
+            }
+        )
+        return {
+            "ad_plan": new_ad_plan,
+            "status": ChatStatus.SELECTING_FB_PAGE,
+            "account_selection": None,
+            "auto_selected_assets": auto_selected,
+        }
 
     if all_fields_collected(new_ad_plan, config):
         writer(
@@ -212,6 +256,7 @@ async def select_account_node(state: ChatState) -> dict[str, Any]:
             "ad_plan": new_ad_plan,
             "status": ChatStatus.AWAITING_CONFIRMATION,
             "account_selection": None,
+            "auto_selected_assets": auto_selected,
         }
 
     writer(
@@ -227,9 +272,13 @@ async def select_account_node(state: ChatState) -> dict[str, Any]:
         "status": ChatStatus.IN_PROGRESS,
         "response_message": f"{config['account_label'].capitalize()} selected.",
         "account_selection": None,
+        "auto_selected_assets": auto_selected,
     }
 
 
 def _get_config(state: ChatState) -> dict:
-    platform = state.get("ad_plan", {}).get("platform", "google")
-    return PLATFORM_CONFIG[platform]
+    return PLATFORM_CONFIG[_get_platform(state)]
+
+
+def _get_platform(state: ChatState) -> str:
+    return state.get("ad_plan", {}).get("platform", "google")
