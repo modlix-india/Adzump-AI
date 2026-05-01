@@ -78,8 +78,12 @@ async def _fetch_adzump_session(
     """
     base = get_base_url().rstrip("/")
     url = f"{base}/{ADZUMP_APP_CODE}/{client_code}/api/ai/adzump/sessions/{adzump_session_id}"
+    # Ds's AuthContextMiddleware strips the "Bearer " prefix on inbound, so
+    # access_token is a bare JWT here. Saas's securityContextAuthentication
+    # filter rejects bare tokens — always prefix on the way out.
+    bearer = access_token if access_token.lower().startswith("bearer ") else f"Bearer {access_token}"
     headers = {
-        "authorization": access_token,
+        "authorization": bearer,
         "clientCode": client_code,
         "appCode": ADZUMP_APP_CODE,
         "X-Forwarded-Host": x_forwarded_host or "",
