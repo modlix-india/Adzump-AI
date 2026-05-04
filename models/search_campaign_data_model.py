@@ -12,7 +12,7 @@ class GenerateCampaignRequest(BaseModel):
     goal: str
     websiteURL: str
     geoTargetTypeSetting: Dict[str, Any]
-    locations: List[Dict[str, str]]
+    locations: List[Dict[str, Any]]
     targeting: List[Dict[str, Any]]
     networkSettings: Optional[Dict[str, Any]] = None
     trackingUrlTemplate: Optional[str] = None
