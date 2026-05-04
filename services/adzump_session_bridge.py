@@ -213,7 +213,11 @@ def _create_ds_session(campaign_data: dict, client_code: str) -> str:
         "chat_history": [],
         "last_activity": datetime.now(timezone.utc),
         "campaign_data": campaign_data,
-        "status": "ready",  # not "in_progress" — adzump already collected the data
+        # adzump already collected and confirmed everything — mark complete so
+        # `get_basic_details` returns the actual `campaign_data` dict (the
+        # in-progress branch returns presence booleans only, which broke
+        # downstream ads/keywords UIs that read real values).
+        "status": "completed",
         "mcc_options": [],
         "customer_options": [],
         "client_code": client_code,
