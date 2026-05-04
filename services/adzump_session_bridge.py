@@ -163,25 +163,39 @@ def _strip_account_id(value: Any) -> Optional[str]:
 
 def map_adzump_context_to_campaign_data(context: dict) -> dict:
     """Pure transform: adzump session.context dict → ds campaign_data dict."""
+    from utils.helpers import get_today_end_date_with_duration
+
     product = context.get("product_data") or {}
     spec = context.get("campaign_spec") or {}
     competitive = context.get("competitor_analysis") or {}
     location_meta = context.get("_location_meta") or {}
     account_names = context.get("account_names") or {}
 
+    duration_days = _extract_int(spec.get("duration"))
+    summary = product.get("summary") or ""
+
+    # Compute startDate/endDate from durationDays — ds chat normally seeds
+    # these at confirmation time (helpers.get_today_end_date_with_duration);
+    # adzump skips that step so we do it here.
+    dates = get_today_end_date_with_duration(duration_days) if duration_days else {}
+
     return {
         # Core CampaignData fields (typed in models/campaign_data_model.py)
         "businessName": product.get("product_name") or "",
         "websiteURL": _resolve_url(context),
         "budget": str(_extract_int(spec.get("budget")) or "") or None,
-        "durationDays": _extract_int(spec.get("duration")),
+        "durationDays": duration_days,
+        "startDate": dates.get("startDate"),
+        "endDate": dates.get("endDate"),
         "loginCustomerId": _strip_account_id(spec.get("parent_account")),
         "customerId": _strip_account_id(spec.get("account")),
 
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
-        "productSummary": product.get("summary") or "",
+        "productSummary": summary,
+        # ds keyword/creative services read `business_summary` (snake_case)
+        "business_summary": summary,
         "businessType": product.get("business_type") or "",
         "competitors": competitive.get("competitors") or [],
         "accountNames": account_names,
@@ -213,7 +227,11 @@ def _create_ds_session(campaign_data: dict, client_code: str) -> str:
         "chat_history": [],
         "last_activity": datetime.now(timezone.utc),
         "campaign_data": campaign_data,
-        "status": "ready",  # not "in_progress" — adzump already collected the data
+        # adzump already collected and confirmed everything — mark complete so
+        # `get_basic_details` returns the actual `campaign_data` dict (the
+        # in-progress branch returns presence booleans only, which broke
+        # downstream ads/keywords UIs that read real values).
+        "status": "completed",
         "mcc_options": [],
         "customer_options": [],
         "client_code": client_code,
