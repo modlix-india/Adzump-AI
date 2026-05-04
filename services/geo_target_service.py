@@ -21,15 +21,17 @@ class GeoTargetService:
     DEFAULT_RADIUS_KM = 15
 
     # Grid configuration
-    GRID_STEP_KM = 5  # 5km steps
-    MAX_GRID_POINTS = 40  # Safety cap
+    GRID_STEP_KM = 3  # 3km steps (denser scan)
+    MAX_GRID_POINTS = 100  # Increased for larger radius/denser scan
     MAX_CONCURRENT_GEOCODE = 10  # Parallel requests
     MIN_DISTANCE_KM = 2.0  # Deduplication threshold
 
     def __init__(self, client_code: str) -> None:
         self._google_maps_api_key = os.getenv("GOOGLE_MAPS_API_KEY")
         self._developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")
-        self._access_token = os.getenv("GOOGLE_ADS_ACCESS_TOKEN") or fetch_google_api_token_simple(client_code)
+        self._access_token = os.getenv(
+            "GOOGLE_ADS_ACCESS_TOKEN"
+        ) or fetch_google_api_token_simple(client_code)
 
     async def suggest_geo_targets(
         self,
@@ -39,6 +41,7 @@ class GeoTargetService:
     ) -> TargetPlaceResponse:
         product_location = area_location
         product_coordinates = coordinates
+        target_state = ""
 
         # Try to get coordinates - either from input or by geocoding area_location
         if not self._is_valid_coordinates(coordinates):
@@ -51,22 +54,24 @@ class GeoTargetService:
                     coordinates = {"lat": geo_data["lat"], "lng": geo_data["lng"]}
                     product_location = geo_data.get("name", area_location)
                     product_coordinates = coordinates
+                    target_state = geo_data.get("state", "")
 
             if not self._is_valid_coordinates(coordinates):
                 logger.error("No valid coordinates and no area_location to geocode")
                 return TargetPlaceResponse(locations=[], unresolved=[])
 
-        # If coordinates were provided directly (map embed), reverse-geocode to get the specific business site name
+        # If coordinates were provided directly (map embed), reverse-geocode to get the specific business site name and state
         if product_coordinates and self._is_valid_coordinates(product_coordinates):
             rev_geo = await self._reverse_geocode_center(
                 product_coordinates["lat"], product_coordinates["lng"]
             )
             if rev_geo:
-                product_location = rev_geo
+                product_location = rev_geo.get("name")
+                target_state = rev_geo.get("state", "")
 
         lat, lng = coordinates["lat"], coordinates["lng"]
         logger.info(
-            f"Starting grid-based geo-targeting at ({lat}, {lng}), radius={radius_km}km"
+            f"Starting geo-targeting at ({lat}, {lng}), target_state={target_state}, radius={radius_km}km"
         )
 
         # Step 1: Generate grid
@@ -75,7 +80,9 @@ class GeoTargetService:
         )
 
         # Step 2: Geocode grid points (async) + extract country
-        locations, country_code = await self._geocode_grid_points_async(grid_points)
+        locations, country_code = await self._geocode_grid_points_async(
+            points=grid_points, target_state=target_state
+        )
 
         if not locations:
             logger.warning("No locations found from grid")
@@ -103,10 +110,11 @@ class GeoTargetService:
             f"Resolving {len(location_names)} verified locations to geo-target constants"
         )
 
-        # Step 5: Resolve to Google Ads (using extracted country_code)
+        # Step 5: Resolve to Google Ads (using extracted country_code and target_state)
         result = await self.resolve_locations_batch(
             locations=location_names,
             country_code=country_code,
+            target_state=target_state,
         )
 
         # Add distance and LOG distances after resolution
@@ -159,7 +167,7 @@ class GeoTargetService:
         return points
 
     async def _geocode_grid_points_async(
-        self, points: List[Dict[str, float]]
+        self, points: List[Dict[str, float]], target_state: str = ""
     ) -> tuple[List[Dict], str]:
         country_code: Optional[str] = None
         semaphore = Semaphore(self.MAX_CONCURRENT_GEOCODE)
@@ -234,10 +242,18 @@ class GeoTargetService:
 
                     if best_component and best_res:
                         name = best_component.get("long_name")
-                        # Add parent city if it's different from the name itself
-                        search_name = name
+
+                        # Build enriched search name: "Neighborhood, City, State, Country"
+                        search_parts = [name]
                         if parent_city and parent_city.lower() != name.lower():
-                            search_name = f"{name}, {parent_city}"
+                            search_parts.append(parent_city)
+
+                        if target_state:
+                            search_parts.append(target_state)
+
+                        search_parts.append(country_code or "IN")
+
+                        search_name = ", ".join(search_parts)
 
                         geo = best_res.get("geometry", {}).get("location", {})
                         return {
@@ -299,6 +315,7 @@ class GeoTargetService:
         self,
         locations: List[str],
         country_code: str = "IN",
+        target_state: str = "",
         locale: str = "en",
     ) -> TargetPlaceResponse:
         """Resolve location names to geoTargetConstants using Google Ads API."""
@@ -351,6 +368,7 @@ class GeoTargetService:
                 resolved, resolved_names = self._process_suggestions(
                     suggestions,
                     original_locations=set(loc.lower() for loc in batch),
+                    target_state=target_state,
                 )
 
                 # Accumulate results
@@ -433,8 +451,22 @@ class GeoTargetService:
                 formatted_address = results[0].get("formatted_address")
 
                 if lat and lng:
-                    logger.info(f"Geocoded '{area_location}' to ({lat}, {lng})")
-                    return {"lat": lat, "lng": lng, "name": formatted_address}
+                    # Extract state
+                    state = ""
+                    for component in results[0].get("address_components", []):
+                        if "administrative_area_level_1" in component.get("types", []):
+                            state = component.get("long_name", "")
+                            break
+
+                    logger.info(
+                        f"Geocoded '{area_location}' to ({lat}, {lng}) in state: {state}"
+                    )
+                    return {
+                        "lat": lat,
+                        "lng": lng,
+                        "name": formatted_address,
+                        "state": state,
+                    }
 
             logger.warning(f"No coordinates found for '{area_location}'")
             return None
@@ -443,8 +475,8 @@ class GeoTargetService:
             logger.exception(f"Error geocoding '{area_location}': {e}")
             return None
 
-    async def _reverse_geocode_center(self, lat: float, lng: float) -> Optional[str]:
-        """Reverse geocode specific coordinates to get a formal address name."""
+    async def _reverse_geocode_center(self, lat: float, lng: float) -> Optional[Dict]:
+        """Reverse geocode specific coordinates to get a formal address name and state."""
         if not self._google_maps_api_key:
             return None
 
@@ -455,8 +487,16 @@ class GeoTargetService:
             data = response.json()
 
             if data.get("status") == "OK" and data.get("results"):
-                # Use formatted address of the most specific result
-                return data["results"][0].get("formatted_address")
+                result = data["results"][0]
+                name = result.get("formatted_address")
+
+                state = ""
+                for component in result.get("address_components", []):
+                    if "administrative_area_level_1" in component.get("types", []):
+                        state = component.get("long_name", "")
+                        break
+
+                return {"name": name, "state": state}
         except Exception as e:
             logger.debug(f"Reverse geocoding center failed: {e}")
         return None
@@ -551,6 +591,7 @@ class GeoTargetService:
         self,
         suggestions: List[Dict],
         original_locations: Optional[set] = None,
+        target_state: str = "",
     ) -> tuple[List[TargetPlaceLocation], set]:
         resolved: List[TargetPlaceLocation] = []
         resolved_canonical_names: set = set()
@@ -590,8 +631,14 @@ class GeoTargetService:
                 )
                 continue
 
-            # Removed state filtering to support multi-state radius results
-            # The Haversine distance verification in Step 3 is now our primary accuracy anchor.
+            # State validation (Lock to target state if provided)
+            if target_state:
+                # canonical_name is usually "Neighborhood, City, State, Country"
+                if target_state.lower() not in canonical_name.lower():
+                    logger.info(
+                        f"Skipping cross-state match: {canonical_name} (Target State: {target_state})"
+                    )
+                    continue
 
             if search_term_lower not in by_search_term:
                 by_search_term[search_term_lower] = []
