@@ -4,6 +4,7 @@ from structlog import get_logger  # type: ignore
 import structlog.contextvars
 
 from oserver.services.storage_service import storage_service
+from utils.helpers import normalize_url
 from oserver.models.storage_request_model import (
     StorageReadRequest,
     StorageFilter,
@@ -79,12 +80,15 @@ class CompetitorAnalysisOrchestrator:
         self, business_url: str
     ) -> Tuple[Dict[str, Any], str, BusinessMetadata]:
         """Fetch business record and resolve info context."""
-        # 1. Fetch from storage
+        # 1. Fetch from storage. Normalize the URL to match how records are
+        # keyed (lowercase host, no www., no trailing slash, force https).
+        # Without this, e.g. "https://example.com/" misses the record stored
+        # under "https://example.com".
         read_req = StorageReadRequest(
             storageName=self.STORAGE_NAME,
             appCode=self.APP_CODE,
             clientCode=auth_context.client_code,
-            filter=StorageFilter(field="businessUrl", value=business_url),
+            filter=StorageFilter(field="businessUrl", value=normalize_url(business_url)),
         )
         resp = await storage_service.read_page_storage(read_req)
 
