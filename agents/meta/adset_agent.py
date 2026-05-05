@@ -282,14 +282,32 @@ class MetaAdSetAgent:
         async def resolve_target(target):
             logger.info("meta_adset_geo.resolving_target", target=target)
 
+            target_type = target.get("targetType")
             canonical = target.get("canonicalName")
+
+            # Strategy 1: Use specific query based on target type
+            search_query = canonical
+            if target_type == "Postal Code" and canonical:
+                # Strip ZIP to just digits (e.g. "560083,Karnataka,India" -> "560083")
+                search_query = canonical.split(",")[0].strip()
 
             results = await self.geo_targeting_adapter.search_locations(
                 client_code=auth_context.client_code,
-                location_name=canonical,
+                location_name=search_query,
                 limit=5,
             )
 
+            # Strategy 2: Fallback to broad search (just the locality name)
+            if not results and canonical:
+                locality_query = canonical.split(",")[0].strip()
+                if locality_query != search_query:  # Avoid redundant search
+                    results = await self.geo_targeting_adapter.search_locations(
+                        client_code=auth_context.client_code,
+                        location_name=locality_query,
+                        limit=5,
+                    )
+
+            # Strategy 3: Final fallback to display name
             if not results:
                 results = await self.geo_targeting_adapter.search_locations(
                     client_code=auth_context.client_code,
@@ -299,7 +317,6 @@ class MetaAdSetAgent:
 
             if not results:
                 return []
-
             filtered = []
 
             for r in results:
