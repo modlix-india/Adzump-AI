@@ -16,6 +16,9 @@ Business Summary:
 Creative Strategy:
 {strategy}
 
+Valid CTAs:
+{valid_ctas}
+
 ---
 
 Task:
@@ -92,34 +95,12 @@ Never exceed character limits.
 
 IMPORTANT:
 Return CTA values in UPPER_SNAKE_CASE exactly as required by Meta Ads API.
-Example: SIGN_UP, LEARN_MORE, SHOP_NOW
-
 
 CTA Selection Rules:
-
-Choose ONE CTA that aligns with the campaign goal:
-
-- If goal is "awareness":
-  - Learn More
-  - See More
-
-- If goal is "traffic":
-  - Learn More
-  - Get Started
-  - Download
-
-- If goal is "leads":
-  - Contact Us
-  - Sign Up
-  - Get Quote
-  - Book Now
-  - Apply Now
-
-- If goal is "conversions":
-  - Shop Now
-  - Get Offer
-  - Order Now
-  - Subscribe
+You MUST choose exactly ONE CTA from the "Valid CTAs" list provided above.
+Do NOT use any CTA not in the "Valid CTAs" list.
+Read the business summary and creative strategy carefully.
+Pick the single most contextually relevant CTA that best matches what a user would naturally do after seeing this ad.
 
 ---
 
