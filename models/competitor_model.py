@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
@@ -8,13 +8,13 @@ class RelatedQuery(BaseModel):
 
 
 class KeywordAlternatives(BaseModel):
-    top: List[RelatedQuery] = Field(default_factory=list)
-    rising: List[RelatedQuery] = Field(default_factory=list)
+    top: list[RelatedQuery] = Field(default_factory=list)
+    rising: list[RelatedQuery] = Field(default_factory=list)
 
 
 class TrendInterestMetrics(BaseModel):
-    values: List[int] = Field(default_factory=list)
-    dates: List[str] = Field(default_factory=list)
+    values: list[int] = Field(default_factory=list)
+    dates: list[str] = Field(default_factory=list)
     avg_interest: float = 0.0
     max_interest: int = 0
     min_interest: int = 0
@@ -25,23 +25,23 @@ class TrendInterestMetrics(BaseModel):
 
 class TrendInterestResponse(BaseModel):
     success: bool = True
-    keywords: List[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
     timeframe: str = "today 12-m"
-    data: Dict[str, TrendInterestMetrics] = Field(default_factory=dict)
+    data: dict[str, TrendInterestMetrics] = Field(default_factory=dict)
 
 
 class RelatedQueriesResponse(BaseModel):
     success: bool = True
     keyword: str
-    top: List[RelatedQuery] = Field(default_factory=list)
-    rising: List[RelatedQuery] = Field(default_factory=list)
+    top: list[RelatedQuery] = Field(default_factory=list)
+    rising: list[RelatedQuery] = Field(default_factory=list)
 
 
 class TrendingSearchResponse(BaseModel):
     success: bool = True
     country: str
     date: str
-    trending_searches: List[str] = Field(default_factory=list)
+    trending_searches: list[str] = Field(default_factory=list)
 
 
 class KeywordOpportunityScoring(BaseModel):
@@ -49,10 +49,12 @@ class KeywordOpportunityScoring(BaseModel):
 
     keyword: str = Field(..., description="The keyword text")
     opportunity_score: float = Field(default=0, ge=0, le=100)
-    difficulty: str = "medium"
-    strategic_fit: str = "moderate"
     recommended_action: str = ""
     reasoning: str = ""
+    competitor_advantage: str | None = Field(
+        None,
+        description="Why this keyword gives the competitor a strategic edge",
+    )
 
 
 class CompetitorKeyword(KeywordOpportunityScoring):
@@ -64,20 +66,13 @@ class CompetitorKeyword(KeywordOpportunityScoring):
         default="content",
         description="Where it was found: heading, title, meta, url_path, content, autocomplete",
     )
-    relevance: float = Field(
-        default=0.5, description="Relevance score 0-1", ge=0.0, le=1.0
-    )
     intent: str = Field(
         default="commercial",
         description="Search intent: informational, commercial, transactional, navigational",
     )
-    suggested_match_type: str = Field(
-        default="BROAD",
-        description="LLM-suggested match type for Google Ads: EXACT, PHRASE, BROAD",
-    )
-    competitor_advantage: Optional[str] = Field(
-        None,
-        description="Why this keyword gives the competitor a strategic edge",
+    match_type: str = Field(
+        default="PHRASE",
+        description="LLM-suggested match type for Google Ads: EXACT, PHRASE",
     )
 
     volume: int = 0
@@ -96,20 +91,38 @@ class Competitor(BaseModel):
     pages_scraped: int = Field(
         default=1, description="Number of pages scraped for this competitor"
     )
-    extracted_keywords: List[CompetitorKeyword] = Field(
+    extracted_keywords: list[CompetitorKeyword] = Field(
         default_factory=list, description="Keywords extracted from competitor site"
     )
-    features: List[str] = Field(
+    features: list[str] = Field(
         default_factory=list, description="Core product features extracted"
     )
-    summary: Optional[str] = Field(
+    summary: str | None = Field(
         None, description="Brief summary of competitor positioning"
     )
-    reasoning: Optional[str] = Field(
+    reasoning: str | None = Field(
         None, description="AI reasoning for why this is a competitor"
     )
 
 
 class CompetitorAnalysisResult(BaseModel):
-    competitor_analysis: List[Competitor] = Field(default_factory=list)
-    enriched_keywords: List[CompetitorKeyword] = Field(default_factory=list)
+    competitor_analysis: list[Competitor] = Field(default_factory=list)
+    enriched_keywords: list[CompetitorKeyword] = Field(default_factory=list)
+
+    @staticmethod
+    def load_from_record(record: dict) -> tuple[list[Competitor], list[Competitor]]:
+        """
+        Utility to parse and validate competitor lists from a raw database(storage) record.
+        Returns: (raw_competitors_to_analyze, existing_competitor_analysis)
+        """
+        raw_comps = [
+            Competitor.model_validate(c)
+            for c in record.get("competitors", [])
+            if isinstance(c, dict)
+        ]
+        existing_comps = [
+            Competitor.model_validate(c)
+            for c in record.get("competitor_analysis", [])
+            if isinstance(c, dict)
+        ]
+        return raw_comps, existing_comps

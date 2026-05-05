@@ -210,8 +210,8 @@ class PyTrendsService:
         """Raise the appropriate typed exception based on the error.
 
         Rate-limit errors (429) are raised as TrendRateLimitException so that
-        the @async_retry decorator on the calling method can catch them by type
-        and retry the request after a backoff delay.
+        the @_retry_on_rate_limit decorator on the calling method can catch them
+        by type and retry the request after a backoff delay.
         """
         if "429" in str(e):
             # Warning not error — this is a retryable condition, the decorator
