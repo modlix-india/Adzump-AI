@@ -2,7 +2,12 @@ import asyncio
 import structlog
 
 from adapters.meta.adsets import MetaAdSetAdapter
-from core.models.meta import AdSetPayload, CreateAdSetRequest, DetailedTargeting
+from core.models.meta import (
+    LLMAdSetTargeting,
+    CreateAdSetRequest,
+    DetailedTargeting,
+    LLMAdSetGenerationResponse,
+)
 from agents.shared.llm import chat_completion
 from core.infrastructure.context import auth_context
 from exceptions.custom_exceptions import (
@@ -30,7 +35,9 @@ class MetaAdSetAgent:
         self.targeting_adapter = MetaDetailedTargetingAdapter()
         self.geo_targeting_adapter = MetaGeoTargetingAdapter()
 
-    async def generate_payload(self, session_id: str, ad_account_id: str) -> dict:
+    async def generate_payload(
+        self, session_id: str, ad_account_id: str
+    ) -> LLMAdSetGenerationResponse:
         website_data = await self.business_service.fetch_website_data(session_id)
 
         logger.info(
@@ -104,14 +111,14 @@ class MetaAdSetAgent:
             allowed_countries=allowed_countries,
         )
 
-        return {
-            "genders": targeting.genders,
-            "age_min": targeting.age_min,
-            "age_max": targeting.age_max,
-            "locales": locales,
-            "flexible_spec": flexible_spec,
-            "locations": locations,
-        }
+        return LLMAdSetGenerationResponse(
+            genders=targeting.genders,
+            age_min=targeting.age_min,
+            age_max=targeting.age_max,
+            locales=locales,
+            flexible_spec=flexible_spec,
+            locations=locations,
+        )
 
     # TODO: wire to API route when adset creation endpoint is added
     async def create_adset(
@@ -130,7 +137,7 @@ class MetaAdSetAgent:
         self,
         summary: str,
         business_type: str,
-    ) -> AdSetPayload:
+    ) -> LLMAdSetTargeting:
         template = load_prompt("meta/adset.txt")
         prompt = template.format(
             summary=summary,
@@ -150,7 +157,7 @@ class MetaAdSetAgent:
         if not raw_output:
             raise AIProcessingException("LLM returned empty response")
         try:
-            return AdSetPayload.model_validate_json(raw_output)
+            return LLMAdSetTargeting.model_validate_json(raw_output)
         except ValidationError as e:
             logger.error(
                 "Failed to parse AdSet LLM output",
@@ -256,18 +263,28 @@ class MetaAdSetAgent:
             return None
 
         allowed_region = None
+        allowed_country_code = None
         if suggested_geo_targets:
             first = suggested_geo_targets[0]
-            canonical = first.get("canonicalName")
 
+            # Extract country code from the 'name' field (e.g., "..., IN")
+            display_name = first.get("name")
+            if display_name:
+                name_parts = [p.strip() for p in display_name.split(",")]
+                if name_parts:
+                    allowed_country_code = name_parts[-1].strip().upper()
+
+            # Extract region from the 'canonicalName' (e.g., "..., Karnataka, India")
+            canonical = first.get("canonicalName")
             if canonical:
                 parts = [p.strip() for p in canonical.split(",")]
                 if len(parts) >= 2:
                     allowed_region = parts[-2].strip().lower()
 
         logger.info(
-            "meta_adset_geo.derived_allowed_region",
+            "meta_adset_geo.derived_filters",
             allowed_region=allowed_region,
+            allowed_country_code=allowed_country_code,
         )
 
         all_valid_results = []
@@ -275,14 +292,32 @@ class MetaAdSetAgent:
         async def resolve_target(target):
             logger.info("meta_adset_geo.resolving_target", target=target)
 
+            target_type = target.get("targetType")
             canonical = target.get("canonicalName")
+
+            # Strategy 1: Use specific query based on target type
+            search_query = canonical
+            if target_type == "Postal Code" and canonical:
+                # Strip ZIP to just digits (e.g. "560083,Karnataka,India" -> "560083")
+                search_query = canonical.split(",")[0].strip()
 
             results = await self.geo_targeting_adapter.search_locations(
                 client_code=auth_context.client_code,
-                location_name=canonical,
+                location_name=search_query,
                 limit=5,
             )
 
+            # Strategy 2: Fallback to broad search (just the locality name)
+            if not results and canonical:
+                locality_query = canonical.split(",")[0].strip()
+                if locality_query != search_query:  # Avoid redundant search
+                    results = await self.geo_targeting_adapter.search_locations(
+                        client_code=auth_context.client_code,
+                        location_name=locality_query,
+                        limit=5,
+                    )
+
+            # Strategy 3: Final fallback to display name
             if not results:
                 results = await self.geo_targeting_adapter.search_locations(
                     client_code=auth_context.client_code,
@@ -292,15 +327,39 @@ class MetaAdSetAgent:
 
             if not results:
                 return []
-
             filtered = []
 
             for r in results:
+                # 1. Strict Country Code Filter
+                if allowed_country_code and r.get("country_code"):
+                    if r.get("country_code").strip().upper() != allowed_country_code:
+                        logger.info(
+                            "meta_adset_geo.skip_country_mismatch",
+                            name=r.get("name"),
+                            found=r.get("country_code"),
+                            expected=allowed_country_code,
+                        )
+                        continue
+
+                # 2. Special Ad Category Country Filter
                 if allowed_countries and r.get("country_code") not in allowed_countries:
+                    logger.info(
+                        "meta_adset_geo.skip_special_category_mismatch",
+                        name=r.get("name"),
+                        found=r.get("country_code"),
+                        allowed=allowed_countries,
+                    )
                     continue
 
+                # 3. Strict Region Filter
                 if allowed_region and r.get("region"):
                     if r.get("region").strip().lower() != allowed_region:
+                        logger.info(
+                            "meta_adset_geo.skip_region_mismatch",
+                            name=r.get("name"),
+                            found=r.get("region"),
+                            expected=allowed_region,
+                        )
                         continue
 
                 filtered.append(r)

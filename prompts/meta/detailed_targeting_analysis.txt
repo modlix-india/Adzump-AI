@@ -1,0 +1,89 @@
+Your task is to evaluate a list of Meta targeting candidates and return only those with a strong, direct connection to the given business and its buyers.
+
+When in doubt — reject. A smaller, high-quality list always beats a larger, diluted one.
+
+STEP 1 — UNDERSTAND THE BUSINESS
+
+Before evaluating any candidate, extract from the business summary:
+- What product or service is being sold?
+- Who is the most likely buyer? (demographics, lifestyle, behavior)
+- What problem does the product solve or desire does it fulfill?
+- What would a buyer be doing, interested in, or searching for before purchasing?
+
+Use this buyer profile as your filter for every candidate.
+
+STEP 2 — EVALUATE EACH CANDIDATE
+
+Apply these checks in order. Fail any check → reject immediately.
+
+A. Direct Relevance
+Does this candidate have a clear, direct connection to what the business sells or who buys it?
+- Direct means: someone matching this segment is meaningfully more likely to be a buyer
+- Loosely related or could maybe apply is not enough → reject
+
+B. Intent Signal
+Does this candidate indicate real purchase intent, spending behavior, or life-stage relevance?
+
+Keep if:
+- Active buying behavior in the relevant category
+- High discretionary spending or premium consumption
+- Lifestyle strongly associated with the product
+- Life stage that directly triggers this type of purchase
+
+Reject if:
+- Passive interest with no buying connection
+- Generic platform behavior (device type, connectivity, app access)
+- Broad demographic with no targeting precision
+- Vague affinity that could apply to almost anyone
+
+C. Geography
+If this candidate is locked to a specific country or region outside the business's target market → reject.
+
+STEP 3 — CATEGORY-SPECIFIC RULES
+
+INTERESTS
+Keep: hobbies, brand affinities, topic communities, lifestyle interests directly tied to the business domain
+Reject: interests so broad they apply to a general population; any interest where the connection to the business requires more than one logical step
+
+BEHAVIORS
+Keep: engaged shoppers, frequent online buyers, high-value goods purchasers, category-specific purchase intent, lifestyle or luxury spenders, e-commerce engagement
+Reject: device ownership, network or connectivity type, generic platform access patterns, any segment with no clear purchase or spending signal
+
+DEMOGRAPHICS
+Keep only when the life stage or situation directly triggers or strongly predicts a purchase:
+- Life stage triggers: new parents, college students, newly married, recently moved, new homeowners, empty nesters
+- Occupation: specific job roles that are direct buyers of this product
+- Education: only when it correlates with income or buying behavior for this product
+- Relationship or family status: only when directly tied to a life-stage purchase
+
+Reject:
+- Broad imprecise groups (e.g. "Parents – All", "Homeowners", "Adults 18–65")
+- Any segment so large it offers no real targeting advantage
+- Education or relationship status that does not connect to this product's buyer profile
+
+Before keeping any demographic candidate, confirm:
+1. Does being in this group make someone meaningfully more likely to buy this specific product?
+2. Is this segment precise enough to offer a real targeting advantage?
+3. Is the connection to the business direct — not assumed or stretched?
+If any answer is NO → reject.
+
+STEP 4 — OUTPUT
+
+Return only the IDs of candidates that pass all checks.
+Do not generate, rename, or modify any candidates.
+Do not include explanations, reasoning, or commentary.
+Strict JSON only.
+
+OUTPUT FORMAT
+{{
+  "selected_ids": ["id1", "id2", "id3"]
+}}
+
+BUSINESS CONTEXT
+{summary}
+
+TARGETING CATEGORY
+{category}
+
+CANDIDATES
+{candidates}

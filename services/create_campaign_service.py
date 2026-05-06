@@ -1,7 +1,10 @@
 # services/campaign_service.py
 from typing import Any, Dict
+from structlog import get_logger
 
 from third_party.google.services import google_ads_client , build_google_search_ad_payload
+
+logger = get_logger(__name__)
 
 
 class CampaignServiceError(Exception):
@@ -32,6 +35,8 @@ async def create_and_post_campaign(
             "login_customer_id is required in the request payload (key: login_customer_id or loginCustomerId or login-customer-id)"
         )
 
+    logger.info("Starting Campaign Creation Flow", customer_id=customer_id, client_code=client_code)
+
     # Build mutate payload using your existing generator
     mutate_payload = build_google_search_ad_payload.generate_google_ads_mutate_operations(customer_id=customer_id, campaign_data_payload=request_body)
 
@@ -45,6 +50,8 @@ async def create_and_post_campaign(
             api_version=api_version,
         )
     except Exception as e:
+        logger.error("Campaign Creation Failed", error=str(e), customer_id=customer_id)
         raise CampaignServiceError(str(e))
 
+    logger.info("Campaign Creation Flow Completed", customer_id=customer_id)
     return response

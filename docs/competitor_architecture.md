@@ -245,12 +245,12 @@ User: "Why 75? What does that mean for me?"
 Returns:
 {
   "opportunity_score": 72,
-  "strategic_fit": "medium",
   "reasoning": "While volume is attractive (12K/month), this generic term is
                 dominated by Asana, Monday, Trello with DR 80+. For a small team,
                 better ROI comes from 'project management for remote teams'
                 which has 8.5K volume, aligns with your async-first positioning,
                 and faces realistic competition.",
+  "competitor_advantage": "Strong top-of-funnel traffic driver for established market leaders.",
   "recommended_action": "Skip this generic term. Target the long-tail variation instead."
 }
 
@@ -710,12 +710,10 @@ BUSINESS CONTEXT:
 - Business Size: Small team, limited budget
 
 Provide:
-1. opportunity_score (0–100) with detailed reasoning
-2. strategic_fit — high / medium / low
-3. difficulty — easy / medium / hard
-4. time_to_rank — realistic estimate
-5. reasoning — why this is or isn't a good opportunity
-6. recommended_action — specific next step
+1. opportunity_score (0–100)
+2. competitor_advantage (Strategic reason why the competitor currenty wins here)
+3. reasoning — why this is or isn't a good opportunity
+4. recommended_action — specific next step
 
 JSON format."
 ```
@@ -736,10 +734,8 @@ JSON format."
       "ranking_competitors": 5,
 
       "opportunity_score": 87,
-      "strategic_fit": "high",
-      "difficulty": "medium",
-      "time_to_rank": "3–4 months",
       "reasoning": "Excellent fit with your async-first positioning. Rising trend (+25.7%) aligns with remote work growth. Medium competition is realistic. Volume (8.5K) is meaningful without being dominated by giants.",
+      "competitor_advantage": "Highly relevant landing page with deep feature documentation.",
       "recommended_action": "CREATE: Dedicated /remote-teams landing page + 3 supporting blog posts. Timeline: 3–4 months to page 1."
     },
     {
@@ -750,10 +746,8 @@ JSON format."
       "trend_slope": 0.8,
 
       "opportunity_score": 41,
-      "strategic_fit": "low",
-      "difficulty": "hard",
-      "time_to_rank": "12+ months",
       "reasoning": "High volume but poor strategic fit. 'Free' intent signals low purchase intent — these users won't convert to your paid plans. Dominated by Trello, Asana free tier with DR 80+. Not winnable.",
+      "competitor_advantage": "Massive historical domain authority for 'free' software terms.",
       "recommended_action": "SKIP: Redirect effort to keywords matching your paid ICP."
     }
   ]

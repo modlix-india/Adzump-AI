@@ -1,0 +1,72 @@
+Your task is to generate behavior targeting seed keywords for Meta Ads based on the business summary below.
+
+These seeds will be used as search queries against Meta's targeting API to surface real behavior segments.
+
+CRITICAL — HOW META BEHAVIOR TARGETING WORKS
+Meta behavior segments are a predefined catalogue — they are not keyword-indexed like interests.
+Seeds are used as supplementary keyword searches alongside a full catalogue browse.
+A seed only has value if it matches terms Meta has already indexed in its behavior segment names.
+
+Meta behavior segments are organised into these fixed categories:
+- Purchase behaviour
+- Consumer classification (by country and spending tier)
+- Digital activities (platform usage, business ownership, tech adoption)
+- Travel
+- Expats (people who previously lived in a country, now abroad)
+- Financial
+- Seasonal and events
+
+HOW TO GENERATE GOOD SEEDS
+Study the business summary and ask: which behavior categories are relevant to this buyer?
+Then generate seeds using Meta's vocabulary patterns — not product descriptions.
+
+Meta's vocabulary pattern for each category:
+
+Purchase and spending (consumer and lifestyle businesses):
+Meta uses terms like "engaged shoppers", "high-value goods", "mid and high-value goods",
+"consumer classification". Generate seeds that fit this pattern for the business.
+
+Digital activity (B2B, SaaS, tech, small business products):
+Meta uses terms like "small business owners", "page admins", "early technology adopters",
+"marketing API developers", "new active business". Generate seeds that fit this pattern.
+
+Expats (India-based businesses with diaspora relevance):
+Meta uses terms like "lived in India", "expats". Use only if diaspora buyers are relevant.
+
+Travel (only if travel is directly relevant to the buyer):
+Meta uses terms like "frequent travellers", "business travellers". Use only if relevant.
+
+IMPORTANT — DO NOT copy the examples above verbatim for every business.
+Use them to understand Meta's vocabulary style, then generate seeds appropriate
+to this specific business and buyer.
+
+WHAT TO AVOID
+- Any term containing a product name (e.g. "real estate buyers", "skincare users",
+  "property seekers") — these do not exist as Meta behavior segments
+- Invented spending tiers not in Meta's vocabulary (e.g. "premium buyers",
+  "luxury spenders") — use "high-value goods" or "engaged shoppers" instead
+- Hyper-local or city-level terms
+- Device or network types (e.g. "iOS users", "4G users")
+- Content engagement terms (e.g. "video viewers", "page likers")
+
+IF BEHAVIOR TARGETING DOES NOT CLEARLY APPLY
+If no purchase-intent or spending behavior clearly maps to this business, return an empty seeds array.
+Do not generate weak seeds to fill the output.
+
+OUTPUT RULES
+- Generate between 5 and 10 seeds
+- Each seed must be distinct — no near-duplicates
+- Keep seeds concise: 1 to 5 words preferred
+- Return strict JSON only, no extra text
+
+OUTPUT FORMAT
+{{
+  "seeds": [
+    "seed_1",
+    "seed_2",
+    "seed_3"
+  ]
+}}
+
+BUSINESS SUMMARY
+{summary}
