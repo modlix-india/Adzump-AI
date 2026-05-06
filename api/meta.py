@@ -4,7 +4,7 @@ from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
 from core.models.lead_form import LeadFormPayload
 from agents.meta.creative_agent import meta_creative_agent
-from core.models.meta import MetaAdCreationRequest, PlacementRequest
+from core.models.meta import MetaAdCreationRequest, PlacementRequest, CreativeGenerationRequest
 from agents.meta.lead_form_agent import meta_lead_form_agent
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
 from agents.meta.detailed_targeting_agent import detailed_targeting_agent
@@ -30,8 +30,14 @@ async def generate_adset(
 
 
 @router.post("/creative/generate")
-async def generate_creative(session_id: str = Query(..., alias="sessionId")):
-    result = await meta_creative_agent.generate_payload(session_id)
+async def generate_creative(
+    body: CreativeGenerationRequest,
+    session_id: str = Query(..., alias="sessionId")
+):
+    result = await meta_creative_agent.generate_payload(
+        session_id=session_id,
+        destination_type=body.destination_type
+    )
     return success_response(data=result.model_dump(mode="json"))
 
 

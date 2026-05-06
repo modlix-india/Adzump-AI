@@ -263,18 +263,28 @@ class MetaAdSetAgent:
             return None
 
         allowed_region = None
+        allowed_country_code = None
         if suggested_geo_targets:
             first = suggested_geo_targets[0]
-            canonical = first.get("canonicalName")
 
+            # Extract country code from the 'name' field (e.g., "..., IN")
+            display_name = first.get("name")
+            if display_name:
+                name_parts = [p.strip() for p in display_name.split(",")]
+                if name_parts:
+                    allowed_country_code = name_parts[-1].strip().upper()
+
+            # Extract region from the 'canonicalName' (e.g., "..., Karnataka, India")
+            canonical = first.get("canonicalName")
             if canonical:
                 parts = [p.strip() for p in canonical.split(",")]
                 if len(parts) >= 2:
                     allowed_region = parts[-2].strip().lower()
 
         logger.info(
-            "meta_adset_geo.derived_allowed_region",
+            "meta_adset_geo.derived_filters",
             allowed_region=allowed_region,
+            allowed_country_code=allowed_country_code,
         )
 
         all_valid_results = []
@@ -320,11 +330,36 @@ class MetaAdSetAgent:
             filtered = []
 
             for r in results:
+                # 1. Strict Country Code Filter
+                if allowed_country_code and r.get("country_code"):
+                    if r.get("country_code").strip().upper() != allowed_country_code:
+                        logger.info(
+                            "meta_adset_geo.skip_country_mismatch",
+                            name=r.get("name"),
+                            found=r.get("country_code"),
+                            expected=allowed_country_code,
+                        )
+                        continue
+
+                # 2. Special Ad Category Country Filter
                 if allowed_countries and r.get("country_code") not in allowed_countries:
+                    logger.info(
+                        "meta_adset_geo.skip_special_category_mismatch",
+                        name=r.get("name"),
+                        found=r.get("country_code"),
+                        allowed=allowed_countries,
+                    )
                     continue
 
+                # 3. Strict Region Filter
                 if allowed_region and r.get("region"):
                     if r.get("region").strip().lower() != allowed_region:
+                        logger.info(
+                            "meta_adset_geo.skip_region_mismatch",
+                            name=r.get("name"),
+                            found=r.get("region"),
+                            expected=allowed_region,
+                        )
                         continue
 
                 filtered.append(r)
