@@ -11,6 +11,9 @@ from core.models.meta import (
     CreateCreativeResponse,
     CallToAction,
     CreativeImage,
+    DestinationType,
+    META_CTA_MAPPING,
+    CampaignObjective,
 )
 from exceptions.custom_exceptions import (
     AIProcessingException,
@@ -49,24 +52,33 @@ def normalize_cta(value: str) -> str:
     return value if value in ALLOWED_CTAS else CallToAction.LEARN_MORE.value
 
 
+def get_valid_ctas(
+    objective: CampaignObjective, destination_type: DestinationType
+) -> str:
+    valid_ctas = META_CTA_MAPPING.get(objective, {}).get(
+        destination_type, [CallToAction.LEARN_MORE]
+    )
+    return ", ".join(cta.value for cta in valid_ctas)
+
+
 class MetaCreativeAgent:
     def __init__(self):
         self.business_service = BusinessService()
         self.creative_adapter = MetaCreativeAdapter()
 
-    async def generate_payload(self, session_id: str) -> LLMCreativeTextPayload:
+    async def generate_payload(
+        self,
+        session_id: str,
+        destination_type: DestinationType,
+    ) -> LLMCreativeTextPayload:
 
         if session_id not in sessions:
             raise BusinessValidationException("Session not found")
 
-        website_data = await self.business_service.fetch_website_data(session_id)
-
-        summary = website_data.final_summary or website_data.summary
+        summary = sessions[session_id].get("campaign_data", {}).get("business_summary")
 
         if not summary:
-            raise BusinessValidationException(
-                "Missing summary in product data. Please complete website analysis."
-            )
+            raise BusinessValidationException("Missing business summary in session.")
 
         strategy_raw = await chat_completion(
             [{"role": "user", "content": STRATEGY_PROMPT.format(summary=summary)}]
@@ -78,12 +90,16 @@ class MetaCreativeAgent:
         sessions[session_id]["campaign_data"]["business_summary"] = summary
         sessions[session_id]["campaign_data"]["visual_strategy"] = strategy_json
 
+        valid_ctas = get_valid_ctas(CampaignObjective.OUTCOME_LEADS, destination_type)
+
         text_raw = await chat_completion(
             [
                 {
                     "role": "user",
                     "content": TEXT_PROMPT.format(
-                        summary=summary, strategy=strategy_json
+                        summary=summary,
+                        strategy=strategy_json,
+                        valid_ctas=valid_ctas,
                     ),
                 }
             ]
