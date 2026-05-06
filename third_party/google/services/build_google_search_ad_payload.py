@@ -1,5 +1,8 @@
 from datetime import datetime
 from typing import List, Dict, Any
+from structlog import get_logger
+
+logger = get_logger(__name__)
 
 
 def get_unique_suffix() -> str:
@@ -280,6 +283,33 @@ def generate_google_ads_mutate_operations(
 
         add_asset_and_link("BUSINESS_MESSAGE", asset_body)
 
+    # 4.f Price Assets
+    for pa in assets.get("priceAssets", []):
+        offerings = []
+        for offer in pa.get("price_offerings", []):
+            offerings.append(
+                {
+                    "header": offer.get("header"),
+                    "description": offer.get("description"),
+                    "price": {
+                        "amountMicros": int(float(offer.get("price", 0)) * 1_000_000),
+                        "currencyCode": pa.get("currency_code", "INR"),
+                    },
+                    "unit": offer.get("unit", "UNSPECIFIED"),
+                    "finalUrl": offer.get("final_url") or "",
+                }
+            )
+
+        asset_body = {
+            "priceAsset": {
+                "type": pa.get("type", "SERVICES"),
+                "priceQualifier": pa.get("price_qualifier", "FROM"),
+                "languageCode": pa.get("language_code", "en"),
+                "priceOfferings": offerings,
+            }
+        }
+        add_asset_and_link("PRICE", asset_body)
+
     # ---------- 5) Ad Groups + Criteria + Ads ----------
     ALL_AGE_RANGES = [
         "AGE_RANGE_18_24",
@@ -470,6 +500,18 @@ def generate_google_ads_mutate_operations(
         if final_urls:
             ad_obj["ad"]["finalUrls"] = final_urls
 
+        # Ad-level tracking parameters (Check ad-specific targeting first, then fallback to global)
+        tracking_url_template = targeting.get(
+            "trackingUrlTemplate"
+        ) or campaign_data_payload.get("trackingUrlTemplate")
+        final_url_suffix = targeting.get("finalUrlSuffix") or campaign_data_payload.get(
+            "finalUrlSuffix"
+        )
+        if tracking_url_template:
+            ad_obj["ad"]["trackingUrlTemplate"] = tracking_url_template
+        if final_url_suffix:
+            ad_obj["ad"]["finalUrlSuffix"] = final_url_suffix
+
         mutate_ops.append(
             {
                 "adGroupAdOperation": {
@@ -481,4 +523,6 @@ def generate_google_ads_mutate_operations(
             }
         )
     # Return final payload
-    return {"mutateOperations": mutate_ops}
+    payload = {"mutateOperations": mutate_ops}
+    logger.info("Generated Google Ads Mutate Operations", payload=payload)
+    return payload
