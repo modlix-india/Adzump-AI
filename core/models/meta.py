@@ -66,6 +66,29 @@ class CallToAction(str, Enum):
     WATCH_MORE = "WATCH_MORE"
 
 
+class WebsiteCallToAction(str, Enum):
+    """CTAs allowed for WEBSITE destination type."""
+
+    CONTACT_US = "CONTACT_US"
+    SIGN_UP = "SIGN_UP"
+    GET_QUOTE = "GET_QUOTE"
+    DOWNLOAD = "DOWNLOAD"
+    APPLY_NOW = "APPLY_NOW"
+    LEARN_MORE = "LEARN_MORE"
+    SUBSCRIBE = "SUBSCRIBE"
+
+
+class LeadGenCallToAction(str, Enum):
+    """CTAs allowed for ON_AD (Lead Gen) destination type."""
+
+    APPLY_NOW = "APPLY_NOW"
+    DOWNLOAD = "DOWNLOAD"
+    GET_QUOTE = "GET_QUOTE"
+    LEARN_MORE = "LEARN_MORE"
+    SIGN_UP = "SIGN_UP"
+    SUBSCRIBE = "SUBSCRIBE"
+
+
 class Gender(str, Enum):
     MALE = "MALE"
     FEMALE = "FEMALE"
@@ -559,13 +582,13 @@ class AdSetPayload(BaseModel):
 
 
 class WebsiteCTA(BaseModel):
-    type: CallToAction
+    type: WebsiteCallToAction
     url: str
     lead_gen_form_id: None = None
 
 
 class LeadGenCTA(BaseModel):
-    type: CallToAction
+    type: LeadGenCallToAction
     lead_gen_form_id: str = Field(..., min_length=1)
     url: str = Field(..., min_length=1)
 

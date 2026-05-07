@@ -21,9 +21,7 @@ class MetaPayloadAssemblyService:
         """Assemble Campaign, AdSet, Creative, and Ad payloads concurrently."""
         creative_input = meta_request.creative
 
-        is_dynamic_creative = MetaPayloadAssemblyService._is_dynamic_creative(
-            creative_input
-        )
+        is_dynamic_creative = False
 
         async def _run_task(name: str, func, *args) -> dict:
             try:
