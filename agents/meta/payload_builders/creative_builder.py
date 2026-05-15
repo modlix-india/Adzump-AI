@@ -150,7 +150,7 @@ def _build_standard_carousel(creative: CreativePayload) -> dict:
         }
         # Add thumbnail if available (pair by index)
         if creative.thumbnail_urls and i < len(creative.thumbnail_urls):
-            card["image_url"] = creative.thumbnail_urls[i]
+            card["picture"] = creative.thumbnail_urls[i]
 
         if description:
             card["description"] = description
@@ -169,11 +169,10 @@ def _build_standard_carousel(creative: CreativePayload) -> dict:
         "multi_share_optimized": True,
     }
 
-    # Meta requires a root-level image/picture for carousel preview/fallback
+    # Meta requires a root-level image/picture for carousel preview/fallback.
+    # If not provided, it's often inferred from the first card, but we can set it explicitly if needed.
     if creative.image_hashes:
         link_data["image_hash"] = creative.image_hashes[0]
-    elif creative.thumbnail_urls:
-        link_data["picture"] = creative.thumbnail_urls[0]
 
     spec["link_data"] = link_data
 
