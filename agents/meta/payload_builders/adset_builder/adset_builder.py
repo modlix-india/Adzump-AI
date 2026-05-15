@@ -39,6 +39,32 @@ def _build_targeting(targeting: Targeting) -> dict:
     if targeting.locales:
         meta_targeting["locales"] = list({loc.key for loc in targeting.locales})
 
+    # Manual Placements
+    if targeting.publisher_platforms:
+        meta_targeting["publisher_platforms"] = [
+            p.value for p in targeting.publisher_platforms
+        ]
+    if targeting.facebook_positions:
+        meta_targeting["facebook_positions"] = [
+            p.value for p in targeting.facebook_positions
+        ]
+    if targeting.instagram_positions:
+        meta_targeting["instagram_positions"] = [
+            p.value for p in targeting.instagram_positions
+        ]
+    if targeting.messenger_positions:
+        meta_targeting["messenger_positions"] = [
+            p.value for p in targeting.messenger_positions
+        ]
+    if targeting.audience_network_positions:
+        meta_targeting["audience_network_positions"] = [
+            p.value for p in targeting.audience_network_positions
+        ]
+    if targeting.device_platforms:
+        meta_targeting["device_platforms"] = [
+            p.value for p in targeting.device_platforms
+        ]
+
     entity_payload = entity_targeting_builder.build_entity_targeting(targeting)
     meta_targeting.update(entity_payload)
 
