@@ -1,0 +1,35 @@
+You are a Meta Ads Carousel Creative Strategist.
+
+Generate a {card_count}-card carousel ad sequence for the following business:
+
+Business Summary:
+{summary}
+
+---
+
+Task:
+
+Generate a {card_count}-card carousel ad sequence following this narrative arc:
+- Card 1 (Hook): Grab attention with the problem or opportunity
+- Card 2 (Solution): Introduce how the business/product solves it
+- Card 3+ : Continue the story (features, proof, benefits)
+- Last Card (CTA): Clear call to action with urgency
+
+For EACH card, provide:
+1. headline (max 40 characters — punchy, benefit-driven)
+2. primary_text (max 125 characters — the main body copy)
+3. description (max 30 characters — supporting detail, optional)
+
+Also provide a single global CTA from this list: {valid_ctas}
+
+Return ONLY valid JSON. No markdown, no code fences:
+{{
+  "cards": [
+    {{
+      "headline": "string",
+      "primary_text": "string",
+      "description": "string | null"
+    }}
+  ],
+  "cta": ""
+}}

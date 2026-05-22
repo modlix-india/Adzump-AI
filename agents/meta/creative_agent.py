@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from adapters.meta.creatives import MetaCreativeAdapter
 from core.models.meta import (
     LLMCreativeTextPayload,
+    LLMCarouselPayload,
     CreateCreativeRequest,
     CreateCreativeResponse,
     CallToAction,
@@ -20,7 +21,7 @@ from exceptions.custom_exceptions import (
     BusinessValidationException,
 )
 from services.business_service import BusinessService
-from services.session_manager import sessions
+from services.session_manager import sessions, get_website_url
 from adapters.gemini.client import generate_images
 from agents.shared.llm import chat_completion
 from utils.prompt_loader import load_prompt
@@ -31,6 +32,7 @@ logger = structlog.get_logger()
 STRATEGY_PROMPT = load_prompt("meta/creative_strategy.txt")
 TEXT_PROMPT = load_prompt("meta/creative_text.txt")
 IMAGE_INTENT_PROMPT = load_prompt("meta/image_scene.txt")
+CAROUSEL_TEXT_PROMPT = load_prompt("meta/carousel_text.txt")
 
 ALLOWED_CTAS = {c.value for c in CallToAction}
 
@@ -118,6 +120,45 @@ class MetaCreativeAgent:
             raise AIProcessingException("Invalid creative payload from LLM")
 
         return creative_payload
+
+    async def generate_carousel_payload(
+        self,
+        session_id: str,
+        card_count: int = 5,
+    ) -> LLMCarouselPayload:
+
+        if session_id not in sessions:
+            raise BusinessValidationException("Session not found")
+
+        summary = sessions[session_id].get("campaign_data", {}).get("business_summary")
+        if not summary:
+            raise BusinessValidationException("Missing business summary in session.")
+
+        sessions[session_id].setdefault("campaign_data", {})
+        sessions[session_id]["campaign_data"]["business_summary"] = summary
+
+        valid_ctas = get_valid_ctas(CampaignObjective.OUTCOME_LEADS, DestinationType.WEBSITE)
+
+        text_raw = await chat_completion(
+            [{"role": "user", "content": CAROUSEL_TEXT_PROMPT.format(
+                summary=summary,
+                card_count=card_count,
+                valid_ctas=valid_ctas,
+            )}]
+        )
+        text_json = json.loads(_extract_json(text_raw.choices[0].message.content))
+        text_json["cta"] = normalize_cta(text_json.get("cta"))
+
+        website_url = get_website_url(session_id)
+        text_json.pop("cta_url", None)
+
+        try:
+            payload = LLMCarouselPayload(**text_json, cta_url=website_url)
+        except ValidationError as e:
+            logger.error("Carousel payload validation failed", error=str(e), raw=text_json)
+            raise AIProcessingException("Invalid carousel payload from LLM")
+
+        return payload
 
     async def generate_image(
         self,

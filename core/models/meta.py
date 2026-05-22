@@ -299,8 +299,31 @@ class LLMCreativeTextPayload(BaseModel):
     image: CreativeImage | None = None
 
 
+class CarouselCard(BaseModel):
+    headline: str = Field(..., max_length=255)
+    primary_text: str = Field(..., max_length=2200)
+    description: str | None = Field(None, max_length=255)
+
+
+class LLMCarouselPayload(BaseModel):
+    cards: list[CarouselCard] = Field(..., min_length=3, max_length=5)
+    cta: str
+    cta_url: str
+
+    @field_validator("cards")
+    @classmethod
+    def validate_card_count(cls, v):
+        if len(v) < 3:
+            raise ValueError("Carousel requires at least 3 cards")
+        if len(v) > 5:
+            raise ValueError("Carousel max 5 cards")
+        return v
+
+
 class CreativeGenerationRequest(BaseModel):
     destination_type: DestinationType
+    creative_type: CreativeType = CreativeType.IMAGE
+    card_count: int | None = Field(None, ge=3, le=5)
 
 
 class CreateCreativeRequest(BaseModel):

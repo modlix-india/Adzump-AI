@@ -4,7 +4,12 @@ from agents.meta.adset_agent import meta_adset_agent
 from utils.response_helpers import success_response
 from core.models.lead_form import LeadFormPayload
 from agents.meta.creative_agent import meta_creative_agent
-from core.models.meta import MetaAdCreationRequest, PlacementRequest, CreativeGenerationRequest
+from core.models.meta import (
+    MetaAdCreationRequest,
+    PlacementRequest,
+    CreativeGenerationRequest,
+    CreativeType,
+)
 from agents.meta.lead_form_agent import meta_lead_form_agent
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
 from agents.meta.detailed_targeting_agent import detailed_targeting_agent
@@ -31,13 +36,17 @@ async def generate_adset(
 
 @router.post("/creative/generate")
 async def generate_creative(
-    body: CreativeGenerationRequest,
-    session_id: str = Query(..., alias="sessionId")
+    body: CreativeGenerationRequest, session_id: str = Query(..., alias="sessionId")
 ):
-    result = await meta_creative_agent.generate_payload(
-        session_id=session_id,
-        destination_type=body.destination_type
-    )
+    if body.creative_type == CreativeType.CAROUSEL:
+        result = await meta_creative_agent.generate_carousel_payload(
+            session_id=session_id,
+            card_count=body.card_count or 5,
+        )
+    else:
+        result = await meta_creative_agent.generate_payload(
+            session_id=session_id, destination_type=body.destination_type
+        )
     return success_response(data=result.model_dump(mode="json"))
 
 
@@ -95,11 +104,9 @@ async def generate_meta_targeting_suggestions(
     """
     Generate Meta targeting suggestions for interests, demographics, and behaviors.
     """
-    result = (
-        await detailed_targeting_agent.generate_detailed_targeting_suggestions(
-            session_id=session_id,
-            ad_account_id=ad_account_id,
-        )
+    result = await detailed_targeting_agent.generate_detailed_targeting_suggestions(
+        session_id=session_id,
+        ad_account_id=ad_account_id,
     )
     return success_response(data=result.model_dump(mode="json"))
 
