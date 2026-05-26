@@ -43,6 +43,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from structlog import get_logger  # type: ignore
 
@@ -81,7 +82,11 @@ async def _fetch_adzump_session(
     # Ds's AuthContextMiddleware strips the "Bearer " prefix on inbound, so
     # access_token is a bare JWT here. Saas's securityContextAuthentication
     # filter rejects bare tokens — always prefix on the way out.
-    bearer = access_token if access_token.lower().startswith("bearer ") else f"Bearer {access_token}"
+    bearer = (
+        access_token
+        if access_token.lower().startswith("bearer ")
+        else f"Bearer {access_token}"
+    )
     headers = {
         "authorization": bearer,
         "clientCode": client_code,
@@ -95,8 +100,7 @@ async def _fetch_adzump_session(
     try:
         result = await client.request("GET", url, headers=headers)
     except Exception as e:
-        logger.warning("adzump_session_fetch_failed",
-                       url=url, err=str(e)[:200])
+        logger.warning("adzump_session_fetch_failed", url=url, err=str(e)[:200])
         raise BusinessValidationException(
             f"Failed to fetch adzump session {adzump_session_id}: {e}",
         ) from e
@@ -132,14 +136,29 @@ def _extract_int(value: Any) -> Optional[int]:
         return None
 
 
+def _normalize_url(url: str) -> str:
+    """Canonicalize a business URL for storage keys and lookups.
+
+    - Force ``https`` scheme so the same business doesn't end up with two
+      records keyed under ``http://`` and ``https://``.
+    - Lowercase host, strip leading ``www.``, drop trailing slash.
+    """
+    if not url:
+        return ""
+    p = urlparse(url.strip())
+    host = (p.netloc or "").lower().removeprefix("www.")
+    path = (p.path or "").rstrip("/")
+    return f"https://{host}{path}"
+
+
 def _resolve_url(context: dict) -> str:
     profile = context.get("product_profile") or {}
     if profile.get("url"):
-        return str(profile["url"])
+        return _normalize_url(str(profile["url"]))
     product = context.get("product_data") or {}
     pages = product.get("pages_analyzed") or []
     if pages:
-        return str(pages[0])
+        return _normalize_url(str(pages[0]))
     return ""
 
 
@@ -189,7 +208,6 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         "endDate": dates.get("endDate"),
         "loginCustomerId": _strip_account_id(spec.get("parent_account")),
         "customerId": _strip_account_id(spec.get("account")),
-
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
@@ -199,11 +217,9 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         "businessType": product.get("business_type") or "",
         "competitors": competitive.get("competitors") or [],
         "accountNames": account_names,
-
         # Meta-only — passed through by name; ds Meta path reads as needed
         "fbPageId": _strip_account_id(spec.get("fb_page")),
         "igAccountId": _strip_account_id(spec.get("ig_page")),
-
         # Provenance — useful for debugging / re-syncing
         "adzumpProductId": context.get("product_id"),
         "adzumpSessionId": context.get("_adzump_session_id_seed", ""),
@@ -236,9 +252,12 @@ def _create_ds_session(campaign_data: dict, client_code: str) -> str:
         "customer_options": [],
         "client_code": client_code,
     }
-    logger.info("adzump_bridge_session_created",
-                session_id=session_id, client_code=client_code,
-                businessName=campaign_data.get("businessName"))
+    logger.info(
+        "adzump_bridge_session_created",
+        session_id=session_id,
+        client_code=client_code,
+        businessName=campaign_data.get("businessName"),
+    )
     return session_id
 
 
@@ -274,7 +293,11 @@ async def create_session_from_adzump(adzump_session_id: str) -> dict:
     raw_session = payload.get("session") or {}
     context_json = raw_session.get("context_json") or "{}"
     try:
-        context = json.loads(context_json) if isinstance(context_json, str) else (context_json or {})
+        context = (
+            json.loads(context_json)
+            if isinstance(context_json, str)
+            else (context_json or {})
+        )
     except (ValueError, json.JSONDecodeError) as e:
         raise BusinessValidationException(
             f"Adzump session context_json is not valid JSON: {e}",
