@@ -747,9 +747,7 @@ META_CTA_MAPPING: dict[CampaignObjective, dict[DestinationType, list[CallToActio
     CampaignObjective.OUTCOME_LEADS: {
         DestinationType.ON_AD: [
             CallToAction.APPLY_NOW,
-            CallToAction.BOOK_NOW,
             CallToAction.DOWNLOAD,
-            CallToAction.GET_OFFER,
             CallToAction.GET_QUOTE,
             CallToAction.LEARN_MORE,
             CallToAction.SIGN_UP,
@@ -759,7 +757,7 @@ META_CTA_MAPPING: dict[CampaignObjective, dict[DestinationType, list[CallToActio
             CallToAction.CONTACT_US,
             CallToAction.SIGN_UP,
             CallToAction.GET_QUOTE,
-            CallToAction.BOOK_NOW,
+            CallToAction.DOWNLOAD,
             CallToAction.APPLY_NOW,
             CallToAction.LEARN_MORE,
             CallToAction.SUBSCRIBE,
