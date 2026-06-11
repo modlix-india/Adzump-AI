@@ -131,6 +131,8 @@ def test_campaign_builder(sample_payload_data):
 
     assert payload["name"].startswith("Life by the Lake")
     assert payload["objective"] == "OUTCOME_LEADS"
+    # required by Meta v24+ for ABO campaigns (no campaign budget)
+    assert payload["is_adset_budget_sharing_enabled"] is False
     # Campaign model conversion to Enum check
     assert SpecialAdCategory.HOUSING in campaign_model.special_ad_categories
     assert "HOUSING" in payload["special_ad_categories"]
