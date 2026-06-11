@@ -8,6 +8,9 @@ def build_campaign_payload(campaign: CampaignPayload) -> dict:
         "name": build_name(campaign.name, AdCreationStage.CAMPAIGN),
         "objective": campaign.objective.value,
         "status": campaign.status.value,
+        # required by Meta (v24+) when campaign has no budget (ABO);
+        # single adset per campaign → nothing to share, keep spend deterministic
+        "is_adset_budget_sharing_enabled": False,
     }
 
     if campaign.special_ad_categories:
