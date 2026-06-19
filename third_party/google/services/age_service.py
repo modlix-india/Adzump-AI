@@ -21,7 +21,7 @@ async def fetch_age_metrics(
             status_code=401, detail="Missing Google Ads credentials or tokens"
         )
 
-    url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:searchStream"
+    url = f"https://googleads.googleapis.com/v23/customers/{customer_id}/googleAds:searchStream"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "developer-token": DEVELOPER_TOKEN,

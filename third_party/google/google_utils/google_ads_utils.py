@@ -9,7 +9,7 @@ logger = structlog.get_logger(__name__)
 RETRY_ATTEMPTS = 3
 RETRY_DELAY = 5
 BASEURL = "https://googleads.googleapis.com"
-APIVERSION = "v21"
+APIVERSION = "v23"
 
 
 async def execute_google_ads_query(
