@@ -175,7 +175,7 @@ class SearchTermPipeline:
     # Fetch search terms
     async def fetch_search_terms(self, customer_id: str = None) -> list:
         target_customer_id = customer_id or self.customer_id
-        endpoint = f"https://googleads.googleapis.com/v20/customers/{target_customer_id}/googleAds:search"
+        endpoint = f"https://googleads.googleapis.com/v23/customers/{target_customer_id}/googleAds:search"
         headers = {
             "Authorization": f"Bearer {self.google_ads_access_token}",
             "developer-token": self.developer_token,

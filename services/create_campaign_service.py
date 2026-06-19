@@ -14,7 +14,7 @@ class CampaignServiceError(Exception):
 async def create_and_post_campaign(
     request_body: Dict[str, Any],
     client_code: str,
-    api_version: str = "v20",
+    api_version: str = "v23",
 ) -> Dict[str, Any]:
     """
     1. Build mutate payload using generate_google_ads_mutate_operations
