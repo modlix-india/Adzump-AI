@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 
 class GeoTargetService:
-    GOOGLE_ADS_API_VERSION = "v20"
+    GOOGLE_ADS_API_VERSION = "v23"
     SUGGEST_ENDPOINT = f"https://googleads.googleapis.com/{GOOGLE_ADS_API_VERSION}/geoTargetConstants:suggest"
     GEOCODING_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
     HTTP_TIMEOUT = 30.0
