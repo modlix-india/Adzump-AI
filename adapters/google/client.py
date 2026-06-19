@@ -23,7 +23,7 @@ _google_api_token_expiry: float = 0
 
 class GoogleAdsClient:
     BASE_URL = "https://googleads.googleapis.com"
-    API_VERSION = "v21"
+    API_VERSION = "v23"
 
     def __init__(self) -> None:
         self.developer_token = os.getenv("GOOGLE_ADS_DEVELOPER_TOKEN")

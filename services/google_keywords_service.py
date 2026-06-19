@@ -130,7 +130,7 @@ class GoogleKeywordService:
             if not developer_token:
                 raise ValueError("GOOGLE_ADS_DEVELOPER_TOKEN is required")
 
-            endpoint = f"https://googleads.googleapis.com/v20/customers/{customer_id}:generateKeywordIdeas"
+            endpoint = f"https://googleads.googleapis.com/v23/customers/{customer_id}:generateKeywordIdeas"
             headers = {
                 "authorization": f"Bearer {access_token}",
                 "developer-token": developer_token,
