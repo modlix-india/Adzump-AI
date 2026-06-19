@@ -10,7 +10,7 @@ async def fetch_audit_logs(customer_id: str, login_customer_id: str, access_toke
     end_date = date.today()
     start_date = end_date - timedelta(days=29)
     
-    url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:searchStream"
+    url = f"https://googleads.googleapis.com/v23/customers/{customer_id}/googleAds:searchStream"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "developer-token": DEVELOPER_TOKEN,
@@ -45,7 +45,7 @@ async def fetch_audit_logs(customer_id: str, login_customer_id: str, access_toke
 
 # ---------------------- Fetch Campaign Metrics ----------------------
 async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, access_token: str, campaign_id: str) -> list:
-    url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:searchStream"
+    url = f"https://googleads.googleapis.com/v23/customers/{customer_id}/googleAds:searchStream"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "developer-token": DEVELOPER_TOKEN,
@@ -84,7 +84,7 @@ async def fetch_campaign_metrics(customer_id: str, login_customer_id: str, acces
 
 # ---------------------- Fetch Old Budget ----------------------
 async def fetch_old_budget(customer_id: str, login_customer_id: str, access_token: str, campaign_id: str) -> dict:
-    url = f"https://googleads.googleapis.com/v21/customers/{customer_id}/googleAds:search"
+    url = f"https://googleads.googleapis.com/v23/customers/{customer_id}/googleAds:search"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "developer-token": DEVELOPER_TOKEN,

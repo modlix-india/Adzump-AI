@@ -4,7 +4,7 @@ import os
 from typing import Dict, List, Any
 from oserver.services import connection
 
-GOOGLE_ADS_API = "https://googleads.googleapis.com/v20"
+GOOGLE_ADS_API = "https://googleads.googleapis.com/v23"
 
 
 def _get_auth_headers(client_code: str) -> Dict[str, str]:

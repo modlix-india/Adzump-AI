@@ -10,7 +10,7 @@ async def post_mutate_operations(
     login_customer_id: str,
     mutate_payload: Dict[str, Any],
     client_code: str,
-    api_version: str = "v20",
+    api_version: str = "v23",
     timeout_seconds: int = 30,
 ) -> Dict[str, Any]:
     """

@@ -29,7 +29,7 @@ async def fetch_ads(
         if not developer_token or not google_ads_access_token:
             raise ValueError("Missing Google Ads credentials or tokens.")
 
-        endpoint = f"https://googleads.googleapis.com/v20/customers/{customer_id}/googleAds:search"
+        endpoint = f"https://googleads.googleapis.com/v23/customers/{customer_id}/googleAds:search"
         headers = {
             "Authorization": f"Bearer {google_ads_access_token}",
             "developer-token": developer_token,
