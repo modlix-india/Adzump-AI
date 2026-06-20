@@ -66,6 +66,29 @@ class CallToAction(str, Enum):
     WATCH_MORE = "WATCH_MORE"
 
 
+class WebsiteCallToAction(str, Enum):
+    """CTAs allowed for WEBSITE destination type."""
+
+    CONTACT_US = "CONTACT_US"
+    SIGN_UP = "SIGN_UP"
+    GET_QUOTE = "GET_QUOTE"
+    DOWNLOAD = "DOWNLOAD"
+    APPLY_NOW = "APPLY_NOW"
+    LEARN_MORE = "LEARN_MORE"
+    SUBSCRIBE = "SUBSCRIBE"
+
+
+class LeadGenCallToAction(str, Enum):
+    """CTAs allowed for ON_AD (Lead Gen) destination type."""
+
+    APPLY_NOW = "APPLY_NOW"
+    DOWNLOAD = "DOWNLOAD"
+    GET_QUOTE = "GET_QUOTE"
+    LEARN_MORE = "LEARN_MORE"
+    SIGN_UP = "SIGN_UP"
+    SUBSCRIBE = "SUBSCRIBE"
+
+
 class Gender(str, Enum):
     MALE = "MALE"
     FEMALE = "FEMALE"
@@ -174,6 +197,53 @@ class DestinationType(str, Enum):
     MESSAGING_INSTAGRAM_DIRECT_WHATSAPP = "MESSAGING_INSTAGRAM_DIRECT_WHATSAPP"
 
 
+class PublisherPlatform(str, Enum):
+    FACEBOOK = "facebook"
+    INSTAGRAM = "instagram"
+    MESSENGER = "messenger"
+    AUDIENCE_NETWORK = "audience_network"
+    THREADS = "threads"
+
+
+class FacebookPosition(str, Enum):
+    FEED = "feed"
+    RIGHT_HAND_COLUMN = "right_hand_column"
+    MARKETPLACE = "marketplace"
+    VIDEO_FEEDS = "video_feeds"
+    SEARCH = "search"
+    STORY = "story"
+    INSTREAM_VIDEO = "instream_video"
+    FACEBOOK_REELS = "facebook_reels"
+    FACEBOOK_REELS_OVERLAY = "facebook_reels_overlay"
+
+
+class InstagramPosition(str, Enum):
+    STREAM = "stream"
+    STORY = "story"
+    EXPLORE = "explore"
+    EXPLORE_HOME = "explore_home"
+    REELS = "reels"
+    PROFILE_FEED = "profile_feed"
+    IG_SEARCH = "ig_search"
+
+
+class MessengerPosition(str, Enum):
+    MESSENGER_HOME = "messenger_home"
+    SPONSORED_MESSAGES = "sponsored_messages"
+    STORY = "story"
+
+
+class AudienceNetworkPosition(str, Enum):
+    CLASSIC = "classic"
+    INSTREAM_VIDEO = "instream_video"
+    REWARDED_VIDEO = "rewarded_video"
+
+
+class DevicePlatform(str, Enum):
+    MOBILE = "mobile"
+    DESKTOP = "desktop"
+
+
 class PromotedObjectType(str, Enum):
     PIXEL = "PIXEL"
     APP = "APP"
@@ -197,6 +267,12 @@ class CreativeType(str, Enum):
     IMAGE = "IMAGE"
     VIDEO = "VIDEO"
     CAROUSEL = "CAROUSEL"
+
+
+class CreativeMode(str, Enum):
+    STANDARD = "STANDARD"
+    FLEXIBLE = "FLEXIBLE"
+    DYNAMIC = "DYNAMIC"
 
 
 class CreativeFormat(str, Enum):
@@ -418,6 +494,14 @@ class Targeting(BaseModel):
     )
     genders: list[Gender] | None = None
 
+    # Manual Placements
+    publisher_platforms: list[PublisherPlatform] | None = None
+    facebook_positions: list[FacebookPosition] | None = None
+    instagram_positions: list[InstagramPosition] | None = None
+    messenger_positions: list[MessengerPosition] | None = None
+    audience_network_positions: list[AudienceNetworkPosition] | None = None
+    device_platforms: list[DevicePlatform] | None = None
+
     @field_validator("locations")
     @classmethod
     def validate_locations(cls, v):
@@ -537,6 +621,10 @@ class PromotedObject(BaseModel):
 class AdSetPayload(BaseModel):
     name: str = Field(..., min_length=1)
     status: Status = Status.PAUSED
+    is_dynamic_creative: bool = Field(
+        default=False,
+        description="Whether the AdSet is configured for Dynamic Creative (asset_feed_spec).",
+    )
     schedule: Schedule | None = None
     targeting: Targeting
     destination_type: DestinationType
@@ -559,13 +647,13 @@ class AdSetPayload(BaseModel):
 
 
 class WebsiteCTA(BaseModel):
-    type: CallToAction
+    type: WebsiteCallToAction
     url: str
     lead_gen_form_id: None = None
 
 
 class LeadGenCTA(BaseModel):
-    type: CallToAction
+    type: LeadGenCallToAction
     lead_gen_form_id: str = Field(..., min_length=1)
     url: str = Field(..., min_length=1)
 
@@ -573,11 +661,25 @@ class LeadGenCTA(BaseModel):
 class BaseCreative(BaseModel):
     name: str = Field(..., min_length=1)
     type: CreativeType
+    mode: CreativeMode = Field(
+        default=CreativeMode.STANDARD,
+        description="Inferred mode: STANDARD, FLEXIBLE (Advantage+), or DYNAMIC.",
+    )
+    is_dynamic: bool = Field(
+        default=False,
+        description="Whether this creative uses asset_feed_spec logic.",
+    )
     page_id: str = Field(..., min_length=1)
     instagram_user_id: str | None = Field(default=None, min_length=1)
     destination_type: DestinationType
     image_hashes: list[str] = Field(
-        ..., min_length=1, max_length=meta_constants.MAX_IMAGES
+        default_factory=list, max_length=meta_constants.MAX_IMAGES
+    )
+    video_ids: list[str] = Field(
+        default_factory=list, description="Meta Video IDs for VIDEO type"
+    )
+    thumbnail_urls: list[str] = Field(
+        default_factory=list, description="List of cover image URLs for video ads"
     )
     headlines: list[HeadlineStr] = Field(
         ..., min_length=1, max_length=meta_constants.MAX_HEADLINES
@@ -588,11 +690,6 @@ class BaseCreative(BaseModel):
     descriptions: list[DescriptionStr] | None = Field(
         default=None, min_length=1, max_length=meta_constants.MAX_DESCRIPTIONS
     )
-
-
-class WebsiteCreative(BaseCreative):
-    destination_type: Literal[DestinationType.WEBSITE]
-    call_to_action: WebsiteCTA
     url_tags: str | None = None
 
     @field_validator("url_tags", mode="before")
@@ -632,6 +729,11 @@ class WebsiteCreative(BaseCreative):
                         f"Allowed macros: {sorted(valid_macros)}"
                     )
         return value
+
+
+class WebsiteCreative(BaseCreative):
+    destination_type: Literal[DestinationType.WEBSITE]
+    call_to_action: WebsiteCTA
 
 
 class LeadGenCreative(BaseCreative):
@@ -743,24 +845,66 @@ class PlacementRequest(BaseModel):
     creative_type: CreativeType
 
 
-META_CTA_MAPPING: dict[CampaignObjective, dict[DestinationType, list[CallToAction]]] = {
+META_CTA_MAPPING: dict[
+    CampaignObjective, dict[DestinationType, dict[CreativeType, list[CallToAction]]]
+] = {
     CampaignObjective.OUTCOME_LEADS: {
-        DestinationType.ON_AD: [
-            CallToAction.APPLY_NOW,
-            CallToAction.DOWNLOAD,
-            CallToAction.GET_QUOTE,
-            CallToAction.LEARN_MORE,
-            CallToAction.SIGN_UP,
-            CallToAction.SUBSCRIBE,
-        ],
-        DestinationType.WEBSITE: [
-            CallToAction.CONTACT_US,
-            CallToAction.SIGN_UP,
-            CallToAction.GET_QUOTE,
-            CallToAction.DOWNLOAD,
-            CallToAction.APPLY_NOW,
-            CallToAction.LEARN_MORE,
-            CallToAction.SUBSCRIBE,
-        ],
+        DestinationType.ON_AD: {
+            CreativeType.IMAGE: [
+                CallToAction.APPLY_NOW,
+                CallToAction.DOWNLOAD,
+                CallToAction.GET_QUOTE,
+                CallToAction.LEARN_MORE,
+                CallToAction.SIGN_UP,
+                CallToAction.SUBSCRIBE,
+            ],
+            CreativeType.VIDEO: [
+                CallToAction.APPLY_NOW,
+                CallToAction.DOWNLOAD,
+                CallToAction.GET_QUOTE,
+                CallToAction.LEARN_MORE,
+                CallToAction.SIGN_UP,
+                CallToAction.SUBSCRIBE,
+                CallToAction.WATCH_MORE,
+            ],
+            CreativeType.CAROUSEL: [
+                CallToAction.APPLY_NOW,
+                CallToAction.DOWNLOAD,
+                CallToAction.GET_QUOTE,
+                CallToAction.LEARN_MORE,
+                CallToAction.SIGN_UP,
+                CallToAction.SUBSCRIBE,
+            ],
+        },
+        DestinationType.WEBSITE: {
+            CreativeType.IMAGE: [
+                CallToAction.CONTACT_US,
+                CallToAction.SIGN_UP,
+                CallToAction.GET_QUOTE,
+                CallToAction.DOWNLOAD,
+                CallToAction.APPLY_NOW,
+                CallToAction.LEARN_MORE,
+                CallToAction.SUBSCRIBE,
+            ],
+            CreativeType.VIDEO: [
+                CallToAction.CONTACT_US,
+                CallToAction.SIGN_UP,
+                CallToAction.GET_QUOTE,
+                CallToAction.DOWNLOAD,
+                CallToAction.APPLY_NOW,
+                CallToAction.LEARN_MORE,
+                CallToAction.SUBSCRIBE,
+                CallToAction.WATCH_MORE,
+            ],
+            CreativeType.CAROUSEL: [
+                CallToAction.CONTACT_US,
+                CallToAction.SIGN_UP,
+                CallToAction.GET_QUOTE,
+                CallToAction.DOWNLOAD,
+                CallToAction.APPLY_NOW,
+                CallToAction.LEARN_MORE,
+                CallToAction.SUBSCRIBE,
+            ],
+        },
     }
 }
