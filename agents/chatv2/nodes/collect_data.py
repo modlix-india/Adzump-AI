@@ -194,6 +194,7 @@ def _has_all_fields(ad_plan: dict) -> bool:
     platform = ad_plan.get("platform")
     if platform == "google":
         return "budget" in ad_plan or "targetLeads" in ad_plan
+    # For meta, once we have basic info, we move to business account selection
     return "budget" in ad_plan
 
 

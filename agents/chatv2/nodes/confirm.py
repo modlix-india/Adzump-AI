@@ -127,17 +127,19 @@ def build_summary(ad_plan: dict, state: ChatState) -> str:
     config = _get_config(ad_plan)
     lines = ["I have the following details for your campaign:"]
 
-    field_labels = {
-        "platform": "Platform",
-        "businessName": "Business Name",
-        "websiteURL": "Website",
-        "budget": "Budget",
-        "durationDays": "Duration",
-        config["parent_id_field"]: config["parent_label"].capitalize(),
-        config["account_id_field"]: config["account_label"].capitalize(),
-    }
+    # Basic fields
+    base_fields = [
+        ("platform", "Platform"),
+        ("businessName", "Business Name"),
+        ("websiteURL", "Website"),
+        ("budget", "Budget"),
+        ("durationDays", "Duration"),
+    ]
 
-    for field, label in field_labels.items():
+    auto_selected = state.get("auto_selected_assets", [])
+    auto_ids = {a["id"] for a in auto_selected}
+
+    for field, label in base_fields:
         if field not in ad_plan:
             continue
         value = ad_plan[field]
@@ -148,17 +150,37 @@ def build_summary(ad_plan: dict, state: ChatState) -> str:
             value = f"\u20b9{int(float(value)):,}"
         elif field == "durationDays":
             value = f"{value} days"
-        elif field == config["parent_id_field"]:
-            name = _find_account_name(state.get("parent_account_options", []), value)
-            if name:
-                value = f"{name} ({value})"
-        elif field == config["account_id_field"]:
-            name = _find_account_name(state.get("account_options", []), value)
-            if name:
-                value = f"{name} ({value})"
-
+        
         lines.append(f"- {label}: {value}")
 
+    # Account and Platform specific fields
+    summary_fields = config.get("summary_fields", [])
+    for field, label in summary_fields:
+        if field not in ad_plan:
+            continue
+        
+        value_id = str(ad_plan[field])
+        
+        # Try to find name in auto_selected first
+        name = next((a["name"] for a in auto_selected if a["id"] == value_id), None)
+        
+        # Fallback to lists
+        if not name:
+            if field == config.get("parent_id_field"):
+                name = _find_account_name(state.get("parent_account_options", []), value_id)
+            else:
+                # FB page, IG, and Ad Account options are all stored in account_options at different times
+                name = _find_account_name(state.get("account_options", []), value_id)
+
+        display_name = f"{name} ({value_id})" if name else value_id
+        
+        # Mark as auto if it was auto-selected
+        is_auto = value_id in auto_ids
+        marker = " (auto)" if is_auto else ""
+        
+        lines.append(f"- {label}: {display_name}{marker}")
+
+    # Location and Competitors
     location = ad_plan.get("location")
     if isinstance(location, dict):
         loc_name = location.get("product_location") or location.get("area_location")
@@ -274,6 +296,7 @@ async def _handle_account_change(
         return {
             "ad_plan": ad_plan,
             "account_options": [],
+            "auto_selected_assets": [],
             "status": ChatStatus.SELECTING_PARENT_ACCOUNT,
             "response_message": f"Here are your {config['parent_label']}s:",
             "account_selection": AccountSelection.parent_account_selection(
@@ -284,6 +307,7 @@ async def _handle_account_change(
         ad_plan.pop(config["account_id_field"], None)
         return {
             "ad_plan": ad_plan,
+            "auto_selected_assets": [],
             "status": ChatStatus.SELECTING_ACCOUNT,
             "response_message": f"Here are the {config['account_label']}s:",
             "account_selection": AccountSelection.account_selection(
@@ -318,6 +342,7 @@ def _handle_platform_change(
         "ad_plan": ad_plan,
         "parent_account_options": [],
         "account_options": [],
+        "auto_selected_assets": [],
         "status": ChatStatus.SELECTING_PARENT_ACCOUNT,
         "response_message": full_message,
         "messages": [AIMessage(content=full_message)],
@@ -340,7 +365,6 @@ def _get_config(ad_plan: dict) -> dict:
 def _get_system_prompt() -> str:
     """Load the confirm prompt."""
     return load_prompt("chatv2/confirm.txt")
-
 
 
 def _start_background_scrape(session_id: str, url: str) -> None:
