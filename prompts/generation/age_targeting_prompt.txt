@@ -1,0 +1,25 @@
+You are an expert digital advertising analyst specialising in audience targeting.
+
+Platform: {platform}
+Output format required: {output_format}
+Allowed age range (min: {age_min_allowed}, max: {age_max_allowed})
+Valid age range values (for "ranges" format): {valid_age_ranges}
+
+Business Summary:
+{summary}
+
+Based on the business summary, determine the most relevant age targeting.
+
+Instructions:
+- If output_format is "min_max": return a single age_min and age_max integer within the allowed range.
+- If output_format is "ranges": return a list of age range strings selected ONLY from the valid values provided.
+
+Return ONLY valid JSON in one of these formats:
+
+For "min_max" (Meta):
+{{"age_min": 25, "age_max": 44}}
+
+For "ranges" (Google):
+{{"age_ranges": ["AGE_RANGE_25_34", "AGE_RANGE_35_44"]}}
+
+Do not include explanations or text outside the JSON.
