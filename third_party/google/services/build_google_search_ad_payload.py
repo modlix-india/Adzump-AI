@@ -27,15 +27,15 @@ def generate_google_ads_mutate_operations(
     budget_number = float(campaign_data_payload.get("budget", 0) or 0)
     amount_micros = int(budget_number * 1_000_000) if budget_number > 0 else None
 
-    # v23: Campaign uses start_date_time/end_date_time (ISO-8601 + tz),
-    # replacing the v22 date-only start_date/end_date. +05:30 = IST account tz;
-    # derive from the customer's time_zone for non-IST accounts.
+    # v23 start_date_time/end_date_time format MUST be "yyyy-mm-dd hh:mm:ss"
+    # (no 'T', no tz offset) — interpreted in the account timezone. start-of-day
+    # / end-of-day.
     start_date = datetime.strptime(
         campaign_data_payload.get("startDate"), "%d/%m/%Y"
-    ).strftime("%Y-%m-%d") + "T00:00:00+05:30"
+    ).strftime("%Y-%m-%d") + " 00:00:00"
     end_date = datetime.strptime(
         campaign_data_payload.get("endDate"), "%d/%m/%Y"
-    ).strftime("%Y-%m-%d") + "T23:59:59+05:30"
+    ).strftime("%Y-%m-%d") + " 23:59:59"
     goal = campaign_data_payload.get("goal", "leads")
     geo_target_type_setting = campaign_data_payload.get("geoTargetTypeSetting")
     locations = campaign_data_payload.get("locations", [])
