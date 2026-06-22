@@ -77,8 +77,8 @@ def generate_google_ads_mutate_operations(
         "advertisingChannelType": "SEARCH",
         "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
         "maximizeConversions": {} if goal == "leads" else {},
-        **({"startDate": start_date} if start_date else {}),
-        **({"endDate": end_date} if end_date else {}),
+        **({"start_date": start_date} if start_date else {}),
+        **({"end_date": end_date} if end_date else {}),
         **(
             {"geoTargetTypeSetting": geo_target_type_setting}
             if geo_target_type_setting
