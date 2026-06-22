@@ -27,12 +27,15 @@ def generate_google_ads_mutate_operations(
     budget_number = float(campaign_data_payload.get("budget", 0) or 0)
     amount_micros = int(budget_number * 1_000_000) if budget_number > 0 else None
 
+    # v23: Campaign uses start_date_time/end_date_time (ISO-8601 + tz),
+    # replacing the v22 date-only start_date/end_date. +05:30 = IST account tz;
+    # derive from the customer's time_zone for non-IST accounts.
     start_date = datetime.strptime(
         campaign_data_payload.get("startDate"), "%d/%m/%Y"
-    ).strftime("%Y-%m-%d")
+    ).strftime("%Y-%m-%d") + "T00:00:00+05:30"
     end_date = datetime.strptime(
         campaign_data_payload.get("endDate"), "%d/%m/%Y"
-    ).strftime("%Y-%m-%d")
+    ).strftime("%Y-%m-%d") + "T23:59:59+05:30"
     goal = campaign_data_payload.get("goal", "leads")
     geo_target_type_setting = campaign_data_payload.get("geoTargetTypeSetting")
     locations = campaign_data_payload.get("locations", [])
@@ -77,8 +80,8 @@ def generate_google_ads_mutate_operations(
         "advertisingChannelType": "SEARCH",
         "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
         "maximizeConversions": {} if goal == "leads" else {},
-        **({"start_date": start_date} if start_date else {}),
-        **({"end_date": end_date} if end_date else {}),
+        **({"start_date_time": start_date} if start_date else {}),
+        **({"end_date_time": end_date} if end_date else {}),
         **(
             {"geoTargetTypeSetting": geo_target_type_setting}
             if geo_target_type_setting
