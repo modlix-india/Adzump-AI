@@ -36,8 +36,9 @@ class MetaPayloadAssemblyService:
             resolved_hashes = await MetaPayloadAssemblyService._resolve_image_hashes(
                 meta_request.ad_account_id, creative_input.image_urls
             )
-            creative_input.image_hashes = resolved_hashes
-
+            # Note: BaseCreative must remain mutable (no frozen=True config) for this assignment.
+            # We explicitly cast resolved_hashes to a list to satisfy type checkers.
+            creative_input.image_hashes = list(resolved_hashes)
 
         is_dynamic_creative = MetaPayloadAssemblyService._is_dynamic_creative(
             creative_input
@@ -91,21 +92,32 @@ class MetaPayloadAssemblyService:
         image_adapter = MetaAdImageAdapter()
 
         async def _upload_single(url: str) -> str:
-            logger.info("Downloading image from URL", url=url)
-            response = await http_request("GET", url)
-            image_base64 = base64.b64encode(response.content).decode("utf-8")
+            try:
+                logger.info("Downloading image from URL", url=url)
+                response = await http_request("GET", url)
+                image_base64 = base64.b64encode(response.content).decode("utf-8")
 
-            logger.info("Uploading image to Meta", url=url)
-            upload_result = await image_adapter.upload_image(
-                ad_account_id=ad_account_id,
-                image_base64=image_base64,
-            )
-            image_data = next(iter(upload_result["images"].values()))
-            image_hash = image_data["hash"]
-            logger.info("Image uploaded successfully", url=url, hash=image_hash)
-            return image_hash
+                logger.info("Uploading image to Meta", url=url)
+                upload_result = await image_adapter.upload_image(
+                    ad_account_id=ad_account_id,
+                    image_base64=image_base64,
+                )
+                
+                images = upload_result.get("images") or {}
+                if not images:
+                    raise ValueError("Meta image upload returned no images")
+                
+                image_data = next(iter(images.values()))
+                image_hash = image_data["hash"]
+                logger.info("Image uploaded successfully", url=url, hash=image_hash)
+                return image_hash
+            except Exception as e:
+                logger.error("Image upload failed", url=url, error=str(e))
+                raise ValueError(f"Failed to upload image {url}: {e}") from e
 
-        return await asyncio.gather(*[_upload_single(url) for url in image_urls])
+        return list(await asyncio.gather(*[_upload_single(url) for url in image_urls]))
+
+
 
     @staticmethod
     def _is_dynamic_creative(creative: CreativePayload) -> bool:
