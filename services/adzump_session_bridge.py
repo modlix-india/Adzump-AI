@@ -16,24 +16,33 @@ Flow:
 Mapping nocode-ai → ds (see CampaignData in models/campaign_data_model.py
 plus actual usages in chat_service / google_keywords_service):
 
-| ds key              | adzump source                                |
-|---------------------|----------------------------------------------|
-| businessName        | product_data.product_name                    |
-| websiteURL          | product_profile.url or pages_analyzed[0]     |
-| budget              | campaign_spec.budget (digits extracted)      |
-| durationDays        | campaign_spec.duration (digits extracted)    |
-| loginCustomerId     | campaign_spec.parent_account                 |
-| customerId          | campaign_spec.account                        |
-| locations           | [_location_meta.address] or [spec.location]  |
-| platform            | campaign_spec.platform                       |
-| productSummary      | product_data.summary                         |
-| competitors         | competitor_analysis.competitors              |
-| adzumpProductId     | session.context["product_id"]                |
-| adzumpSessionId     | source session id                            |
+| ds key                  | adzump source                                      |
+|-------------------------|----------------------------------------------------|
+| businessName            | product_data.product_name                          |
+| websiteURL              | product_profile.url or pages_analyzed[0]           |
+| budget                  | campaign_spec.budget (digits extracted)            |
+| durationDays            | campaign_spec.duration (digits extracted)          |
+| loginCustomerId         | campaign_spec.parent_account                       |
+| customerId              | campaign_spec.account                              |
+| locations               | [_location_meta.address] or [spec.location]        |
+| googleMappedLocations   | _location_meta.google_mapped_locations             |
+| metaMappedLocations     | _location_meta.meta_mapped_locations               |
+| platform                | campaign_spec.platform                             |
+| productSummary          | product_data.summary                               |
+| competitors             | competitor_analysis.competitors                    |
+| adzumpProductId         | session.context["product_id"]                      |
+| adzumpSessionId         | source session id                                  |
 
 Meta-only fields (fb_page, ig_page) are passed through under their adzump
 keys but not mapped to a typed CampaignData field — ds's Meta path can
 read them off the dict directly when needed.
+
+googleMappedLocations / metaMappedLocations come from the GeoTargetingAgent
+(nocode-ai feat/locations-fetching). Each entry is a dict with platform-
+specific keys:
+  Google: {google_id, google_name, lat, lng, ...}
+  Meta:   {meta_key, meta_type, meta_name, lat, lng, ...}
+Falls back to product_data when _location_meta doesn't have them.
 """
 
 from __future__ import annotations
@@ -172,6 +181,15 @@ def _resolve_locations(context: dict) -> list[str]:
     return []
 
 
+def _resolve_mapped_locations(context: dict, key: str) -> list[dict]:
+    """Pull platform-specific mapped locations from _location_meta, falling back to product_data."""
+    loc_meta = context.get("_location_meta") or {}
+    if loc_meta.get(key):
+        return list(loc_meta[key])
+    product = context.get("product_data") or {}
+    return list(product.get(key) or [])
+
+
 def _strip_account_id(value: Any) -> Optional[str]:
     """Account ids should be stored without dashes/whitespace."""
     if value is None:
@@ -211,6 +229,8 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
+        "googleMappedLocations": _resolve_mapped_locations(context, "google_mapped_locations"),
+        "metaMappedLocations": _resolve_mapped_locations(context, "meta_mapped_locations"),
         "productSummary": summary,
         # ds keyword/creative services read `business_summary` (snake_case)
         "business_summary": summary,
