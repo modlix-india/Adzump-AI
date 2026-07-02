@@ -37,11 +37,13 @@ Meta-only fields (fb_page, ig_page) are passed through under their adzump
 keys but not mapped to a typed CampaignData field — ds's Meta path can
 read them off the dict directly when needed.
 
-googleMappedLocations / metaMappedLocations come from the GeoTargetingAgent
-(nocode-ai feat/locations-fetching). Each entry is a dict with platform-
-specific keys:
-  Google: {google_id, google_name, lat, lng, ...}
-  Meta:   {meta_key, meta_type, meta_name, lat, lng, ...}
+googleMappedLocations / metaMappedLocations come from the LocationAgent
+(nocode-ai agents/location - see its AGENT.md). Each entry is a dict with the
+generic 'where' plus a NESTED platform-native handle:
+  Google: {name, city, state, pincode, lat, lng, ..., google: {resourceName, name}}
+  Meta:   {name, city, state, pincode, lat, lng, ..., meta: {type, key, name}}
+metaMappedLocations feed adset geo targeting via
+adapters/meta/geo_targeting.curated_meta_locations (keyed entries only).
 Falls back to product_data when _location_meta doesn't have them.
 """
 

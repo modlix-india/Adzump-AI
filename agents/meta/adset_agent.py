@@ -20,7 +20,11 @@ from utils.prompt_loader import load_prompt
 from pydantic import ValidationError
 
 from adapters.meta.detailed_targeting import MetaDetailedTargetingAdapter
-from adapters.meta.geo_targeting import MetaGeoTargetingAdapter
+from adapters.meta.geo_targeting import (
+    MetaGeoTargetingAdapter,
+    curated_meta_locations,
+)
+from services.session_manager import sessions
 
 from oserver.models.storage_request_model import StorageRequest
 from oserver.services.storage_service import StorageService
@@ -84,32 +88,45 @@ class MetaAdSetAgent:
             flexible_spec_count=len(flexible_spec),
         )
 
-        suggested_geo_targets = getattr(website_data, "suggested_geo_targets", None)
+        # Adzump sessions carry USER-CURATED locations - picked/edited in the
+        # adzump chat and already resolved to Meta keys by nocode-ai. Prefer
+        # them verbatim: no re-search, no name-parsing filters. Legacy DS
+        # sessions (no bridge data) fall through to the suggested-targets path.
+        campaign_data = sessions.get(session_id, {}).get("campaign_data") or {}
+        curated = curated_meta_locations(campaign_data)
+        if curated:
+            logger.info(
+                "meta_adset_geo.using_curated_mapped_locations",
+                count=len(curated),
+            )
+            locations = self.geo_targeting_adapter.build_geo_structure(curated)
+        else:
+            suggested_geo_targets = getattr(website_data, "suggested_geo_targets", None)
 
-        if not suggested_geo_targets and getattr(website_data, "storage_id", None):
-            suggested_geo_targets = await self._fetch_suggested_geo_targets(
-                website_data.storage_id
+            if not suggested_geo_targets and getattr(website_data, "storage_id", None):
+                suggested_geo_targets = await self._fetch_suggested_geo_targets(
+                    website_data.storage_id
+                )
+
+            logger.info(
+                "meta_adset_geo.final_suggested_targets",
+                suggested_geo_targets=suggested_geo_targets,
             )
 
-        logger.info(
-            "meta_adset_geo.final_suggested_targets",
-            suggested_geo_targets=suggested_geo_targets,
-        )
+            allowed_countries = getattr(website_data, "special_ad_category_country", None)
+            if allowed_countries and isinstance(allowed_countries, str):
+                allowed_countries = [allowed_countries]
 
-        allowed_countries = getattr(website_data, "special_ad_category_country", None)
-        if allowed_countries and isinstance(allowed_countries, str):
-            allowed_countries = [allowed_countries]
+            logger.info(
+                "meta_adset_geo.enter_build_locations",
+                suggested_geo_targets=suggested_geo_targets,
+                allowed_countries=allowed_countries,
+            )
 
-        logger.info(
-            "meta_adset_geo.enter_build_locations",
-            suggested_geo_targets=suggested_geo_targets,
-            allowed_countries=allowed_countries,
-        )
-
-        locations = await self._build_locations(
-            suggested_geo_targets=suggested_geo_targets,
-            allowed_countries=allowed_countries,
-        )
+            locations = await self._build_locations(
+                suggested_geo_targets=suggested_geo_targets,
+                allowed_countries=allowed_countries,
+            )
 
         return LLMAdSetGenerationResponse(
             genders=targeting.genders,

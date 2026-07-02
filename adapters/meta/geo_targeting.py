@@ -6,6 +6,41 @@ from adapters.meta.client import meta_client
 
 logger = structlog.get_logger()
 
+# Types the adset geo builder (build_geo_locations) accepts. Meta /search can
+# return finer canonical types (subcity, ...) - coerce those to "city" rather
+# than dropping a user-picked location.
+_CURATED_GEO_TYPES = {"country", "city", "region", "zip", "neighborhood"}
+
+
+def curated_meta_locations(campaign_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """User-curated Meta locations from the adzump bridge.
+
+    ``campaign_data["metaMappedLocations"]`` entries carry a nested
+    platform-native handle: ``{name, lat, lng, ..., meta: {type, key, name}}``
+    (producer: nocode-ai agents/location - see its AGENT.md). Returns
+    build_geo_structure-ready dicts for every entry with a resolved key;
+    keyless entries (no Meta match) are skipped - they cannot be targeted
+    by key.
+    """
+    curated: List[Dict[str, Any]] = []
+    for entry in campaign_data.get("metaMappedLocations") or []:
+        handle = (entry or {}).get("meta") or {}
+        key = handle.get("key")
+        if not key:
+            continue
+        loc_type = (handle.get("type") or "").strip().lower()
+        if loc_type not in _CURATED_GEO_TYPES:
+            logger.warning(
+                "meta_adset_geo.curated_type_coerced", key=key, type=loc_type,
+            )
+            loc_type = "city"
+        curated.append({
+            "key": str(key),
+            "name": handle.get("name") or entry.get("name") or "",
+            "type": loc_type,
+        })
+    return curated
+
 
 class MetaGeoTargetingAdapter:
 
