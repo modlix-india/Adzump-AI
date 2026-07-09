@@ -415,7 +415,6 @@ class GoogleKeywordService:
         x_forwarded_host: str,
         x_forwarded_port: str,
     ) -> KeywordResearchResult:
-        location_ids = keyword_request.location_ids or self.DEFAULT_LOCATION_IDS
         language_id = keyword_request.language_id or self.DEFAULT_LANGUAGE_ID
         seed_count = keyword_request.seed_count or self.DEFAULT_SEED_COUNT
         keyword_type = keyword_request.keyword_type or KeywordType.GENERIC
@@ -433,6 +432,16 @@ class GoogleKeywordService:
         session = sessions[session_id]
         login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
         customer_id = session.get("campaign_data", {}).get("customerId")
+
+        # Prefer user-curated Google locations from adzump bridge over the
+        # caller-supplied location_ids. Fall back to caller → India default.
+        campaign_data = session.get("campaign_data") or {}
+        curated_location_ids = [
+            entry["google"]["resourceName"]
+            for entry in (campaign_data.get("googleMappedLocations") or [])
+            if (entry or {}).get("google", {}).get("resourceName")
+        ]
+        location_ids = curated_location_ids or keyword_request.location_ids or self.DEFAULT_LOCATION_IDS
 
         if not login_customer_id:
             raise HTTPException(

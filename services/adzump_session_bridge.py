@@ -42,8 +42,10 @@ googleMappedLocations / metaMappedLocations come from the LocationAgent
 generic 'where' plus a NESTED platform-native handle:
   Google: {name, city, state, pincode, lat, lng, ..., google: {resourceName, name}}
   Meta:   {name, city, state, pincode, lat, lng, ..., meta: {type, key, name}}
+googleMappedLocations feed campaign criteria + keyword planner via
+third_party/google/services/build_google_search_ad_payload.curated_google_locations.
 metaMappedLocations feed adset geo targeting via
-adapters/meta/geo_targeting.curated_meta_locations (keyed entries only).
+agents/meta/payload_builders/.../geo_targeting_builder.curated_meta_locations.
 Falls back to product_data when _location_meta doesn't have them.
 """
 
