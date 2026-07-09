@@ -20,8 +20,8 @@ from utils.prompt_loader import load_prompt
 from pydantic import ValidationError
 
 from adapters.meta.detailed_targeting import MetaDetailedTargetingAdapter
-from adapters.meta.geo_targeting import (
-    MetaGeoTargetingAdapter,
+from adapters.meta.geo_targeting import MetaGeoTargetingAdapter
+from agents.meta.payload_builders.adset_builder.targeting_builder.geo_targeting_builder import (
     curated_meta_locations,
 )
 from services.session_manager import sessions
@@ -99,7 +99,9 @@ class MetaAdSetAgent:
                 "meta_adset_geo.using_curated_mapped_locations",
                 count=len(curated),
             )
-            locations = self.geo_targeting_adapter.build_geo_structure(curated)
+            locations = self.geo_targeting_adapter.build_geo_structure(
+                [{"key": loc.key, "name": loc.name, "type": loc.type} for loc in curated]
+            )
         else:
             suggested_geo_targets = getattr(website_data, "suggested_geo_targets", None)
 

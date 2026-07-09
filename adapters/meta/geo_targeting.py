@@ -6,31 +6,6 @@ from adapters.meta.client import meta_client
 
 logger = structlog.get_logger()
 
-# Unknown types (e.g. subcity) coerced to city rather than dropped.
-_CURATED_GEO_TYPES = {"country", "city", "region", "zip", "neighborhood"}
-
-
-def curated_meta_locations(campaign_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Lift campaign_data["metaMappedLocations"] nested handles into build_geo_structure-ready dicts."""
-    curated: List[Dict[str, Any]] = []
-    for entry in campaign_data.get("metaMappedLocations") or []:
-        handle = (entry or {}).get("meta") or {}
-        key = handle.get("key")
-        if not key:
-            continue
-        loc_type = (handle.get("type") or "").strip().lower()
-        if loc_type not in _CURATED_GEO_TYPES:
-            logger.warning(
-                "meta_adset_geo.curated_type_coerced", key=key, type=loc_type,
-            )
-            loc_type = "city"
-        curated.append({
-            "key": str(key),
-            "name": handle.get("name") or entry.get("name") or "",
-            "type": loc_type,
-        })
-    return curated
-
 
 class MetaGeoTargetingAdapter:
 
