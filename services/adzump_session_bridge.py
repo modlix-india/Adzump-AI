@@ -216,6 +216,24 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
     # adzump skips that step so we do it here.
     dates = get_today_end_date_with_duration(duration_days) if duration_days else {}
 
+    # Extract TargetArea objects and build full dicts for each platform
+    target_areas = product.get("target_areas") or []
+    def _full_target_dict(ta: dict) -> dict:
+        return {
+            "name": ta.get("name", ""),
+            "city": ta.get("city", ""),
+            "state": ta.get("state", ""),
+            "pincode": ta.get("pincode", ""),
+            "lat": ta.get("lat"),
+            "lng": ta.get("lng"),
+            "distance_km": ta.get("distance_km", 0.0),
+            "place_id": ta.get("place_id"),
+            "scale": getattr(ta.get("scale"), "value", ta.get("scale") or ""),
+            "google": ta.get("google") if ta.get("google") else None,
+            "meta": ta.get("meta") if ta.get("meta") else None,
+        }
+    googleMappedLocations = [_full_target_dict(ta) for ta in target_areas if ta.get("google")]
+    metaMappedLocations = [_full_target_dict(ta) for ta in target_areas if ta.get("meta")]
     return {
         # Core CampaignData fields (typed in models/campaign_data_model.py)
         "businessName": product.get("product_name") or "",
@@ -229,12 +247,23 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
-        "googleMappedLocations": _resolve_mapped_locations(context, "google_mapped_locations"),
-        "metaMappedLocations": _resolve_mapped_locations(context, "meta_mapped_locations"),
+        "googleMappedLocations": googleMappedLocations,
+        "metaMappedLocations": metaMappedLocations,
         "productSummary": summary,
         # ds keyword/creative services read `business_summary` (snake_case)
         "business_summary": summary,
         "businessType": product.get("business_type") or "",
+        "businessScale": product.get("business_scale") or "",
+        "place": product.get("place") or {},
+        "pricing": product.get("pricing", ""),
+        "contact": product.get("contact") or {},
+        "uniqueFeatures": product.get("unique_features", []),
+        "productServices": product.get("products_services", []),
+        "primaryUrl": product.get("primary_url", ""),
+        "pages": product.get("pages", {}),
+        "pages_analyzed": product.get("pages_analyzed", []),
+        "site_links": product.get("site_links", []),
+        "assets": product.get("assets", {}),
         "competitors": competitive.get("competitors") or [],
         "accountNames": account_names,
         # Meta-only — passed through by name; ds Meta path reads as needed
