@@ -25,8 +25,8 @@ plus actual usages in chat_service / google_keywords_service):
 | loginCustomerId         | campaign_spec.parent_account                       |
 | customerId              | campaign_spec.account                              |
 | locations               | [_location_meta.address] or [spec.location]        |
-| googleMappedLocations   | _location_meta.google_mapped_locations             |
-| metaMappedLocations     | _location_meta.meta_mapped_locations               |
+| googleMappedLocations   | product_data.target_areas (entries with google handle) |
+| metaMappedLocations     | product_data.target_areas (entries with meta handle)   |
 | platform                | campaign_spec.platform                             |
 | productSummary          | product_data.summary                               |
 | competitors             | competitor_analysis.competitors                    |
@@ -37,16 +37,14 @@ Meta-only fields (fb_page, ig_page) are passed through under their adzump
 keys but not mapped to a typed CampaignData field — ds's Meta path can
 read them off the dict directly when needed.
 
-googleMappedLocations / metaMappedLocations come from the LocationAgent
-(nocode-ai agents/location - see its AGENT.md). Each entry is a dict with the
-generic 'where' plus a NESTED platform-native handle:
-  Google: {name, city, state, pincode, lat, lng, ..., google: {resourceName, name}}
-  Meta:   {name, city, state, pincode, lat, lng, ..., meta: {type, key, name}}
+googleMappedLocations / metaMappedLocations come from product_data.target_areas
+(set by nocode-ai LocationAgent - see agents/location/AGENT.md). Each entry is a
+TargetArea dict: {name, city, state, lat, lng, ..., google: {resourceName, name},
+meta: {type, key, name}}. Filtered by which platform handle is present.
 googleMappedLocations feed campaign criteria + keyword planner via
 third_party/google/services/build_google_search_ad_payload.curated_google_locations.
 metaMappedLocations feed adset geo targeting via
 agents/meta/payload_builders/.../geo_targeting_builder.curated_meta_locations.
-Falls back to product_data when _location_meta doesn't have them.
 """
 
 from __future__ import annotations
@@ -185,14 +183,6 @@ def _resolve_locations(context: dict) -> list[str]:
     return []
 
 
-def _resolve_mapped_locations(context: dict, key: str) -> list[dict]:
-    """Pull platform-specific mapped locations from _location_meta, falling back to product_data."""
-    loc_meta = context.get("_location_meta") or {}
-    if loc_meta.get(key):
-        return list(loc_meta[key])
-    product = context.get("product_data") or {}
-    return list(product.get(key) or [])
-
 
 def _strip_account_id(value: Any) -> Optional[str]:
     """Account ids should be stored without dashes/whitespace."""
@@ -233,8 +223,8 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
-        "googleMappedLocations": _resolve_mapped_locations(context, "google_mapped_locations"),
-        "metaMappedLocations": _resolve_mapped_locations(context, "meta_mapped_locations"),
+        "googleMappedLocations": [ta for ta in (product.get("target_areas") or []) if (ta or {}).get("google")],
+        "metaMappedLocations": [ta for ta in (product.get("target_areas") or []) if (ta or {}).get("meta")],
         "productSummary": summary,
         # ds keyword/creative services read `business_summary` (snake_case)
         "business_summary": summary,
