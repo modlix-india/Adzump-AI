@@ -1,13 +1,4 @@
-"""curated_meta_locations — adzump's user-curated locations → adset geo input.
-
-The adzump bridge fills campaign_data["metaMappedLocations"] with entries
-carrying a NESTED platform handle ({..., meta: {type, key, name}} — producer:
-nocode-ai agents/location). The helper turns them into build_geo_structure-
-ready {key, name, type} dicts so the adset agent can prefer the user's picks
-over search re-resolution.
-"""
-import pytest
-
+"""Tests for curated_meta_locations: nested Meta handles lifted to build_geo_structure-ready dicts."""
 from adapters.meta.geo_targeting import curated_meta_locations
 
 
