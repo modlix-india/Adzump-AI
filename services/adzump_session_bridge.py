@@ -29,9 +29,27 @@ plus actual usages in chat_service / google_keywords_service):
 | metaMappedLocations     | _location_meta.meta_mapped_locations               |
 | platform                | campaign_spec.platform                             |
 | productSummary          | product_data.summary                               |
+| business_summary        | product_data.summary                               |
+| businessType            | product_data.business_type                         |
+| businessScale           | product_data.business_scale                        |
+| place                   | product_data.place                                 |
+| pricing                 | product_data.pricing                               |
+| contact                 | product_data.contact                               |
+| uniqueFeatures          | product_data.unique_features                       |
+| productServices         | product_data.products_services                     |
+| primaryUrl              | product_data.primary_url                           |
+| pages                   | product_data.pages                                 |
+| pagesAnalyzed           | product_data.pages_analyzed                        |
+| siteLinks               | product_data.site_links                            |
+| assets                  | product_data.assets                                |
 | competitors             | competitor_analysis.competitors                    |
+| accountNames            | account_names                                      |
+| fbPageId                | spec.fb_page (normalized)                         |
+| igAccountId             | spec.ig_page (normalized)                         |
 | adzumpProductId         | session.context["product_id"]                      |
 | adzumpSessionId         | source session id                                  |
+| adzumpLocationLat       | _location_meta.lat                                 |
+| adzumpLocationLng       | _location_meta.lng                                 |
 
 Meta-only fields (fb_page, ig_page) are passed through under their adzump
 keys but not mapped to a typed CampaignData field — ds's Meta path can
@@ -68,6 +86,36 @@ logger = get_logger(__name__)
 # routing prefix `/marketingai/{clientCode}/...`).
 ADZUMP_APP_CODE = "marketingai"
 
+def _build_target_area_dict(ta: dict) -> dict:
+    """Normalize a TargetArea dict for downstream payload.
+    Extracts only the fields required by DS services.
+    """
+    return {
+        "name": ta.get("name", ""),
+        "city": ta.get("city", ""),
+        "state": ta.get("state", ""),
+        "pincode": ta.get("pincode", ""),
+        "lat": ta.get("lat"),
+        "lng": ta.get("lng"),
+        "distance_km": ta.get("distance_km", 0.0),
+        "place_id": ta.get("place_id"),
+        "scale": _normalize_scale(ta.get("scale")),
+        "google": ta.get("google"),
+        "meta": ta.get("meta"),
+    }
+
+
+def _normalize_scale(value) -> str:
+    """Normalize the `scale` field.
+    Handles both enum objects (with a ``value`` attribute) and raw strings.
+    Returns an empty string if ``value`` is ``None``.
+    """
+    if value is None:
+        return ""
+    try:
+        return value.value  # type: ignore[attr-defined]
+    except Exception:
+        return str(value)
 
 # ── Outbound: fetch adzump session from nocode-ai ────────────────────────
 
@@ -181,13 +229,7 @@ def _resolve_locations(context: dict) -> list[str]:
     return []
 
 
-def _resolve_mapped_locations(context: dict, key: str) -> list[dict]:
-    """Pull platform-specific mapped locations from _location_meta, falling back to product_data."""
-    loc_meta = context.get("_location_meta") or {}
-    if loc_meta.get(key):
-        return list(loc_meta[key])
-    product = context.get("product_data") or {}
-    return list(product.get(key) or [])
+
 
 
 def _strip_account_id(value: Any) -> Optional[str]:
@@ -216,6 +258,10 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
     # adzump skips that step so we do it here.
     dates = get_today_end_date_with_duration(duration_days) if duration_days else {}
 
+    # Extract TargetArea objects and build full dicts for each platform
+    target_areas = product.get("target_areas") or []
+    googleMappedLocations = [_build_target_area_dict(ta) for ta in target_areas if ta.get("google")]
+    metaMappedLocations = [_build_target_area_dict(ta) for ta in target_areas if ta.get("meta")]
     return {
         # Core CampaignData fields (typed in models/campaign_data_model.py)
         "businessName": product.get("product_name") or "",
@@ -229,12 +275,23 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
-        "googleMappedLocations": _resolve_mapped_locations(context, "google_mapped_locations"),
-        "metaMappedLocations": _resolve_mapped_locations(context, "meta_mapped_locations"),
+        "googleMappedLocations": googleMappedLocations,
+        "metaMappedLocations": metaMappedLocations,
         "productSummary": summary,
         # ds keyword/creative services read `business_summary` (snake_case)
         "business_summary": summary,
         "businessType": product.get("business_type") or "",
+        "businessScale": product.get("business_scale") or "",
+        "place": product.get("place") or {},
+        "pricing": product.get("pricing", ""),
+        "contact": product.get("contact") or {},
+        "uniqueFeatures": product.get("unique_features", []),
+        "productServices": product.get("products_services", []),
+        "primaryUrl": product.get("primary_url", ""),
+        "pages": product.get("pages", {}),
+        "pagesAnalyzed": product.get("pages_analyzed", []),
+        "siteLinks": product.get("site_links", []),
+        "assets": product.get("assets", {}),
         "competitors": competitive.get("competitors") or [],
         "accountNames": account_names,
         # Meta-only — passed through by name; ds Meta path reads as needed
