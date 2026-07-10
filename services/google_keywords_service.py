@@ -61,6 +61,25 @@ class GoogleKeywordService:
         self.safety_patterns = text_utils.get_safety_patterns()
         self.business_extractor = BusinessService()
 
+    @classmethod
+    def resolve_keyword_location_ids(
+        cls, campaign_data: dict, requested: List[str] | None
+    ) -> List[str]:
+        """Keyword planner geo: curated locations > caller ids > country constant > India."""
+        curated = [
+            entry["google"]["resourceName"]
+            for entry in (campaign_data.get("googleMappedLocations") or [])
+            if (entry or {}).get("google", {}).get("resourceName")
+        ]
+        if curated:
+            return curated
+        if requested:
+            return list(requested)
+        country_constant = campaign_data.get("countryGeoConstant")
+        if country_constant:
+            return [str(country_constant)]
+        return list(cls.DEFAULT_LOCATION_IDS)
+
     async def generate_seed_keywords(
         self,
         scraped_data: str,
@@ -415,7 +434,6 @@ class GoogleKeywordService:
         x_forwarded_host: str,
         x_forwarded_port: str,
     ) -> KeywordResearchResult:
-        location_ids = keyword_request.location_ids or self.DEFAULT_LOCATION_IDS
         language_id = keyword_request.language_id or self.DEFAULT_LANGUAGE_ID
         seed_count = keyword_request.seed_count or self.DEFAULT_SEED_COUNT
         keyword_type = keyword_request.keyword_type or KeywordType.GENERIC
@@ -433,6 +451,11 @@ class GoogleKeywordService:
         session = sessions[session_id]
         login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
         customer_id = session.get("campaign_data", {}).get("customerId")
+
+        campaign_data = session.get("campaign_data") or {}
+        location_ids = self.resolve_keyword_location_ids(
+            campaign_data, keyword_request.location_ids
+        )
 
         if not login_customer_id:
             raise HTTPException(
