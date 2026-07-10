@@ -24,7 +24,8 @@ plus actual usages in chat_service / google_keywords_service):
 | durationDays            | campaign_spec.duration (digits extracted)          |
 | loginCustomerId         | campaign_spec.parent_account                       |
 | customerId              | campaign_spec.account                              |
-| locations               | [_location_meta.address] or [spec.location]        |
+| locations               | [product_data.place.address] or [spec.location]    |
+| countryCode             | product_data.place.country_code                    |
 | googleMappedLocations   | product_data.target_areas (entries with google handle) |
 | metaMappedLocations     | product_data.target_areas (entries with meta handle)   |
 | platform                | campaign_spec.platform                             |
@@ -174,9 +175,9 @@ def _resolve_url(context: dict) -> str:
 
 
 def _resolve_locations(context: dict) -> list[str]:
-    meta = context.get("_location_meta") or {}
-    if meta.get("address"):
-        return [str(meta["address"])]
+    place = (context.get("product_data") or {}).get("place") or {}
+    if place.get("address"):
+        return [str(place["address"])]
     spec = context.get("campaign_spec") or {}
     if spec.get("location"):
         return [str(spec["location"])]
@@ -199,7 +200,7 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
     product = context.get("product_data") or {}
     spec = context.get("campaign_spec") or {}
     competitive = context.get("competitor_analysis") or {}
-    location_meta = context.get("_location_meta") or {}
+    place = product.get("place") or {}
     account_names = context.get("account_names") or {}
 
     duration_days = _extract_int(spec.get("duration"))
@@ -223,6 +224,8 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
+        # ISO-3166 alpha-2; empty for legacy/pre-geocode sessions
+        "countryCode": place.get("country_code") or "",
         "googleMappedLocations": [ta for ta in (product.get("target_areas") or []) if (ta or {}).get("google")],
         "metaMappedLocations": [ta for ta in (product.get("target_areas") or []) if (ta or {}).get("meta")],
         "productSummary": summary,
@@ -237,8 +240,8 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Provenance — useful for debugging / re-syncing
         "adzumpProductId": context.get("product_id"),
         "adzumpSessionId": context.get("_adzump_session_id_seed", ""),
-        "adzumpLocationLat": location_meta.get("lat"),
-        "adzumpLocationLng": location_meta.get("lng"),
+        "adzumpLocationLat": place.get("lat"),
+        "adzumpLocationLng": place.get("lng"),
     }
 
 

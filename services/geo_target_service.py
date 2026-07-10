@@ -19,6 +19,8 @@ class GeoTargetService:
     GEOCODING_API_URL = "https://maps.googleapis.com/maps/api/geocode/json"
     HTTP_TIMEOUT = 30.0
     DEFAULT_RADIUS_KM = 15
+    # Single country fallback, applied only in resolve_locations_batch
+    DEFAULT_COUNTRY_CODE = "IN"
 
     # Grid configuration
     GRID_STEP_KM = 3  # 3km steps (denser scan)
@@ -38,6 +40,7 @@ class GeoTargetService:
         coordinates: Optional[Dict[str, float]] = None,
         area_location: Optional[str] = None,
         radius_km: int = DEFAULT_RADIUS_KM,
+        country_code: str = "",
     ) -> TargetPlaceResponse:
         product_location = area_location
         product_coordinates = coordinates
@@ -79,9 +82,9 @@ class GeoTargetService:
             lat, lng, radius_km, step_km=self.GRID_STEP_KM
         )
 
-        # Step 2: Geocode grid points (async) + extract country
+        # Step 2: Geocode grid points (async); caller country wins, grid fills absence
         locations, country_code = await self._geocode_grid_points_async(
-            points=grid_points, target_state=target_state
+            points=grid_points, target_state=target_state, country_code=country_code
         )
 
         if not locations:
@@ -167,9 +170,13 @@ class GeoTargetService:
         return points
 
     async def _geocode_grid_points_async(
-        self, points: List[Dict[str, float]], target_state: str = ""
+        self,
+        points: List[Dict[str, float]],
+        target_state: str = "",
+        country_code: str = "",
     ) -> tuple[List[Dict], str]:
-        country_code: Optional[str] = None
+        # Caller-provided country is authoritative; grid results only fill absence
+        country_code: Optional[str] = country_code or None
         semaphore = Semaphore(self.MAX_CONCURRENT_GEOCODE)
 
         async def geocode_one(point: Dict) -> Optional[Dict]:
@@ -203,7 +210,7 @@ class GeoTargetService:
                         for component in results[0].get("address_components", []):
                             types = component.get("types", [])
                             if "country" in types:
-                                country_code = component.get("short_name", "IN")
+                                country_code = component.get("short_name")
 
                     # Define target types in priority order
                     target_types = [
@@ -251,7 +258,8 @@ class GeoTargetService:
                         if target_state:
                             search_parts.append(target_state)
 
-                        search_parts.append(country_code or "IN")
+                        if country_code:
+                            search_parts.append(country_code)
 
                         search_name = ", ".join(search_parts)
 
@@ -275,13 +283,12 @@ class GeoTargetService:
         locations = [r for r in results if r and isinstance(r, dict)]
 
         if not country_code:
-            country_code = "IN"
-            logger.warning("No country code found in grid results, defaulting to IN")
+            logger.warning("No country code from caller or grid results")
 
         logger.info(
             f"Found {len(locations)} locations from grid, country: {country_code}"
         )
-        return locations, country_code
+        return locations, country_code or ""
 
     def _deduplicate_locations(self, locations: List[Dict]) -> List[Dict]:
         """Deduplicate by name and distance."""
@@ -314,11 +321,12 @@ class GeoTargetService:
     async def resolve_locations_batch(
         self,
         locations: List[str],
-        country_code: str = "IN",
+        country_code: str = "",
         target_state: str = "",
         locale: str = "en",
     ) -> TargetPlaceResponse:
         """Resolve location names to geoTargetConstants using Google Ads API."""
+        country_code = country_code or self.DEFAULT_COUNTRY_CODE
         if not self._has_google_ads_credentials():
             logger.error("Missing Google Ads credentials")
             return TargetPlaceResponse(locations=[], unresolved=locations)
