@@ -13,6 +13,8 @@ class GenerateCampaignRequest(BaseModel):
     websiteURL: str
     geoTargetTypeSetting: Dict[str, Any]
     locations: List[Dict[str, Any]]
+    # Adzump user-curated locations; preferred over `locations` when present
+    googleMappedLocations: Optional[List[Dict[str, Any]]] = None
     targeting: List[Dict[str, Any]]
     networkSettings: Optional[Dict[str, Any]] = None
     trackingUrlTemplate: Optional[str] = None
