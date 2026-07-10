@@ -30,3 +30,9 @@ def test_mapped_locations_survive_model_dump():
 
 def test_mapped_locations_optional():
     assert _request().model_dump()["googleMappedLocations"] is None
+
+
+def test_locations_no_longer_required():
+    base = {k: v for k, v in _request().model_dump().items() if v is not None}
+    base.pop("locations")
+    assert GenerateCampaignRequest(**base).locations == []

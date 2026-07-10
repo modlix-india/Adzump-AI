@@ -404,7 +404,8 @@ class TargetingEntity(BaseModel):
 
 
 class Targeting(BaseModel):
-    locations: list[Location]
+    # Optional in the request; filled from session curated locations when omitted
+    locations: list[Location] = []
     locales: list[Locale] | None = None
     behaviors: list[TargetingEntity] | None = None
     interests: list[TargetingEntity] | None = None
@@ -417,13 +418,6 @@ class Targeting(BaseModel):
         None, ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE
     )
     genders: list[Gender] | None = None
-
-    @field_validator("locations")
-    @classmethod
-    def validate_locations(cls, v):
-        if not v:
-            raise ValueError("At least one location is required")
-        return v
 
     @model_validator(mode="after")
     @classmethod

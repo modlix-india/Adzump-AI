@@ -9,6 +9,11 @@ from agents.meta.lead_form_agent import meta_lead_form_agent
 from adapters.meta.ad_creation_orchestrator import MetaAdCreationOrchestrator
 from agents.meta.detailed_targeting_agent import detailed_targeting_agent
 from agents.meta.ads_placement_agent import meta_ads_placement_agent
+from agents.meta.payload_builders.adset_builder.targeting_builder.geo_targeting_builder import (
+    curated_meta_locations,
+)
+from exceptions.custom_exceptions import BusinessValidationException
+from services.session_manager import sessions
 
 
 router = APIRouter(prefix="/api/ds/ads/meta", tags=["meta-ads"])
@@ -54,11 +59,21 @@ async def generate_creative_image(
 async def create_meta_ads(
     payload: MetaAdCreationRequest,
     inspect_payload: bool = Query(default=False, alias="inspect_payload"),
+    session_id: str | None = Query(default=None, alias="sessionId"),
 ):
     """
     Creates a full Meta ad structure (campaign → ad set → ad).
     Requires 'ClientCode' header for authentication context.
+    Adset geo comes from the session's curated locations when the body omits them.
     """
+    if not payload.adset.targeting.locations and session_id:
+        campaign_data = sessions.get(session_id, {}).get("campaign_data") or {}
+        payload.adset.targeting.locations = curated_meta_locations(campaign_data)
+    if not payload.adset.targeting.locations:
+        raise BusinessValidationException(
+            "No targeting locations: provide adset.targeting.locations "
+            "or a sessionId with curated locations."
+        )
     result = await MetaAdCreationOrchestrator.create_full_structure(
         payload, inspect_payload
     )
