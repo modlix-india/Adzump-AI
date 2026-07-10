@@ -21,7 +21,8 @@ def curated_meta_locations(campaign_data: dict) -> list[Location]:
         if loc_type not in _CURATED_GEO_TYPES:
             logger.warning("meta_adset_geo.curated_type_coerced", key=key, type=loc_type)
             loc_type = "city"
-        name = handle.get("name") or (entry or {}).get("name") or ""
+        # Location requires non-empty name; producer allows empty names
+        name = handle.get("name") or (entry or {}).get("name") or str(key)
         result.append(Location(key=str(key), name=name, type=loc_type))
     return result
 

@@ -40,3 +40,20 @@ def test_missing_google_handle_skipped():
 def test_empty_and_missing_are_empty():
     assert curated_google_locations({}) == []
     assert curated_google_locations({"googleMappedLocations": []}) == []
+
+
+def test_builder_refuses_empty_locations():
+    class _Stub:
+        def model_dump(self):
+            return {
+                "businessName": "Acme", "budget": 100, "goal": "leads",
+                "startDate": "01/07/2026", "endDate": "31/07/2026",
+                "geoTargetTypeSetting": {}, "locations": [], "targeting": [],
+                "assets": {},
+            }
+
+    try:
+        _mod.generate_google_ads_mutate_operations("123", _Stub())
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "No campaign locations" in str(e)

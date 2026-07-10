@@ -49,6 +49,15 @@ def test_handle_name_falls_back_to_entry_name():
     assert curated_meta_locations(campaign_data)[0].name == "Entry Name"
 
 
+def test_nameless_entry_falls_back_to_key():
+    # Producer allows empty names; Location requires min_length=1
+    campaign_data = {"metaMappedLocations": [
+        {"name": "", "meta": {"type": "zip", "key": "IN:400050"}},
+    ]}
+    out = curated_meta_locations(campaign_data)
+    assert out[0].name == "IN:400050"
+
+
 def test_legacy_flat_entries_yield_nothing():
     campaign_data = {"metaMappedLocations": [
         {"name": "Old", "meta_key": "9", "meta_type": "city"},

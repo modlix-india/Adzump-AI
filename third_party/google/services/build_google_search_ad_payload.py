@@ -52,6 +52,11 @@ def generate_google_ads_mutate_operations(
     geo_target_type_setting = campaign_data_payload.get("geoTargetTypeSetting")
     curated = curated_google_locations(campaign_data_payload)
     locations = curated if curated else campaign_data_payload.get("locations", [])
+    # No geo criteria means Google targets ALL countries; refuse instead
+    if not locations:
+        raise ValueError(
+            "No campaign locations: provide googleMappedLocations or locations"
+        )
     targetings = campaign_data_payload.get("targeting", [])
     assets = campaign_data_payload.get("assets", {}) or {}
     network_settings = campaign_data_payload.get("networkSettings")
