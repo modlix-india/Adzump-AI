@@ -61,6 +61,25 @@ class GoogleKeywordService:
         self.safety_patterns = text_utils.get_safety_patterns()
         self.business_extractor = BusinessService()
 
+    @classmethod
+    def resolve_keyword_location_ids(
+        cls, campaign_data: dict, requested: List[str] | None
+    ) -> List[str]:
+        """Keyword planner geo: curated locations > caller ids > country constant > India."""
+        curated = [
+            entry["google"]["resourceName"]
+            for entry in (campaign_data.get("googleMappedLocations") or [])
+            if (entry or {}).get("google", {}).get("resourceName")
+        ]
+        if curated:
+            return curated
+        if requested:
+            return list(requested)
+        country_constant = campaign_data.get("countryGeoConstant")
+        if country_constant:
+            return [str(country_constant)]
+        return list(cls.DEFAULT_LOCATION_IDS)
+
     async def generate_seed_keywords(
         self,
         scraped_data: str,
@@ -433,15 +452,10 @@ class GoogleKeywordService:
         login_customer_id = session.get("campaign_data", {}).get("loginCustomerId")
         customer_id = session.get("campaign_data", {}).get("customerId")
 
-        # Prefer user-curated Google locations from adzump bridge over the
-        # caller-supplied location_ids. Fall back to caller → India default.
         campaign_data = session.get("campaign_data") or {}
-        curated_location_ids = [
-            entry["google"]["resourceName"]
-            for entry in (campaign_data.get("googleMappedLocations") or [])
-            if (entry or {}).get("google", {}).get("resourceName")
-        ]
-        location_ids = curated_location_ids or keyword_request.location_ids or self.DEFAULT_LOCATION_IDS
+        location_ids = self.resolve_keyword_location_ids(
+            campaign_data, keyword_request.location_ids
+        )
 
         if not login_customer_id:
             raise HTTPException(

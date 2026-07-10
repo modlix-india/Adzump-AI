@@ -26,6 +26,7 @@ plus actual usages in chat_service / google_keywords_service):
 | customerId              | campaign_spec.account                              |
 | locations               | [product_data.place.address] or [spec.location]    |
 | countryCode             | product_data.place.country_code                    |
+| countryGeoConstant      | product_data.place.country_geo_constant            |
 | googleMappedLocations   | product_data.target_areas (entries with google handle) |
 | metaMappedLocations     | product_data.target_areas (entries with meta handle)   |
 | platform                | campaign_spec.platform                             |
@@ -226,6 +227,8 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         "locations": _resolve_locations(context),
         # ISO-3166 alpha-2; empty for legacy/pre-geocode sessions
         "countryCode": place.get("country_code") or "",
+        # Pre-resolved geoTargetConstants/{id} for the country; best-effort
+        "countryGeoConstant": place.get("country_geo_constant") or "",
         "googleMappedLocations": [ta for ta in (product.get("target_areas") or []) if (ta or {}).get("google")],
         "metaMappedLocations": [ta for ta in (product.get("target_areas") or []) if (ta or {}).get("meta")],
         "productSummary": summary,

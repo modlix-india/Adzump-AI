@@ -15,6 +15,7 @@ def _context(**overrides):
                 "lat": 12.97,
                 "lng": 77.59,
                 "country_code": "IN",
+                "country_geo_constant": "geoTargetConstants/2356",
             },
             "target_areas": [],
         },
@@ -42,11 +43,17 @@ def test_country_code_from_place():
     assert map_adzump_context_to_campaign_data(_context())["countryCode"] == "IN"
 
 
-def test_country_code_tolerates_absent_place():
+def test_country_geo_constant_from_place():
+    data = map_adzump_context_to_campaign_data(_context())
+    assert data["countryGeoConstant"] == "geoTargetConstants/2356"
+
+
+def test_country_fields_tolerate_absent_place():
     ctx = _context()
     ctx["product_data"].pop("place")
     data = map_adzump_context_to_campaign_data(ctx)
     assert data["countryCode"] == ""
+    assert data["countryGeoConstant"] == ""
     assert data["adzumpLocationLat"] is None
     assert data["adzumpLocationLng"] is None
 
