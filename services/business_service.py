@@ -277,10 +277,16 @@ class BusinessService:
             if map_embeds and map_embeds[0].get("coordinates"):
                 coordinates = map_embeds[0]["coordinates"]
 
+            # Country from the record's confirmed campaign location, when present
+            record_country_code = (
+                ((existing_record or {}).get("campaign") or {}).get("location") or {}
+            ).get("country_code") or ""
+
             geo_result = await geo_service.suggest_geo_targets(
                 coordinates=coordinates,
                 area_location=location_info.area_location if location_info else None,
                 radius_km=15,
+                country_code=record_country_code,
             )
 
             # Update location info with resolved product details

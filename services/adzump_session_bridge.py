@@ -24,9 +24,11 @@ plus actual usages in chat_service / google_keywords_service):
 | durationDays            | campaign_spec.duration (digits extracted)          |
 | loginCustomerId         | campaign_spec.parent_account                       |
 | customerId              | campaign_spec.account                              |
-| locations               | [_location_meta.address] or [spec.location]        |
-| googleMappedLocations   | _location_meta.google_mapped_locations             |
-| metaMappedLocations     | _location_meta.meta_mapped_locations               |
+| locations               | [product_data.place.address] or [spec.location]    |
+| countryCode             | product_data.place.country_code                    |
+| countryGeoConstant      | product_data.place.country_geo_constant            |
+| googleMappedLocations   | product_data.target_areas (entries with google handle) |
+| metaMappedLocations     | product_data.target_areas (entries with meta handle)   |
 | platform                | campaign_spec.platform                             |
 | productSummary          | product_data.summary                               |
 | business_summary        | product_data.summary                               |
@@ -48,19 +50,21 @@ plus actual usages in chat_service / google_keywords_service):
 | igAccountId             | spec.ig_page (normalized)                         |
 | adzumpProductId         | session.context["product_id"]                      |
 | adzumpSessionId         | source session id                                  |
-| adzumpLocationLat       | _location_meta.lat                                 |
-| adzumpLocationLng       | _location_meta.lng                                 |
+| adzumpLocationLat       | product_data.place.lat                             |
+| adzumpLocationLng       | product_data.place.lng                             |
 
 Meta-only fields (fb_page, ig_page) are passed through under their adzump
 keys but not mapped to a typed CampaignData field — ds's Meta path can
 read them off the dict directly when needed.
 
-googleMappedLocations / metaMappedLocations come from the GeoTargetingAgent
-(nocode-ai feat/locations-fetching). Each entry is a dict with platform-
-specific keys:
-  Google: {google_id, google_name, lat, lng, ...}
-  Meta:   {meta_key, meta_type, meta_name, lat, lng, ...}
-Falls back to product_data when _location_meta doesn't have them.
+googleMappedLocations / metaMappedLocations come from product_data.target_areas
+(set by nocode-ai LocationAgent - see agents/location/AGENT.md). Each entry is a
+TargetArea dict: {name, city, state, lat, lng, ..., google: {resourceName, name},
+meta: {type, key, name}}. Filtered by which platform handle is present.
+googleMappedLocations feed campaign criteria + keyword planner via
+third_party/google/services/build_google_search_ad_payload.curated_google_locations.
+metaMappedLocations feed adset geo targeting via
+agents/meta/payload_builders/.../geo_targeting_builder.curated_meta_locations.
 """
 
 from __future__ import annotations
@@ -220,16 +224,13 @@ def _resolve_url(context: dict) -> str:
 
 
 def _resolve_locations(context: dict) -> list[str]:
-    meta = context.get("_location_meta") or {}
-    if meta.get("address"):
-        return [str(meta["address"])]
+    place = (context.get("product_data") or {}).get("place") or {}
+    if place.get("address"):
+        return [str(place["address"])]
     spec = context.get("campaign_spec") or {}
     if spec.get("location"):
         return [str(spec["location"])]
     return []
-
-
-
 
 
 def _strip_account_id(value: Any) -> Optional[str]:
@@ -247,7 +248,7 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
     product = context.get("product_data") or {}
     spec = context.get("campaign_spec") or {}
     competitive = context.get("competitor_analysis") or {}
-    location_meta = context.get("_location_meta") or {}
+    place = product.get("place") or {}
     account_names = context.get("account_names") or {}
 
     duration_days = _extract_int(spec.get("duration"))
@@ -275,6 +276,10 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
+        # ISO-3166 alpha-2; empty for legacy/pre-geocode sessions
+        "countryCode": place.get("country_code") or "",
+        # Pre-resolved geoTargetConstants/{id} for the country; best-effort
+        "countryGeoConstant": place.get("country_geo_constant") or "",
         "googleMappedLocations": googleMappedLocations,
         "metaMappedLocations": metaMappedLocations,
         "productSummary": summary,
@@ -300,8 +305,8 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Provenance — useful for debugging / re-syncing
         "adzumpProductId": context.get("product_id"),
         "adzumpSessionId": context.get("_adzump_session_id_seed", ""),
-        "adzumpLocationLat": location_meta.get("lat"),
-        "adzumpLocationLng": location_meta.get("lng"),
+        "adzumpLocationLat": place.get("lat"),
+        "adzumpLocationLng": place.get("lng"),
     }
 
 
