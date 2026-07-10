@@ -79,6 +79,7 @@ def sample_payload_data(future_dates):
             "page_id": "332515906622723",
             "primary_texts": ["Experience lakeside living."],
             "headlines": ["Luxury Villas"],
+            "image_urls": ["https://example.com/image.jpg"],
             "image_hashes": ["b5a136d20f5c4e4d993ada2062936e2f"],
             "destination_type": "WEBSITE",
             "call_to_action": {"type": "LEARN_MORE", "url": "https://lifebythelake.in"},
