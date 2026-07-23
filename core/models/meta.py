@@ -404,7 +404,8 @@ class TargetingEntity(BaseModel):
 
 
 class Targeting(BaseModel):
-    locations: list[Location]
+    # Optional in the request; filled from session curated locations when omitted
+    locations: list[Location] = []
     locales: list[Locale] | None = None
     behaviors: list[TargetingEntity] | None = None
     interests: list[TargetingEntity] | None = None
@@ -417,13 +418,6 @@ class Targeting(BaseModel):
         None, ge=meta_constants.MIN_AGE, le=meta_constants.MAX_AGE
     )
     genders: list[Gender] | None = None
-
-    @field_validator("locations")
-    @classmethod
-    def validate_locations(cls, v):
-        if not v:
-            raise ValueError("At least one location is required")
-        return v
 
     @model_validator(mode="after")
     @classmethod
@@ -576,8 +570,11 @@ class BaseCreative(BaseModel):
     page_id: str = Field(..., min_length=1)
     instagram_user_id: str | None = Field(default=None, min_length=1)
     destination_type: DestinationType
-    image_hashes: list[str] = Field(
-        ..., min_length=1, max_length=meta_constants.MAX_IMAGES
+    image_urls: list[str] | None = Field(
+        default=None, max_length=meta_constants.MAX_IMAGES
+    )
+    image_hashes: list[str] | None = Field(
+        default=None, max_length=meta_constants.MAX_IMAGES
     )
     headlines: list[HeadlineStr] = Field(
         ..., min_length=1, max_length=meta_constants.MAX_HEADLINES
@@ -588,6 +585,13 @@ class BaseCreative(BaseModel):
     descriptions: list[DescriptionStr] | None = Field(
         default=None, min_length=1, max_length=meta_constants.MAX_DESCRIPTIONS
     )
+
+    @model_validator(mode="after")
+    def validate_images(self) -> BaseCreative:
+        if not self.image_urls and not self.image_hashes:
+            raise ValueError("Either image_urls or image_hashes must be provided")
+        return self
+
 
 
 class WebsiteCreative(BaseCreative):

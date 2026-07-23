@@ -1,5 +1,30 @@
+import structlog
+
 from core.models.meta import Location
 from core.models.meta_constants import MIN_RADIUS_KM, DEFAULT_DISTANCE_UNIT
+
+logger = structlog.get_logger()
+
+# Unknown types (e.g. subcity from Meta /search) coerced to city rather than dropped.
+_CURATED_GEO_TYPES = {"country", "city", "region", "zip", "neighborhood"}
+
+
+def curated_meta_locations(campaign_data: dict) -> list[Location]:
+    """Extract adzump metaMappedLocations from campaign_data as Location objects."""
+    result = []
+    for entry in (campaign_data.get("metaMappedLocations") or []):
+        handle = (entry or {}).get("meta") or {}
+        key = handle.get("key")
+        if not key:
+            continue
+        loc_type = (handle.get("type") or "").strip().lower()
+        if loc_type not in _CURATED_GEO_TYPES:
+            logger.warning("meta_adset_geo.curated_type_coerced", key=key, type=loc_type)
+            loc_type = "city"
+        # Location requires non-empty name; producer allows empty names
+        name = handle.get("name") or (entry or {}).get("name") or str(key)
+        result.append(Location(key=str(key), name=name, type=loc_type))
+    return result
 
 
 def build_geo_locations(locations: list[Location]):

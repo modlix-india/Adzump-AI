@@ -9,6 +9,18 @@ def get_unique_suffix() -> str:
     return datetime.now().strftime("%d/%m/%Y_%H:%M:%S")
 
 
+def curated_google_locations(campaign_data: dict) -> list[dict]:
+    """Extract {resourceName} dicts from adzump googleMappedLocations for campaign criteria."""
+    result = []
+    for entry in (campaign_data.get("googleMappedLocations") or []):
+        handle = (entry or {}).get("google") or {}
+        resource_name = handle.get("resourceName")
+        if not resource_name:
+            continue
+        result.append({"resourceName": resource_name})
+    return result
+
+
 def generate_google_ads_mutate_operations(
     customer_id: str, campaign_data_payload: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -38,7 +50,13 @@ def generate_google_ads_mutate_operations(
     ).strftime("%Y-%m-%d") + " 23:59:59"
     goal = campaign_data_payload.get("goal", "leads")
     geo_target_type_setting = campaign_data_payload.get("geoTargetTypeSetting")
-    locations = campaign_data_payload.get("locations", [])
+    curated = curated_google_locations(campaign_data_payload)
+    locations = curated if curated else campaign_data_payload.get("locations", [])
+    # No geo criteria means Google targets ALL countries; refuse instead
+    if not locations:
+        raise ValueError(
+            "No campaign locations: provide googleMappedLocations or locations"
+        )
     targetings = campaign_data_payload.get("targeting", [])
     assets = campaign_data_payload.get("assets", {}) or {}
     network_settings = campaign_data_payload.get("networkSettings")

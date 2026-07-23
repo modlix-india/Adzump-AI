@@ -16,24 +16,55 @@ Flow:
 Mapping nocode-ai → ds (see CampaignData in models/campaign_data_model.py
 plus actual usages in chat_service / google_keywords_service):
 
-| ds key              | adzump source                                |
-|---------------------|----------------------------------------------|
-| businessName        | product_data.product_name                    |
-| websiteURL          | product_profile.url or pages_analyzed[0]     |
-| budget              | campaign_spec.budget (digits extracted)      |
-| durationDays        | campaign_spec.duration (digits extracted)    |
-| loginCustomerId     | campaign_spec.parent_account                 |
-| customerId          | campaign_spec.account                        |
-| locations           | [_location_meta.address] or [spec.location]  |
-| platform            | campaign_spec.platform                       |
-| productSummary      | product_data.summary                         |
-| competitors         | competitor_analysis.competitors              |
-| adzumpProductId     | session.context["product_id"]                |
-| adzumpSessionId     | source session id                            |
+| ds key                  | adzump source                                      |
+|-------------------------|----------------------------------------------------|
+| businessName            | product_data.product_name                          |
+| websiteURL              | product_profile.url or pages_analyzed[0]           |
+| budget                  | campaign_spec.budget (digits extracted)            |
+| durationDays            | campaign_spec.duration (digits extracted)          |
+| loginCustomerId         | campaign_spec.parent_account                       |
+| customerId              | campaign_spec.account                              |
+| locations               | [product_data.place.address] or [spec.location]    |
+| countryCode             | product_data.place.country_code                    |
+| countryGeoConstant      | product_data.place.country_geo_constant            |
+| googleMappedLocations   | product_data.target_areas (entries with google handle) |
+| metaMappedLocations     | product_data.target_areas (entries with meta handle)   |
+| platform                | campaign_spec.platform                             |
+| productSummary          | product_data.summary                               |
+| business_summary        | product_data.summary                               |
+| businessType            | product_data.business_type                         |
+| businessScale           | product_data.business_scale                        |
+| place                   | product_data.place                                 |
+| pricing                 | product_data.pricing                               |
+| contact                 | product_data.contact                               |
+| uniqueFeatures          | product_data.unique_features                       |
+| productServices         | product_data.products_services                     |
+| primaryUrl              | product_data.primary_url                           |
+| pages                   | product_data.pages                                 |
+| pagesAnalyzed           | product_data.pages_analyzed                        |
+| siteLinks               | product_data.site_links                            |
+| assets                  | product_data.assets                                |
+| competitors             | competitor_analysis.competitors                    |
+| accountNames            | account_names                                      |
+| fbPageId                | spec.fb_page (normalized)                         |
+| igAccountId             | spec.ig_page (normalized)                         |
+| adzumpProductId         | session.context["product_id"]                      |
+| adzumpSessionId         | source session id                                  |
+| adzumpLocationLat       | product_data.place.lat                             |
+| adzumpLocationLng       | product_data.place.lng                             |
 
 Meta-only fields (fb_page, ig_page) are passed through under their adzump
 keys but not mapped to a typed CampaignData field — ds's Meta path can
 read them off the dict directly when needed.
+
+googleMappedLocations / metaMappedLocations come from product_data.target_areas
+(set by nocode-ai LocationAgent - see agents/location/AGENT.md). Each entry is a
+TargetArea dict: {name, city, state, lat, lng, ..., google: {resourceName, name},
+meta: {type, key, name}}. Filtered by which platform handle is present.
+googleMappedLocations feed campaign criteria + keyword planner via
+third_party/google/services/build_google_search_ad_payload.curated_google_locations.
+metaMappedLocations feed adset geo targeting via
+agents/meta/payload_builders/.../geo_targeting_builder.curated_meta_locations.
 """
 
 from __future__ import annotations
@@ -59,6 +90,36 @@ logger = get_logger(__name__)
 # routing prefix `/marketingai/{clientCode}/...`).
 ADZUMP_APP_CODE = "marketingai"
 
+def _build_target_area_dict(ta: dict) -> dict:
+    """Normalize a TargetArea dict for downstream payload.
+    Extracts only the fields required by DS services.
+    """
+    return {
+        "name": ta.get("name", ""),
+        "city": ta.get("city", ""),
+        "state": ta.get("state", ""),
+        "pincode": ta.get("pincode", ""),
+        "lat": ta.get("lat"),
+        "lng": ta.get("lng"),
+        "distance_km": ta.get("distance_km", 0.0),
+        "place_id": ta.get("place_id"),
+        "scale": _normalize_scale(ta.get("scale")),
+        "google": ta.get("google"),
+        "meta": ta.get("meta"),
+    }
+
+
+def _normalize_scale(value) -> str:
+    """Normalize the `scale` field.
+    Handles both enum objects (with a ``value`` attribute) and raw strings.
+    Returns an empty string if ``value`` is ``None``.
+    """
+    if value is None:
+        return ""
+    try:
+        return value.value  # type: ignore[attr-defined]
+    except Exception:
+        return str(value)
 
 # ── Outbound: fetch adzump session from nocode-ai ────────────────────────
 
@@ -163,9 +224,9 @@ def _resolve_url(context: dict) -> str:
 
 
 def _resolve_locations(context: dict) -> list[str]:
-    meta = context.get("_location_meta") or {}
-    if meta.get("address"):
-        return [str(meta["address"])]
+    place = (context.get("product_data") or {}).get("place") or {}
+    if place.get("address"):
+        return [str(place["address"])]
     spec = context.get("campaign_spec") or {}
     if spec.get("location"):
         return [str(spec["location"])]
@@ -187,7 +248,7 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
     product = context.get("product_data") or {}
     spec = context.get("campaign_spec") or {}
     competitive = context.get("competitor_analysis") or {}
-    location_meta = context.get("_location_meta") or {}
+    place = product.get("place") or {}
     account_names = context.get("account_names") or {}
 
     duration_days = _extract_int(spec.get("duration"))
@@ -198,6 +259,10 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
     # adzump skips that step so we do it here.
     dates = get_today_end_date_with_duration(duration_days) if duration_days else {}
 
+    # Extract TargetArea objects and build full dicts for each platform
+    target_areas = product.get("target_areas") or []
+    googleMappedLocations = [_build_target_area_dict(ta) for ta in target_areas if ta.get("google")]
+    metaMappedLocations = [_build_target_area_dict(ta) for ta in target_areas if ta.get("meta")]
     return {
         # Core CampaignData fields (typed in models/campaign_data_model.py)
         "businessName": product.get("product_name") or "",
@@ -211,10 +276,27 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Extras consumed by other ds services (chat / external_link / ...)
         "platform": spec.get("platform"),
         "locations": _resolve_locations(context),
+        # ISO-3166 alpha-2; empty for legacy/pre-geocode sessions
+        "countryCode": place.get("country_code") or "",
+        # Pre-resolved geoTargetConstants/{id} for the country; best-effort
+        "countryGeoConstant": place.get("country_geo_constant") or "",
+        "googleMappedLocations": googleMappedLocations,
+        "metaMappedLocations": metaMappedLocations,
         "productSummary": summary,
         # ds keyword/creative services read `business_summary` (snake_case)
         "business_summary": summary,
         "businessType": product.get("business_type") or "",
+        "businessScale": product.get("business_scale") or "",
+        "place": product.get("place") or {},
+        "pricing": product.get("pricing", ""),
+        "contact": product.get("contact") or {},
+        "uniqueFeatures": product.get("unique_features", []),
+        "productServices": product.get("products_services", []),
+        "primaryUrl": product.get("primary_url", ""),
+        "pages": product.get("pages", {}),
+        "pagesAnalyzed": product.get("pages_analyzed", []),
+        "siteLinks": product.get("site_links", []),
+        "assets": product.get("assets", {}),
         "competitors": competitive.get("competitors") or [],
         "accountNames": account_names,
         # Meta-only — passed through by name; ds Meta path reads as needed
@@ -223,8 +305,8 @@ def map_adzump_context_to_campaign_data(context: dict) -> dict:
         # Provenance — useful for debugging / re-syncing
         "adzumpProductId": context.get("product_id"),
         "adzumpSessionId": context.get("_adzump_session_id_seed", ""),
-        "adzumpLocationLat": location_meta.get("lat"),
-        "adzumpLocationLng": location_meta.get("lng"),
+        "adzumpLocationLat": place.get("lat"),
+        "adzumpLocationLng": place.get("lng"),
     }
 
 

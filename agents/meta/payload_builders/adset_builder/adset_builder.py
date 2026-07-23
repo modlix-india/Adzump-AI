@@ -42,6 +42,8 @@ def _build_targeting(targeting: Targeting) -> dict:
     entity_payload = entity_targeting_builder.build_entity_targeting(targeting)
     meta_targeting.update(entity_payload)
 
+    meta_targeting["targeting_automation"] = {"advantage_audience": 0}
+
     return meta_targeting
 
 
