@@ -48,6 +48,8 @@ class GoogleSearchTermAdapter:
             AND ad_group.status = 'ENABLED'
             AND campaign.status = 'ENABLED'
             AND campaign.end_date >= '{date.today().strftime("%Y-%m-%d")}'
+        ORDER BY metrics.cost_micros DESC
+        LIMIT 1000
         """
 
         try:
