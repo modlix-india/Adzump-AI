@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal, Tuple, get_args, Dict, Any
 from datetime import datetime
 
+
 # Single Source of Truth (SSOT) for recommendation enums and character limits.
 # Defined in the core layer to ensure strict consistency between Pydantic
 # boundary validation and platform-specific logic in 'adapters'.
@@ -167,18 +168,28 @@ class OptimizationFields(BaseModel):
     sitelinks: Optional[List[SitelinkRecommendation]] = None
 
 
-class CampaignRecommendation(BaseModel):
+class BaseCampaignRecommendation(BaseModel):
+    """Shared contract for all platform campaign recommendations.
+    Both Google and Meta campaign recommendation models inherit from this.
+    """
+
     id: Optional[str] = Field(None, alias="_id")
-    platform: str  # google_ads, meta_ads, tiktok_ads, etc.
+    platform: str  # "GOOGLE" | "META"
     parent_account_id: str = Field(
         ..., min_length=1
     )  # Google: loginCustomerId, Meta: businessId
     account_id: str = Field(..., min_length=1)  # Google: customerId, Meta: adAccountId
-    product_id: Optional[str] = None  # Your product (website) linked to campaign
+    product_id: Optional[str] = None  # Linked product / website
     campaign_id: str = Field(..., min_length=1)
     campaign_name: str
-    campaign_type: str
+    campaign_type: str  # Google: "SEARCH"/"DISPLAY", Meta: objective string
     completed: bool = False
+
+
+class CampaignRecommendation(BaseCampaignRecommendation):
+    """Google Ads campaign recommendation."""
+
+    platform: Literal["GOOGLE"] = "GOOGLE"
     fields: OptimizationFields
 
 

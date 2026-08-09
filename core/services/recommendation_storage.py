@@ -2,8 +2,11 @@ from datetime import datetime, timezone
 from typing import Any
 from structlog import get_logger
 
-from core.models.optimization import CampaignRecommendation
+from core.models.optimization import BaseCampaignRecommendation
+
 from core.infrastructure.context import auth_context
+from exceptions.custom_exceptions import StorageException
+
 from oserver.models.storage_request_model import (
     StorageReadRequest,
     StorageRequest,
@@ -25,8 +28,9 @@ class RecommendationStorageService:
         self.storage = StorageService()
 
     async def store(
-        self, recommendation: CampaignRecommendation, client_code: str
+        self, recommendation: BaseCampaignRecommendation, client_code: str
     ) -> dict:
+
         campaign_id = recommendation.campaign_id
         existing = await self._fetch_existing(campaign_id, client_code)
 
@@ -64,8 +68,9 @@ class RecommendationStorageService:
         return response.content[0] if response.content else None
 
     def _build_recommendation(
-        self, rec: CampaignRecommendation, base_fields: dict | None
+        self, rec: BaseCampaignRecommendation, base_fields: dict | None
     ) -> dict:
+
         fields = self._merge_fields(rec, base_fields)
         return {
             "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -81,8 +86,9 @@ class RecommendationStorageService:
         }
 
     def _merge_fields(
-        self, rec: CampaignRecommendation, base_fields: dict | None
+        self, rec: BaseCampaignRecommendation, base_fields: dict | None
     ) -> dict:
+
         fields = dict[Any, Any](base_fields) if base_fields else {}
         rec_fields = rec.fields.model_dump(exclude_none=True)
         for key, new_items in rec_fields.items():
@@ -109,7 +115,11 @@ class RecommendationStorageService:
             appCode=self.APP_CODE,
             dataObject=doc,
         )
-        return await self.storage.write_storage(request)
+        response = await self.storage.write_storage(request)
+        if not response.success:
+            raise StorageException(response.error)
+        return response
+
 
     async def _mark_completed(self, record_id: str):
         request = StorageUpdateWithPayload(
@@ -132,9 +142,10 @@ class RecommendationStorageService:
 
     async def apply_mutation_results(
         self,
-        recommendation: CampaignRecommendation,
+        recommendation: BaseCampaignRecommendation,
         is_partial: bool,
-    ) -> CampaignRecommendation:
+    ) -> BaseCampaignRecommendation:
+
         """Mark items as applied locally, handle completion status, and sync with storage."""
         # Mark fields as applied locally for the response
         fields = recommendation.fields
@@ -200,9 +211,10 @@ class RecommendationStorageService:
 
     async def sync_mutation_result(
         self,
-        recommendation: CampaignRecommendation,
+        recommendation: BaseCampaignRecommendation,
         is_partial: bool,
     ):
+
         """Update storage by merging applied status from the current mutation into the full record."""
         if not recommendation.id:
             return

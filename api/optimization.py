@@ -15,6 +15,10 @@ from agents.optimization.location_optimization_agent import (
     location_optimization_agent,
 )
 from agents.optimization.gender_optimization_agent import gender_optimization_agent
+from agents.meta_optimization.age_optimization_agent import (
+    meta_age_optimization_agent,
+)
+from core.models.meta_optimization import MetaOptimizationResponse
 
 router = APIRouter(prefix="/api/ds/optimize", tags=["optimization"])
 
@@ -76,3 +80,8 @@ async def validate_google_ads_mutation(
 ):
     """Dry-run validation of the campaign recommendation."""
     return await google_ads_mutation_service.validate_mutation(campaign=campaign)
+
+
+@router.post("/meta/age", response_model=MetaOptimizationResponse)
+async def generate_meta_age_optimization():
+    return await meta_age_optimization_agent.generate_recommendations()
