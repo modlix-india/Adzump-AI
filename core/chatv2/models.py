@@ -14,7 +14,10 @@ class ChatStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     CONFIRMING_LOCATION = "confirming_location"
     SELECTING_PARENT_ACCOUNT = "selecting_parent_account"
+    SELECTING_FB_PAGE = "selecting_fb_page"
+    SELECTING_IG_PAGE = "selecting_ig_page"
     SELECTING_ACCOUNT = "selecting_account"
+    SELECTING_PIXEL = "selecting_pixel"
     AWAITING_CONFIRMATION = "awaiting_confirmation"
     COMPLETED = "completed"
 
@@ -30,7 +33,10 @@ class AccountType(str, Enum):
     """Type of ad platform account."""
 
     PARENT_ACCOUNT = "parent_account"
+    FB_PAGE = "fb_page"
+    IG_ACCOUNT = "ig_account"
     ACCOUNT = "account"
+    PIXEL = "pixel"
 
 
 class AccountOption(BaseModel):
@@ -55,6 +61,12 @@ class AccountSelection(BaseModel):
     def account_selection(cls, options: list[dict]) -> "AccountSelection":
         return cls(
             type=AccountType.ACCOUNT, options=[AccountOption(**o) for o in options]
+        )
+
+    @classmethod
+    def pixel_selection(cls, options: list[dict]) -> "AccountSelection":
+        return cls(
+            type=AccountType.PIXEL, options=[AccountOption(**o) for o in options]
         )
 
 
