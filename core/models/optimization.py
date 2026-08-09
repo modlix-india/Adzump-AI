@@ -50,7 +50,6 @@ class GenderFieldRecommendation(BaseModel):
     gender_type: GenderType
     recommendation: Literal["ADD", "REMOVE"]
     reason: str
-    resource_name: Optional[str] = None
     applied: bool = False
 
 
