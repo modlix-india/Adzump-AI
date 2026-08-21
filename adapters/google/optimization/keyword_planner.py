@@ -46,6 +46,23 @@ class GoogleKeywordPlannerAdapter:
             f"/customers/{customer_id}:generateKeywordIdeas"
         )
 
+        total_chunks = (
+            (len(seed_keywords) + self.CHUNK_SIZE - 1) // self.CHUNK_SIZE
+            if seed_keywords
+            else 0
+        )
+        logger.info(
+            "keyword_planner_start",
+            customer_id=customer_id,
+            login_customer_id=login_customer_id,
+            endpoint=endpoint,
+            total_seeds=len(seed_keywords),
+            total_chunks=total_chunks,
+            location_ids=location_ids,
+            language_id=language_id,
+            url=url,
+        )
+
         seen: dict[str, dict] = {}
 
         for i in range(0, len(seed_keywords), self.CHUNK_SIZE):
@@ -53,16 +70,37 @@ class GoogleKeywordPlannerAdapter:
             chunk_num = i // self.CHUNK_SIZE + 1
 
             payload = _build_payload(chunk, url, location_ids, language_id)
-            logger.info("keyword_planner_chunk", chunk=chunk_num, seeds=len(chunk))
-
-            response = await http_request(
-                "POST",
-                endpoint,
-                headers=headers,
-                json=payload,
-                error_handler=_raise_google_error,
-                retry_delay_parser=_extract_retry_delay,
+            logger.info(
+                "keyword_planner_chunk",
+                chunk=chunk_num,
+                total_chunks=total_chunks,
+                seeds=len(chunk),
+                customer_id=customer_id,
+                login_customer_id=login_customer_id,
+                endpoint=endpoint,
+                payload=payload,
             )
+
+            try:
+                response = await http_request(
+                    "POST",
+                    endpoint,
+                    headers=headers,
+                    json=payload,
+                    error_handler=_raise_google_error,
+                    retry_delay_parser=_extract_retry_delay,
+                )
+            except Exception as e:
+                logger.error(
+                    "keyword_planner_chunk_failed",
+                    chunk=chunk_num,
+                    customer_id=customer_id,
+                    login_customer_id=login_customer_id,
+                    endpoint=endpoint,
+                    payload=payload,
+                    error=str(e),
+                )
+                raise
 
             for idea in response.json().get("results", []):
                 parsed = _parse_keyword_idea(idea)

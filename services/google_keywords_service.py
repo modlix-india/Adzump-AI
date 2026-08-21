@@ -113,9 +113,9 @@ class GoogleKeywordService:
             seed_keywords = KeywordUtils.parse_and_normalize_seed_keywords(raw, max_kw)
 
             logger.info(
-                f"Generated {len(seed_keywords)} strategic seed keywords for type '{keyword_type.value}'"
+                f"Generated {len(seed_keywords)} strategic seed keywords for type '{keyword_type.value}'",
+                sample_seeds=seed_keywords[:5],
             )
-            logger.info("seed keywords generated: " + str(seed_keywords))
             return seed_keywords
 
         except Exception as e:
@@ -157,11 +157,34 @@ class GoogleKeywordService:
                 "login-customer-id": login_customer_id,
             }
 
+            total_chunks = (
+                (len(seed_keywords) + chunk_size - 1) // chunk_size
+                if seed_keywords
+                else 0
+            )
+            logger.info(
+                "Starting Google Ads keyword planner fetch",
+                customer_id=customer_id,
+                login_customer_id=login_customer_id,
+                endpoint=endpoint,
+                total_seeds=len(seed_keywords),
+                total_chunks=total_chunks,
+                location_ids=location_ids,
+                language_id=language_id,
+                url=url,
+            )
+
             async with httpx.AsyncClient(timeout=self.HTTP_TIMEOUT) as client:
                 for i in range(0, len(seed_keywords), chunk_size):
                     chunk = seed_keywords[i : i + chunk_size]
                     chunk_num = i // chunk_size + 1
-                    logger.info("Processing chunk %d (size=%d)", chunk_num, len(chunk))
+                    logger.info(
+                        "Processing keyword chunk",
+                        chunk=chunk_num,
+                        total_chunks=total_chunks,
+                        size=len(chunk),
+                        sample_seeds=chunk[:5],
+                    )
 
                     try:
                         payload = {
@@ -187,26 +210,56 @@ class GoogleKeywordService:
                                     endpoint, headers=headers, json=payload
                                 )
                                 if response.status_code == 200:
+                                    logger.info(
+                                        "Google Ads API chunk request succeeded",
+                                        chunk=chunk_num,
+                                        attempt=attempt + 1,
+                                    )
                                     break
                                 logger.warning(
-                                    f"API error attempt {attempt + 1}: {response.status_code}"
+                                    f"API error attempt {attempt + 1}: {response.status_code} - {response.text}",
+                                    status_code=response.status_code,
+                                    attempt=attempt + 1,
+                                    chunk=chunk_num,
+                                    endpoint=endpoint,
+                                    customer_id=customer_id,
+                                    login_customer_id=login_customer_id,
+                                    response_body=response.text,
+                                    payload=payload,
                                 )
                                 await asyncio.sleep(self.RETRY_DELAY)
                             except httpx.RequestError as ex:
                                 logger.warning(
-                                    f"Request error attempt {attempt + 1}: {str(ex)[:100]}"
+                                    f"Request error attempt {attempt + 1}: {str(ex)[:100]}",
+                                    attempt=attempt + 1,
+                                    chunk=chunk_num,
+                                    endpoint=endpoint,
+                                    customer_id=customer_id,
+                                    login_customer_id=login_customer_id,
+                                    error=str(ex),
+                                    payload=payload,
                                 )
                                 await asyncio.sleep(self.RETRY_DELAY)
 
                         if not response or response.status_code != 200:
-                            logger.warning(
-                                f"Skipping chunk {chunk_num} due to invalid response"
+                            logger.error(
+                                f"Skipping chunk {chunk_num} due to invalid response",
+                                chunk=chunk_num,
+                                status_code=response.status_code if response else None,
+                                response_body=response.text if response else None,
+                                endpoint=endpoint,
+                                customer_id=customer_id,
+                                login_customer_id=login_customer_id,
+                                payload=payload,
                             )
                             continue
 
                         results = response.json().get("results", [])
                         if not results:
-                            logger.info(f"No results in chunk {chunk_num}")
+                            logger.info(
+                                f"No results in chunk {chunk_num}",
+                                chunk=chunk_num,
+                            )
                             continue
 
                         for kw_idea in results:
@@ -446,6 +499,7 @@ class GoogleKeywordService:
 
         # validate the session
         if session_id not in sessions:
+            logger.error("Session not found", session_id=session_id)
             raise HTTPException(status_code=404, detail="Invalid or expired session.")
 
         session = sessions[session_id]
@@ -457,9 +511,27 @@ class GoogleKeywordService:
             campaign_data, keyword_request.location_ids
         )
 
+        logger.info(
+            "Resolved session parameters for positive strategy",
+            session_id=session_id,
+            login_customer_id=login_customer_id,
+            customer_id=customer_id,
+            location_ids=location_ids,
+            data_object_id=keyword_request.data_object_id,
+            keyword_type=keyword_type.value,
+        )
+
         if not login_customer_id:
+            logger.error("loginCustomerId not found in session", session_id=session_id)
             raise HTTPException(
                 status_code=401, detail="loginCustomerId not found in session."
+            )
+
+        if not customer_id:
+            logger.warning(
+                "customerId not found in session; Google Ads planner call may fail if required",
+                session_id=session_id,
+                login_customer_id=login_customer_id,
             )
 
         # get business details
@@ -473,10 +545,17 @@ class GoogleKeywordService:
         scraped_data = business_data.get("finalSummary", "")
         url = business_data.get("businessUrl", "")
 
+        logger.info(
+            "Fetched business details for keyword research",
+            data_object_id=keyword_request.data_object_id,
+            url=url
+        )
+
         # validate we got data
         if not scraped_data:
             logger.error(
-                f"No scraped data found for data_object_id: {keyword_request.data_object_id}"
+                f"No scraped data found for data_object_id: {keyword_request.data_object_id}",
+                data_object_id=keyword_request.data_object_id,
             )
             return KeywordResearchResult(
                 positive_keywords=[], brand_info=BusinessMetadata(), unique_features=[]
@@ -545,7 +624,11 @@ class GoogleKeywordService:
             logger.info("STEP 4: Final optimization for buying intent and match types")
 
             all_suggestions.sort(key=lambda x: x.volume, reverse=True)
-            logger.info("sorted suggestions from google ads api: %s", all_suggestions)
+        
+            logger.info(
+                "Sorted suggestions preview",
+                total_suggestions=len(all_suggestions)
+            )
 
             optimized_positive = await self.select_positive_keywords(
                 all_suggestions,
