@@ -52,10 +52,7 @@ class GoogleKeywordPlannerAdapter:
             else 0
         )
         logger.info(
-            "keyword_planner_start",
-            customer_id=customer_id,
-            login_customer_id=login_customer_id,
-            endpoint=endpoint,
+            "Starting Google Ads keyword planner fetch",
             total_seeds=len(seed_keywords),
             total_chunks=total_chunks,
             location_ids=location_ids,
@@ -71,14 +68,11 @@ class GoogleKeywordPlannerAdapter:
 
             payload = _build_payload(chunk, url, location_ids, language_id)
             logger.info(
-                "keyword_planner_chunk",
+                "Processing keyword chunk",
                 chunk=chunk_num,
                 total_chunks=total_chunks,
-                seeds=len(chunk),
-                customer_id=customer_id,
-                login_customer_id=login_customer_id,
-                endpoint=endpoint,
-                payload=payload,
+                size=len(chunk),
+                sample_seeds=chunk[:5],
             )
 
             try:
@@ -92,12 +86,8 @@ class GoogleKeywordPlannerAdapter:
                 )
             except Exception as e:
                 logger.error(
-                    "keyword_planner_chunk_failed",
+                    f"Keyword planner chunk {chunk_num} failed",
                     chunk=chunk_num,
-                    customer_id=customer_id,
-                    login_customer_id=login_customer_id,
-                    endpoint=endpoint,
-                    payload=payload,
                     error=str(e),
                 )
                 raise
@@ -111,7 +101,7 @@ class GoogleKeywordPlannerAdapter:
                 await asyncio.sleep(self.CHUNK_DELAY)
 
         results = sorted(seen.values(), key=lambda k: k["volume"], reverse=True)
-        logger.info("keyword_planner_done", total=len(results))
+        logger.info("Keyword planner fetch completed", total=len(results))
         return results
 
 

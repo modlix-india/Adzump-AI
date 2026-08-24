@@ -1,5 +1,6 @@
 import os
 from structlog import get_logger  # type: ignore
+from structlog.contextvars import bind_contextvars, unbind_contextvars
 import time
 import asyncio
 import json
@@ -164,9 +165,6 @@ class GoogleKeywordService:
             )
             logger.info(
                 "Starting Google Ads keyword planner fetch",
-                customer_id=customer_id,
-                login_customer_id=login_customer_id,
-                endpoint=endpoint,
                 total_seeds=len(seed_keywords),
                 total_chunks=total_chunks,
                 location_ids=location_ids,
@@ -218,12 +216,9 @@ class GoogleKeywordService:
                                     break
                                 logger.warning(
                                     f"API error attempt {attempt + 1}: {response.status_code} - {response.text}",
-                                    status_code=response.status_code,
                                     attempt=attempt + 1,
+                                    status_code=response.status_code,
                                     chunk=chunk_num,
-                                    endpoint=endpoint,
-                                    customer_id=customer_id,
-                                    login_customer_id=login_customer_id,
                                     response_body=response.text,
                                     payload=payload,
                                 )
@@ -233,9 +228,6 @@ class GoogleKeywordService:
                                     f"Request error attempt {attempt + 1}: {str(ex)[:100]}",
                                     attempt=attempt + 1,
                                     chunk=chunk_num,
-                                    endpoint=endpoint,
-                                    customer_id=customer_id,
-                                    login_customer_id=login_customer_id,
                                     error=str(ex),
                                     payload=payload,
                                 )
@@ -247,9 +239,6 @@ class GoogleKeywordService:
                                 chunk=chunk_num,
                                 status_code=response.status_code if response else None,
                                 response_body=response.text if response else None,
-                                endpoint=endpoint,
-                                customer_id=customer_id,
-                                login_customer_id=login_customer_id,
                                 payload=payload,
                             )
                             continue
@@ -499,7 +488,7 @@ class GoogleKeywordService:
 
         # validate the session
         if session_id not in sessions:
-            logger.error("Session not found", session_id=session_id)
+            logger.error("session_not_found", session_id=session_id)
             raise HTTPException(status_code=404, detail="Invalid or expired session.")
 
         session = sessions[session_id]
@@ -511,27 +500,28 @@ class GoogleKeywordService:
             campaign_data, keyword_request.location_ids
         )
 
-        logger.info(
-            "Resolved session parameters for positive strategy",
+        bind_contextvars(
             session_id=session_id,
-            login_customer_id=login_customer_id,
             customer_id=customer_id,
-            location_ids=location_ids,
+            login_customer_id=login_customer_id,
             data_object_id=keyword_request.data_object_id,
             keyword_type=keyword_type.value,
         )
 
+        logger.info(
+            "Resolved session parameters for positive strategy",
+            location_ids=location_ids,
+        )
+
         if not login_customer_id:
-            logger.error("loginCustomerId not found in session", session_id=session_id)
+            logger.error("loginCustomerId not found in session")
             raise HTTPException(
                 status_code=401, detail="loginCustomerId not found in session."
             )
 
         if not customer_id:
             logger.warning(
-                "customerId not found in session; Google Ads planner call may fail if required",
-                session_id=session_id,
-                login_customer_id=login_customer_id,
+                "customerId not found in session; Google Ads planner call may fail if required"
             )
 
         # get business details
@@ -547,8 +537,7 @@ class GoogleKeywordService:
 
         logger.info(
             "Fetched business details for keyword research",
-            data_object_id=keyword_request.data_object_id,
-            url=url
+            url=url,
         )
 
         # validate we got data
@@ -663,6 +652,14 @@ class GoogleKeywordService:
                 positive_keywords=[],
                 brand_info=brand_info,
                 unique_features=unique_features,
+            )
+        finally:
+            unbind_contextvars(
+                "session_id",
+                "customer_id",
+                "login_customer_id",
+                "data_object_id",
+                "keyword_type",
             )
 
     async def extract_negative_strategy(
