@@ -46,6 +46,20 @@ class GoogleKeywordPlannerAdapter:
             f"/customers/{customer_id}:generateKeywordIdeas"
         )
 
+        total_chunks = (
+            (len(seed_keywords) + self.CHUNK_SIZE - 1) // self.CHUNK_SIZE
+            if seed_keywords
+            else 0
+        )
+        logger.info(
+            "Starting Google Ads keyword planner fetch",
+            total_seeds=len(seed_keywords),
+            total_chunks=total_chunks,
+            location_ids=location_ids,
+            language_id=language_id,
+            url=url,
+        )
+
         seen: dict[str, dict] = {}
 
         for i in range(0, len(seed_keywords), self.CHUNK_SIZE):
@@ -53,16 +67,30 @@ class GoogleKeywordPlannerAdapter:
             chunk_num = i // self.CHUNK_SIZE + 1
 
             payload = _build_payload(chunk, url, location_ids, language_id)
-            logger.info("keyword_planner_chunk", chunk=chunk_num, seeds=len(chunk))
-
-            response = await http_request(
-                "POST",
-                endpoint,
-                headers=headers,
-                json=payload,
-                error_handler=_raise_google_error,
-                retry_delay_parser=_extract_retry_delay,
+            logger.info(
+                "Processing keyword chunk",
+                chunk=chunk_num,
+                total_chunks=total_chunks,
+                size=len(chunk),
+                sample_seeds=chunk[:5],
             )
+
+            try:
+                response = await http_request(
+                    "POST",
+                    endpoint,
+                    headers=headers,
+                    json=payload,
+                    error_handler=_raise_google_error,
+                    retry_delay_parser=_extract_retry_delay,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Keyword planner chunk {chunk_num} failed",
+                    chunk=chunk_num,
+                    error=str(e),
+                )
+                raise
 
             for idea in response.json().get("results", []):
                 parsed = _parse_keyword_idea(idea)
@@ -73,7 +101,7 @@ class GoogleKeywordPlannerAdapter:
                 await asyncio.sleep(self.CHUNK_DELAY)
 
         results = sorted(seen.values(), key=lambda k: k["volume"], reverse=True)
-        logger.info("keyword_planner_done", total=len(results))
+        logger.info("Keyword planner fetch completed", total=len(results))
         return results
 
 
